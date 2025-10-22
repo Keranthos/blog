@@ -1,0 +1,362 @@
+[33mcommit 155e8fd7808741738cca6ba79d8eff7aa1425562[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m
+Author: ShanJHS <1597807171@qq.com>
+Date:   Tue Feb 25 10:19:15 2025 +0800
+
+    Initial commit
+
+[1mdiff --git a/backend/attention.txt b/backend/attention.txt[m
+[1mnew file mode 100644[m
+[1mindex 0000000..bd3e25c[m
+[1m--- /dev/null[m
+[1m+++ b/backend/attention.txt[m
+[36m@@ -0,0 +1 @@[m
+[32m+[m[32mjwt的claims(payload)中要放上用户的id和level[m
+\ No newline at end of file[m
+[1mdiff --git a/backend/config/config.go b/backend/config/config.go[m
+[1mnew file mode 100644[m
+[1mindex 0000000..d81dc15[m
+[1m--- /dev/null[m
+[1m+++ b/backend/config/config.go[m
+[36m@@ -0,0 +1,88 @@[m
+[32m+[m[32mpackage config[m
+[32m+[m
+[32m+[m[32mimport ([m
+[32m+[m	[32m"fmt"[m
+[32m+[m	[32m"log"[m
+[32m+[m	[32m"github.com/spf13/viper"[m
+[32m+[m	[32m"gorm.io/driver/mysql"[m
+[32m+[m	[32m"gorm.io/gorm"[m
+[32m+[m	[32m"backend/models"[m
+[32m+[m[32m)[m
+[32m+[m
+[32m+[m[32mtype Config struct {[m
+[32m+[m	[32mApp struct {[m
+[32m+[m		[32mName string[m
+[32m+[m		[32mPort string[m
+[32m+[m	[32m}[m
+[32m+[m	[32mDatabase struct {[m
+[32m+[m		[32mHost     string[m
+[32m+[m		[32mPort     string[m
+[32m+[m		[32mUsername     string[m
+[32m+[m		[32mPassword string[m
+[32m+[m		[32mName     string[m
+[32m+[m	[32m}[m
+[32m+[m	[32mJwt struct {[m
+[32m+[m		[32mSecretKey string[m
+[32m+[m		[32mExpiration string[m
+[32m+[m	[32m}[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mvar AppConfig *Config//包级变量，初始时直接实例化（根据导出规则，首字母大写的包级变量可以直接在其他包中加上包名使用）[m
+[32m+[m[32mvar DB *gorm.DB//数据库连接的全局变量[m
+[32m+[m
+[32m+[m[32mfunc InitConfig() {//只有首字母大写的函数才能导出[m
+[32m+[m	[32mviper.SetConfigName("config")[m
+[32m+[m	[32mviper.AddConfigPath("./config")[m
+[32m+[m	[32mviper.SetConfigType("yaml")[m
+[32m+[m
+[32m+[m	[32mif err := viper.ReadInConfig(); err != nil {[m
+[32m+[m		[32mlog.Fatalf("Error reading config file: %v", err)//日志相关操作暂不熟悉，暂且这么写[m
+[32m+[m	[32m}[m
+[32m+[m
+[32m+[m	[32mAppConfig = &Config{}//appconfig不会是nil，可以填充数据[m
+[32m+[m	[32mif err:= viper.Unmarshal(AppConfig); err != nil {[m
+[32m+[m		[32mlog.Fatalf("Unable to decode into struct,%v",err)//日志相关操作暂不熟悉，暂且这么写[m
+[32m+[m	[32m}[m
+[32m+[m
+[32m+[m	[32mif AppConfig == nil {[m
+[32m+[m[32m        log.Fatalf("fuck!AppConfig is not initialized")[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m[41m [m
+[32m+[m
+[32m+[m[32mfunc InitDB() error {// 初始化全局连接池DB[m
+[32m+[m	[32mdsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",[m
+[32m+[m		[32mAppConfig.Database.Username,[m
+[32m+[m		[32mAppConfig.Database.Password,[m
+[32m+[m		[32mAppConfig.Database.Host,[m
+[32m+[m		[32mAppConfig.Database.Port,[m
+[32m+[m		[32mAppConfig.Database.Name,[m
+[32m+[m	[32m)[m
+[32m+[m
+[32m+[m	[32mvar err error;[m
+[32m+[m	[32mDB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})[m
+[32m+[m	[32mif err != nil {[m
+[32m+[m		[32mreturn fmt.Errorf("error connecting to database: %v", err)[m
+[32m+[m	[32m}[m
+[32m+[m
+[32m+[m	[32m// 自动迁移数据库模型[m
+[32m+[m[32m    if err := DB.AutoMigrate([m
+[32m+[m[32m        &models.BlogArticle{},[m
+[32m+[m[32m        &models.ResearchArticle{},[m
+[32m+[m[32m        &models.ProjectArticle{},[m
+[32m+[m[32m        &models.Comment{},[m
+[32m+[m[32m        &models.Media{},[m
+[32m+[m[32m        &models.Question{},[m
+[32m+[m[32m        &models.User{},[m
+[32m+[m[32m    ); err != nil {[m
+[32m+[m[32m        return fmt.Errorf("error migrating database: %v", err)[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    return nil[m[41m	[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunc GetJWT() (string, string) {[m
+[32m+[m	[32mif AppConfig == nil {[m
+[32m+[m[32m        log.Fatalf("shit!AppConfig is not initialized")[m
+[32m+[m[32m    }[m
+[32m+[m	[32mreturn AppConfig.Jwt.SecretKey, AppConfig.Jwt.Expiration;[m
+[32m+[m[32m}[m
+\ No newline at end of file[m
+[1mdiff --git a/backend/config/config.yml b/backend/config/config.yml[m
+[1mnew file mode 100644[m
+[1mindex 0000000..f68049e[m
+[1m--- /dev/null[m
+[1m+++ b/backend/config/config.yml[m
+[36m@@ -0,0 +1,14 @@[m
+[32m+[m[32mapp:[m
+[32m+[m[32m  name: "WWJ_Blog"[m
+[32m+[m[32m  port: "3000"[m[41m [m
+[32m+[m
+[32m+[m[32mdatabase:[m
+[32m+[m[32m  host: "localhost"[m
+[32m+[m[32m  port: "3306"[m
+[32m+[m[32m  username: "root"[m
+[32m+[m[32m  password: "Wan05609"[m
+[32m+[m[32m  name: "my_blog"[m
+[32m+[m
+[32m+[m[32mjwt:[m
+[32m+[m[32m  secretkey: "wwj_secret_key"[m
+[32m+[m[32m  expiration: 86400[m
+\ No newline at end of file[m
+[1mdiff --git a/backend/controllers/article_controller.go b/backend/controllers/article_controller.go[m
+[1mnew file mode 100644[m
+[1mindex 0000000..0a2bcf6[m
+[1m--- /dev/null[m
+[1m+++ b/backend/controllers/article_controller.go[m
+[36m@@ -0,0 +1,189 @@[m
+[32m+[m[32mpackage controllers[m
+[32m+[m
+[32m+[m[32mimport ([m
+[32m+[m[32m    "net/http"[m
+[32m+[m[32m    "strconv"[m
+[32m+[m[32m    "github.com/gin-gonic/gin"[m
+[32m+[m[32m    "backend/models"[m
+[32m+[m[32m    "backend/config"[m
+[32m+[m[32m)[m
+[32m+[m
+[32m+[m[32m// 获取文章列表[m
+[32m+[m[32mfunc GetArticles(c *gin.Context) {[m
+[32m+[m[32m    page, err := strconv.Atoi(c.Query("page"))[m
+[32m+[m[32m    if err != nil || page < 1 {[m
+[32m+[m[32m        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid page parameter"})[m
+[32m+[m[32m        return[m
+[32m+[m[32m    }[m
+[32m+[m[32m    limit, err := strconv.Atoi(c.Query("limit"))[m
+[32m+[m[32m    if err != nil || limit < 1 {[m
+[32m+[m[32m        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit parameter"})[m
+[32m+[m[32m        return[m
+[32m+[m[32m    }[m
+[32m+[m[32m    articleType := c.Query("type")[m
+[32m+[m[32m    var articles interface{}[m
+[32m+[m[32m    offset := (page - 1) * limit[m
+[32m+[m
+[32m+[m[32m    switch articleType {[m
+[32m+[m[32m    case "blog":[m
+[32m+[m[32m        var blogArticles []models.BlogArticle[m
+[32m+[m[32m        if err := config.DB.Select("id", "title", "tags", "image", "created_at").Order("created_at DESC").Offset(offset).Limit(limit).Find(&blogArticles).Error; err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get articles"})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m        articles = blogArticles[m
+[32m+[m[32m    case "research":[m
+[32m+[m[32m        var researchArticles []models.ResearchArticle[m
+[32m+[m[32m        if err := config.DB.Select("id", "title", "tags", "image", "created_at").Order("created_at DESC").Offset(offset).Limit(limit).Find(&researchArticles).Error; err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get articles"})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m        articles = researchArticles[m
+[32m+[m[32m    case "project":[m
+[32m+[m[32m        var projectArticles []models.ProjectArticle[m
+[32m+[m[32m        if err := config.DB.Select("id", "title", "tags", "image", "created_at").Order("created_at DESC").Offset(offset).Limit(limit).Find(&projectArticles).Error; err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get articles"})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m        articles = projectArticles[m
+[32m+[m[32m    default:[m
+[32m+[m[32m        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})[m
+[32m+[m[32m        return[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    c.JSON(http.StatusOK, gin.H{"data": articles})[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// 获取文章数量[m
+[32m+[m[32mfunc GetArticleCount(c *gin.Context) {[m
+[32m+[m[32m    articleType := c.Query("type")[m
+[32m+[m[32m    var count int64[m
+[32m+[m
+[32m+[m[32m    switch articleType {[m
+[32m+[m[32m    case "blog":[m
+[32m+[m[32m        if err := config.DB.Model(&models.BlogArticle{}).Count(&count).Error; err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get article count"})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m    case "research":[m
+[32m+[m[32m        if err := config.DB.Model(&models.ResearchArticle{}).Count(&count).Error; err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get article count"})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m    case "project":[m
+[32m+[m[32m        if err := config.DB.Model(&models.ProjectArticle{}).Count(&count).Error; err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get article count"})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m    default:[m
+[32m+[m[32m        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})[m
+[32m+[m[32m        return[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    c.JSON(http.StatusOK, gin.H{"num": count})[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// 获取文章详情[m
+[32m+[m[32mfunc GetArticleById(c *gin.Context) {[m
+[32m+[m[32m    id := c.Param("id")[m
+[32m+[m[32m    articleType := c.Query("type")[m
+[32m+[m[32m    var article interface{}[m
+[32m+[m
+[32m+[m[32m    switch articleType {[m
+[32m+[m[32m    case "blog":[m
+[32m+[m[32m        var blogArticle models.BlogArticle[m
+[32m+[m[32m        if err := config.DB.First(&blogArticle, id).Error; err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m        article = blogArticle[m
+[32m+[m[32m    case "research":[m
+[32m+[m[32m        var researchArticle models.ResearchArticle[m
+[32m+[m[32m        if err := config.DB.First(&researchArticle, id).Error; err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m        article = researchArticle[m
+[32m+[m[32m    case "project":[m
+[32m+[m[32m        var projectArticle models.ProjectArticle[m
+[32m+[m[32m        if err := config.DB.First(&projectArticle, id).Error; err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m        article = projectArticle[m
+[32m+[m[32m    default:[m
+[32m+[m[32m        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})[m
+[32m+[m[32m        return[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    c.JSON(http.StatusOK, gin.H{"data": article})[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// 创建文章[m
+[32m+[m[32mfunc CreateArticle(c *gin.Context) {[m
+[32m+[m[32m    var article interface{}[m
+[32m+[m[32m    articleType := c.Query("type")[m
+[32m+[m
+[32m+[m[32m    switch articleType {[m
+[32m+[m[32m    case "blog":[m
+[32m+[m[32m        var blogArticle models.BlogArticle[m
+[32m+[m[32m        if err := c.ShouldBindJSON(&blogArticle); err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m        article = blogArticle[m
+[32m+[m[32m    case "research":[m
+[32m+[m[32m        var researchArticle models.ResearchArticle[m
+[32m+[m[32m        if err := c.ShouldBindJSON(&researchArticle); err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m        article = researchArticle[m
+[32m+[m[32m    case "project":[m
+[32m+[m[32m        var projectArticle models.ProjectArticle[m
+[32m+[m[32m        if err := c.ShouldBindJSON(&projectArticle); err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m        article = projectArticle[m
+[32m+[m[32m    default:[m
+[32m+[m[32m        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})[m
+[32m+[m[32m        return[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if err := config.DB.Create(article).Error; err != nil {[m
+[32m+[m[32m        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create article"})[m
+[32m+[m[32m        return[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    c.JSON(http.StatusOK, gin.H{"message": "Article created"})[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// 删除文章[m
+[32m+[m[32mfunc DeleteArticle(c *gin.Context) {[m
+[32m+[m[32m    id := c.Param("id")[m
+[32m+[m[32m    articleType := c.Query("type")[m
+[32m+[m
+[32m+[m[32m    switch articleType {[m
+[32m+[m[32m    case "blog":[m
+[32m+[m[32m        if err := config.DB.Delete(&models.BlogArticle{}, id).Error; err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete article"})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m    case "research":[m
+[32m+[m[32m        if err := config.DB.Delete(&models.ResearchArticle{}, id).Error; err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete article"})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m    case "project":[m
+[32m+[m[32m        if err := config.DB.Delete(&models.ProjectArticle{}, id).Error; err != nil {[m
+[32m+[m[32m            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete article"})[m
+[32m+[m[32m            return[m
+[32m+[m[32m        }[m
+[32m+[m[32m    default:[m
+[32m+[m[32m        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})[m
+[32m+[m[32m        return[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    c.JSON(http.StatusOK, gin.H{"message": "Article deleted"})[m
+[32m+[m[32m}[m
+\ No newline at end of file[m
+[1mdiff --git a/backend/controllers/auth_controller.go b/backend/controllers/auth_controller.go[m
+[1mnew file mode 100644[m
+[1mindex 0000000..cb39b21[m
+[1m--- /dev/null[m
+[1m+++ b/backend/controllers/auth_controller.go[m
+[36m@@ -0,0 +1,150 @@[m
+[32m+[m[32mpackage controllers[m
+[32m+[m
+[32m+[m[32mimport ([m
+[32m+[m	[32m"backend/config"[m
+[32m+[m	[32m"backend/models"[m
+[32m+[m	[32m"backend/utils"[m
+[32m+[m	[32m"log"[m
+[32m+[m	[32m"net/http"[m
+[32m+[m
+[32m+[m	[32m"github.com/gin-gonic/gin"[m
+[32m+[m	[32m"golang.org/x/crypto/bcrypt"[m
+[32m+[m[32m)[m
+[32m+[m
+[32m+[m[32mfunc Register(c *gin.Context) {[m
+[32m+[m[32m    var user models.User[m
+[32m+[m[32m    if err := c.ShouldBindJSON(&user); err != nil {[m
+[32m+[m[32m        c.JSON(http.StatusBadRequest, gin.H{"error": "请求数据格式错误"})[m
+[32m+[m[32m        return[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if len(user.Username) > 12 {[m
+[32m+[m[32m        c.JSON(http.StatusBadRequest, gin.H{"error": "用户名最多12个字符"})[m
+[32m+[m[32m        return[m
+[32m+[m[32m    }[m
+[32m+[m[32m    if len(user.Password) < 6 {[m
+[32m+[m[32m        c.JSON(http.StatusBadRequest, gin.H{"error": "密码至少6位"})[m
+[32m+[m[32m        return[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    var e

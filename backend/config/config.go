@@ -1,12 +1,15 @@
 package config
 
 import (
+	"backend/models"
 	"fmt"
 	"log"
+	"time"
+
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"backend/models"
+	"gorm.io/gorm/logger"
 )
 
 type Config struct {
@@ -17,40 +20,40 @@ type Config struct {
 	Database struct {
 		Host     string
 		Port     string
-		Username     string
+		Username string
 		Password string
 		Name     string
 	}
 	Jwt struct {
-		SecretKey string
+		SecretKey  string
 		Expiration string
 	}
 }
 
-var AppConfig *Config//包级变量，初始时直接实例化（根据导出规则，首字母大写的包级变量可以直接在其他包中加上包名使用）
-var DB *gorm.DB//数据库连接的全局变量
+var AppConfig *Config //包级变量，初始时直接实例化（根据导出规则，首字母大写的包级变量可以直接在其他包中加上包名使用）
+var DB *gorm.DB       //数据库连接的全局变量
 
-func InitConfig() {//只有首字母大写的函数才能导出
+func InitConfig() { //只有首字母大写的函数才能导出
 	viper.SetConfigName("config")
 	viper.AddConfigPath("./config")
 	viper.SetConfigType("yaml")
 
 	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error reading config file: %v", err)//日志相关操作暂不熟悉，暂且这么写
+		log.Fatalf("Error reading config file: %v", err) //日志相关操作暂不熟悉，暂且这么写
 	}
 
-	AppConfig = &Config{}//appconfig不会是nil，可以填充数据
-	if err:= viper.Unmarshal(AppConfig); err != nil {
-		log.Fatalf("Unable to decode into struct,%v",err)//日志相关操作暂不熟悉，暂且这么写
+	AppConfig = &Config{} //appconfig不会是nil，可以填充数据
+	if err := viper.Unmarshal(AppConfig); err != nil {
+		log.Fatalf("Unable to decode into struct,%v", err) //日志相关操作暂不熟悉，暂且这么写
 	}
 
 	if AppConfig == nil {
-        log.Fatalf("fuck!AppConfig is not initialized")
-    }
-} 
+		log.Fatalf("fuck!AppConfig is not initialized")
+	}
+}
 
-func InitDB() error {// 初始化全局连接池DB
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+func InitDB() error { // 初始化全局连接池DB
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=5s",
 		AppConfig.Database.Username,
 		AppConfig.Database.Password,
 		AppConfig.Database.Host,
@@ -58,31 +61,50 @@ func InitDB() error {// 初始化全局连接池DB
 		AppConfig.Database.Name,
 	)
 
-	var err error;
-	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	var err error
+	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
+		// 关闭查询日志以提高性能（开发时可改为logger.Info）
+		Logger: logger.Default.LogMode(logger.Silent),
+		// 禁用外键约束检查以提高启动速度
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
 	if err != nil {
 		return fmt.Errorf("error connecting to database: %v", err)
 	}
 
-	// 自动迁移数据库模型
-    if err := DB.AutoMigrate(
-        &models.BlogArticle{},
-        &models.ResearchArticle{},
-        &models.ProjectArticle{},
-        &models.Comment{},
-        &models.Media{},
-        &models.Question{},
-        &models.User{},
-    ); err != nil {
-        return fmt.Errorf("error migrating database: %v", err)
-    }
+	// 获取底层sql.DB对象来配置连接池
+	sqlDB, err := DB.DB()
+	if err != nil {
+		return fmt.Errorf("error getting sql.DB: %v", err)
+	}
 
-    return nil	
+	// 优化连接池配置以提高启动速度
+	sqlDB.SetMaxIdleConns(5)                   // 减少最大空闲连接数
+	sqlDB.SetMaxOpenConns(20)                  // 减少最大打开连接数
+	sqlDB.SetConnMaxIdleTime(time.Minute * 30) // 减少连接最大空闲时间
+	sqlDB.SetConnMaxLifetime(time.Hour * 2)    // 减少连接最大生存时间
+
+	// 自动迁移数据库模型
+	if err := DB.AutoMigrate(
+		&models.BlogArticle{},
+		&models.ResearchArticle{},
+		&models.ProjectArticle{},
+		&models.Comment{},
+		&models.Media{},
+		&models.Question{},
+		&models.User{},
+		&models.Moment{},
+		&models.Weather{},
+	); err != nil {
+		return fmt.Errorf("error migrating database: %v", err)
+	}
+
+	return nil
 }
 
 func GetJWT() (string, string) {
 	if AppConfig == nil {
-        log.Fatalf("shit!AppConfig is not initialized")
-    }
-	return AppConfig.Jwt.SecretKey, AppConfig.Jwt.Expiration;
+		log.Fatalf("shit!AppConfig is not initialized")
+	}
+	return AppConfig.Jwt.SecretKey, AppConfig.Jwt.Expiration
 }

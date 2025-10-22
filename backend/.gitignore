@@ -1,0 +1,15 @@
+# 上传的文件
+uploads/
+
+# 配置文件（如果包含敏感信息）
+config/config.yml
+
+# 临时文件
+*.log
+*.tmp
+
+# 编译文件
+*.exe
+*.exe~
+main
+
