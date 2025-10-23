@@ -311,3 +311,76 @@ func getBingImage() (string, error) {
 
 	return "", fmt.Errorf("无法从Bing API获取图片URL")
 }
+
+// CustomImageUpload 自定义图片上传
+func CustomImageUpload(c *gin.Context) {
+	fmt.Printf("收到上传请求，Content-Type: %s\n", c.GetHeader("Content-Type"))
+	fmt.Printf("请求方法: %s\n", c.Request.Method)
+
+	// 获取上传的文件
+	file, header, err := c.Request.FormFile("image")
+	if err != nil {
+		fmt.Printf("获取文件失败: %v\n", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "无法获取上传文件",
+		})
+		return
+	}
+	defer file.Close()
+
+	// 检查文件类型
+	contentType := header.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "image/") {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "只支持图片文件",
+		})
+		return
+	}
+
+	// 检查文件大小 (限制为10MB)
+	if header.Size > 10*1024*1024 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "文件大小不能超过10MB",
+		})
+		return
+	}
+
+	// 创建上传目录
+	uploadDir := "uploads/custom-images"
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "创建上传目录失败",
+		})
+		return
+	}
+
+	// 生成唯一文件名
+	timestamp := time.Now().Unix()
+	fileName := fmt.Sprintf("%d_%s", timestamp, header.Filename)
+	filePath := filepath.Join(uploadDir, fileName)
+
+	// 保存文件
+	if err := c.SaveUploadedFile(header, filePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "保存文件失败",
+		})
+		return
+	}
+
+	// 返回文件URL（使用完整URL）
+	webPath := "/" + strings.ReplaceAll(filePath, "\\", "/")
+	fullURL := "http://localhost:3000" + webPath
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":  true,
+		"imageUrl": fullURL,
+		"fileName": header.Filename,
+		"fileSize": header.Size,
+		"message":  "上传成功",
+	})
+}

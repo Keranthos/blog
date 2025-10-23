@@ -77,9 +77,10 @@ func SetupRouter() *gin.Engine {
 		api.POST("/upload/image", middlewares.Auth(3), controllers.UploadImage) // 上传图片需要管理员权限
 
 		// 图片管理相关路由
-		api.GET("/images", middlewares.Auth(3), controllers.GetImages)             // 获取图片列表需要管理员权限
-		api.DELETE("/images", middlewares.Auth(3), controllers.DeleteImage)        // 删除图片需要管理员权限
-		api.POST("/random-image", middlewares.Auth(1), controllers.GetRandomImage) // 获取随机图片需要用户权限
+		api.GET("/images", middlewares.Auth(3), controllers.GetImages)                       // 获取图片列表需要管理员权限
+		api.DELETE("/images", middlewares.Auth(3), controllers.DeleteImage)                  // 删除图片需要管理员权限
+		api.POST("/random-image", middlewares.Auth(1), controllers.GetRandomImage)           // 获取随机图片需要用户权限
+		api.POST("/upload/custom-image", middlewares.Auth(1), controllers.CustomImageUpload) // 上传自定义图片需要用户权限
 
 		// RSS相关路由
 		api.GET("/rss", controllers.GenerateRSS)             // RSS订阅源
