@@ -31,8 +31,9 @@ func SetupRouter() *gin.Engine {
 	api := r.Group("/api")
 	{
 		// 公共路由，不需要验证
-		api.POST("/auth/login", controllers.Login)       // 登录
-		api.POST("/auth/register", controllers.Register) // 注册
+		api.POST("/auth/login", controllers.Login)           // 登录
+		api.POST("/auth/register", controllers.Register)     // 注册
+		api.GET("/image-apis", controllers.GetAvailableAPIs) // 获取可用的图片API列表（公开）
 
 		// 需要验证的路由
 		// 用户更新自己的信息，权限: 1 (普通用户及以上)
