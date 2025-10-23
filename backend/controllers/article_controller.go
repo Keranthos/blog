@@ -51,6 +51,13 @@ func GetArticles(c *gin.Context) {
 			return
 		}
 		articles = projectArticles
+	case "moment":
+		var momentArticles []models.Moment
+		if err := config.DB.Select("id", "title", "content", "tags", "image", "view_count", "created_at").Order("created_at DESC").Offset(offset).Limit(limit).Find(&momentArticles).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get articles"})
+			return
+		}
+		articles = momentArticles
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})
 		return
@@ -77,6 +84,11 @@ func GetArticleCount(c *gin.Context) {
 		}
 	case "project":
 		if err := config.DB.Model(&models.ProjectArticle{}).Count(&count).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get article count"})
+			return
+		}
+	case "moment":
+		if err := config.DB.Model(&models.Moment{}).Count(&count).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get article count"})
 			return
 		}
@@ -125,6 +137,16 @@ func GetArticleById(c *gin.Context) {
 		config.DB.Model(&projectArticle).Update("view_count", projectArticle.ViewCount+1)
 		projectArticle.ViewCount++
 		article = projectArticle
+	case "moment":
+		var momentArticle models.Moment
+		if err := config.DB.First(&momentArticle, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})
+			return
+		}
+		// 增加阅读量
+		config.DB.Model(&momentArticle).Update("view_count", momentArticle.ViewCount+1)
+		momentArticle.ViewCount++
+		article = momentArticle
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})
 		return
