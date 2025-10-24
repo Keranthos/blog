@@ -1,0 +1,44 @@
+{
+  "version": "Sample 1.0.0",
+  "model": "koharu.model3.json",
+  "textures": [
+    "texture_00.png"
+  ],
+  "physics": "koharu.physics3.json",
+  "pose": "koharu.pose3.json",
+  "expressions": [
+    {
+      "name": "f01",
+      "file": "expressions/f01.exp3.json"
+    },
+    {
+      "name": "f02", 
+      "file": "expressions/f02.exp3.json"
+    },
+    {
+      "name": "f03",
+      "file": "expressions/f03.exp3.json"
+    }
+  ],
+  "motions": {
+    "idle": [
+      {
+        "file": "motions/idle_01.motion3.json"
+      },
+      {
+        "file": "motions/idle_02.motion3.json"
+      }
+    ],
+    "tap_body": [
+      {
+        "file": "motions/tapBody_01.motion3.json"
+      }
+    ]
+  },
+  "hit_areas_custom": {
+    "head_x": [0, 68, 128, 128],
+    "head_y": [0, 101, 128, 128],
+    "body_x": [0, 18, 108, 108],
+    "body_y": [0, 108, 108, 108]
+  }
+}

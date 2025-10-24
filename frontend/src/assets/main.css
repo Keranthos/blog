@@ -1,0 +1,154 @@
+/* 导入现代字体 */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+
+/* 正确导入 LXGW WenKai Screen */
+@import url('https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.1.0/style.css');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* 设置 html 背景 */
+html {
+  position: relative;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  height: auto;
+  width: 100vw;
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-family: "LXGW WenKai Screen", "霞鹜文楷屏幕版", "KaiTi", "楷体", serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* body 继承 html 字体即可，无需重复声明 */
+body {
+  font-family: inherit; /* 继承 html 的字体设置 */
+}
+
+/* 强制全局字体应用 - 覆盖所有可能的样式 */
+* {
+  font-family: "LXGW WenKai Screen", "霞鹜文楷屏幕版", "KaiTi", "楷体", serif !important;
+}
+
+/* 针对Vue组件可能的样式覆盖 */
+.v-application, .v-application *,
+[class*="v-"], [class*="v-"] *,
+[class*="vue"], [class*="vue"] *,
+[class*="component"], [class*="component"] * {
+  font-family: "LXGW WenKai Screen", "霞鹜文楷屏幕版", "KaiTi", "楷体", serif !important;
+}
+
+*::before, 
+*::after {
+  box-sizing: inherit;
+}
+
+/* 使用现有的背景图片并添加模糊效果 */
+html::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('./background-image.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  filter: blur(6px);
+  z-index: -2;
+  height: 100%;
+  width: 100vw;
+}
+
+/* 添加白蒙蒙的叠加层效果 */
+html::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.5) 30%,
+    rgba(255, 255, 255, 0.5) 60%,
+    rgba(255, 255, 255, 0.5) 100%
+  );
+  z-index: -1;
+  height: 100%;
+  width: 100vw;
+}
+
+/* 页面内容层 */
+html>* {
+  position: relative;
+  z-index: 1;
+}
+
+/* === 全局隐藏所有滚动条 === */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+::-webkit-scrollbar {
+  width: 0px !important;
+  height: 0px !important;
+  background: transparent !important;
+  display: none !important;
+}
+
+/* 隐藏所有滚动条相关元素 */
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-thumb,
+::-webkit-scrollbar-corner,
+::-webkit-scrollbar-button,
+::-webkit-scrollbar-track-piece {
+  width: 0px !important;
+  height: 0px !important;
+  background: transparent !important;
+  display: none !important;
+}
+
+/* Firefox 全局隐藏 */
+html, body, * {
+  scrollbar-width: none !important;
+}
+
+/* 通用动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.6s ease-out;
+}
+
+/* 加载动画 */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
