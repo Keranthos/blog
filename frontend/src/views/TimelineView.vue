@@ -540,48 +540,136 @@ onMounted(() => {
   margin-top: 40px;
 }
 
+.timeline-tree::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse at center,
+    rgba(102, 126, 234, 0.05) 0%,
+    rgba(118, 75, 162, 0.03) 30%,
+    transparent 70%
+  );
+  transform: translateX(-50%);
+  z-index: 0;
+  pointer-events: none;
+}
+
 /* 主干 */
 .tree-trunk {
   position: absolute;
   left: 50%;
   top: 60px;
   bottom: 0;
-  width: 6px;
+  width: 8px;
   background: linear-gradient(to bottom,
-    rgba(255, 255, 255, 0.8) 0%,
-    rgba(102, 126, 234, 0.8) 20%,
-    rgba(118, 75, 162, 0.8) 50%,
-    rgba(102, 126, 234, 0.8) 80%,
-    rgba(255, 255, 255, 0.8) 100%
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(102, 126, 234, 0.9) 15%,
+    rgba(118, 75, 162, 0.9) 35%,
+    rgba(102, 126, 234, 0.9) 55%,
+    rgba(118, 75, 162, 0.9) 75%,
+    rgba(102, 126, 234, 0.9) 90%,
+    rgba(255, 255, 255, 0.9) 100%
   );
   transform: translateX(-50%);
   z-index: 1;
-  border-radius: 3px;
-  box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+  border-radius: 4px;
+  box-shadow:
+    0 0 30px rgba(102, 126, 234, 0.4),
+    0 0 60px rgba(118, 75, 162, 0.2),
+    inset 0 0 10px rgba(255, 255, 255, 0.3);
+  animation: trunkGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes trunkGlow {
+  0% {
+    box-shadow:
+      0 0 30px rgba(102, 126, 234, 0.4),
+      0 0 60px rgba(118, 75, 162, 0.2),
+      inset 0 0 10px rgba(255, 255, 255, 0.3);
+  }
+  100% {
+    box-shadow:
+      0 0 40px rgba(102, 126, 234, 0.6),
+      0 0 80px rgba(118, 75, 162, 0.4),
+      inset 0 0 15px rgba(255, 255, 255, 0.5);
+  }
 }
 
 .tree-trunk::before {
   content: '';
   position: absolute;
-  top: -25px;
-  left: -4px;
-  width: 14px;
-  height: 25px;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.9), rgba(102, 126, 234, 0.8));
-  border-radius: 7px 7px 0 0;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  top: -30px;
+  left: -6px;
+  width: 20px;
+  height: 30px;
+  background: linear-gradient(to bottom,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(102, 126, 234, 0.9) 30%,
+    rgba(118, 75, 162, 0.8) 70%,
+    rgba(102, 126, 234, 0.9) 100%
+  );
+  border-radius: 10px 10px 0 0;
+  box-shadow:
+    0 6px 20px rgba(102, 126, 234, 0.5),
+    0 0 40px rgba(118, 75, 162, 0.3),
+    inset 0 0 8px rgba(255, 255, 255, 0.4);
+  animation: trunkTopGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes trunkTopGlow {
+  0% {
+    box-shadow:
+      0 6px 20px rgba(102, 126, 234, 0.5),
+      0 0 40px rgba(118, 75, 162, 0.3),
+      inset 0 0 8px rgba(255, 255, 255, 0.4);
+  }
+  100% {
+    box-shadow:
+      0 8px 25px rgba(102, 126, 234, 0.7),
+      0 0 50px rgba(118, 75, 162, 0.5),
+      inset 0 0 12px rgba(255, 255, 255, 0.6);
+  }
 }
 
 .tree-trunk::after {
   content: '';
   position: absolute;
-  bottom: -25px;
-  left: -4px;
-  width: 14px;
-  height: 25px;
-  background: linear-gradient(to top, rgba(255, 255, 255, 0.9), rgba(118, 75, 162, 0.8));
-  border-radius: 0 0 7px 7px;
-  box-shadow: 0 -4px 15px rgba(118, 75, 162, 0.4);
+  bottom: -30px;
+  left: -6px;
+  width: 20px;
+  height: 30px;
+  background: linear-gradient(to top,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(118, 75, 162, 0.9) 30%,
+    rgba(102, 126, 234, 0.8) 70%,
+    rgba(118, 75, 162, 0.9) 100%
+  );
+  border-radius: 0 0 10px 10px;
+  box-shadow:
+    0 -6px 20px rgba(118, 75, 162, 0.5),
+    0 0 40px rgba(102, 126, 234, 0.3),
+    inset 0 0 8px rgba(255, 255, 255, 0.4);
+  animation: trunkBottomGlow 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes trunkBottomGlow {
+  0% {
+    box-shadow:
+      0 -6px 20px rgba(118, 75, 162, 0.5),
+      0 0 40px rgba(102, 126, 234, 0.3),
+      inset 0 0 8px rgba(255, 255, 255, 0.4);
+  }
+  100% {
+    box-shadow:
+      0 -8px 25px rgba(118, 75, 162, 0.7),
+      0 0 50px rgba(102, 126, 234, 0.5),
+      inset 0 0 12px rgba(255, 255, 255, 0.6);
+  }
 }
 
 /* 树枝区域 */
@@ -622,25 +710,70 @@ onMounted(() => {
 .left-branch::before {
   content: '';
   position: absolute;
-  left: calc(50% - 100px);
+  left: calc(50% - 120px);
   top: 50%;
-  width: 100px;
-  height: 2px;
-  background: linear-gradient(to left, #667eea, transparent);
+  width: 120px;
+  height: 3px;
+  background: linear-gradient(to left,
+    rgba(102, 126, 234, 0.8) 0%,
+    rgba(118, 75, 162, 0.6) 30%,
+    rgba(102, 126, 234, 0.4) 60%,
+    transparent 100%
+  );
   z-index: 1;
   transform: translateY(-50%);
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+  animation: branchGlow 4s ease-in-out infinite alternate;
+}
+
+@keyframes branchGlow {
+  0% {
+    box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+  }
 }
 
 .left-branch::after {
   content: '';
   position: absolute;
-  left: calc(50% - 100px);
+  left: calc(50% - 120px);
   top: 50%;
-  width: 2px;
-  height: 10px;
-  background: #667eea;
-  z-index: 1;
+  width: 8px;
+  height: 8px;
+  background: radial-gradient(circle,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(102, 126, 234, 0.9) 30%,
+    rgba(118, 75, 162, 0.8) 70%,
+    rgba(102, 126, 234, 1) 100%
+  );
+  z-index: 2;
   transform: translateY(-50%);
+  border-radius: 50%;
+  box-shadow:
+    0 0 15px rgba(102, 126, 234, 0.6),
+    0 0 30px rgba(118, 75, 162, 0.3),
+    inset 0 0 4px rgba(255, 255, 255, 0.8);
+  animation: connectionPulse 2s ease-in-out infinite alternate;
+}
+
+@keyframes connectionPulse {
+  0% {
+    transform: translateY(-50%) scale(1);
+    box-shadow:
+      0 0 15px rgba(102, 126, 234, 0.6),
+      0 0 30px rgba(118, 75, 162, 0.3),
+      inset 0 0 4px rgba(255, 255, 255, 0.8);
+  }
+  100% {
+    transform: translateY(-50%) scale(1.1);
+    box-shadow:
+      0 0 20px rgba(102, 126, 234, 0.8),
+      0 0 40px rgba(118, 75, 162, 0.5),
+      inset 0 0 6px rgba(255, 255, 255, 1);
+  }
 }
 
 /* 右分支 */
@@ -651,25 +784,44 @@ onMounted(() => {
 .right-branch::before {
   content: '';
   position: absolute;
-  right: calc(50% - 100px);
+  right: calc(50% - 120px);
   top: 50%;
-  width: 100px;
-  height: 2px;
-  background: linear-gradient(to right, #667eea, transparent);
+  width: 120px;
+  height: 3px;
+  background: linear-gradient(to right,
+    rgba(102, 126, 234, 0.8) 0%,
+    rgba(118, 75, 162, 0.6) 30%,
+    rgba(102, 126, 234, 0.4) 60%,
+    transparent 100%
+  );
   z-index: 1;
   transform: translateY(-50%);
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+  animation: branchGlow 4s ease-in-out infinite alternate;
 }
 
 .right-branch::after {
   content: '';
   position: absolute;
-  right: calc(50% - 100px);
+  right: calc(50% - 120px);
   top: 50%;
-  width: 2px;
-  height: 10px;
-  background: #667eea;
-  z-index: 1;
+  width: 8px;
+  height: 8px;
+  background: radial-gradient(circle,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(102, 126, 234, 0.9) 30%,
+    rgba(118, 75, 162, 0.8) 70%,
+    rgba(102, 126, 234, 1) 100%
+  );
+  z-index: 2;
   transform: translateY(-50%);
+  border-radius: 50%;
+  box-shadow:
+    0 0 15px rgba(102, 126, 234, 0.6),
+    0 0 30px rgba(118, 75, 162, 0.3),
+    inset 0 0 4px rgba(255, 255, 255, 0.8);
+  animation: connectionPulse 2s ease-in-out infinite alternate;
 }
 
 /* 月份标签 */
@@ -689,17 +841,34 @@ onMounted(() => {
 
 /* 文章卡片 */
 .article-card {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 20px;
-  padding: 20px;
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.9) 50%,
+    rgba(248, 250, 252, 0.95) 100%
+  );
+  border-radius: 24px;
+  padding: 24px;
   cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(15px);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.1),
+    0 4px 20px rgba(102, 126, 234, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
   position: relative;
-  max-width: 380px;
+  max-width: 400px;
   overflow: hidden;
+  animation: cardFloat 6s ease-in-out infinite;
+}
+
+@keyframes cardFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
 }
 
 .article-card::before {
@@ -732,9 +901,18 @@ onMounted(() => {
 }
 
 .article-card:hover {
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
-  background: rgba(255, 255, 255, 1);
+  transform: translateY(-12px) scale(1.03);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.15),
+    0 8px 30px rgba(102, 126, 234, 0.2),
+    0 4px 15px rgba(118, 75, 162, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(248, 250, 252, 1) 50%,
+    rgba(240, 242, 255, 1) 100%
+  );
+  animation: none;
 }
 
 .card-hover-effect {
@@ -807,9 +985,17 @@ onMounted(() => {
 
 /* 卡片标题 */
 .card-title {
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   font-weight: 700;
-  color: #2c3e50;
+  background: linear-gradient(135deg,
+    #2c3e50 0%,
+    #34495e 30%,
+    #667eea 60%,
+    #764ba2 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 12px;
   line-height: 1.4;
   display: -webkit-box;
@@ -819,6 +1005,19 @@ onMounted(() => {
   position: relative;
   z-index: 3;
   letter-spacing: 0.3px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.article-card:hover .card-title {
+  background: linear-gradient(135deg,
+    #667eea 0%,
+    #764ba2 50%,
+    #667eea 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* 卡片标签 */
