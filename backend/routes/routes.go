@@ -82,11 +82,6 @@ func SetupRouter() *gin.Engine {
 		api.POST("/random-image", middlewares.Auth(1), controllers.GetRandomImage)           // 获取随机图片需要用户权限
 		api.POST("/upload/custom-image", middlewares.Auth(1), controllers.CustomImageUpload) // 上传自定义图片需要用户权限
 
-		// RSS相关路由
-		api.GET("/rss", controllers.GenerateRSS)             // RSS订阅源
-		api.GET("/rss/stats", controllers.GetRSSStats)       // RSS统计信息
-		api.GET("/sitemap.xml", controllers.GenerateSitemap) // Sitemap
-
 		// 天气相关路由
 		api.GET("/weather", weatherController.GetCurrentWeather)                                    // 获取当前天气（公开）
 		api.POST("/weather/update-location", middlewares.Auth(3), weatherController.UpdateLocation) // 更新位置（需要管理员权限）
@@ -94,12 +89,6 @@ func SetupRouter() *gin.Engine {
 
 	// 静态文件服务（提供上传的图片访问）
 	r.Static("/uploads", "./uploads")
-
-	// RSS订阅源（直接访问）
-	r.GET("/rss", controllers.GenerateRSS)
-
-	// Sitemap（直接访问）
-	r.GET("/sitemap.xml", controllers.GenerateSitemap)
 
 	return r
 }
