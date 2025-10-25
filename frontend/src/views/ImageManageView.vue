@@ -222,13 +222,21 @@ onMounted(() => {
 <style scoped>
 .image-manage-view {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: transparent;
+  position: relative;
+  padding-top: 80px; /* 防止被导航栏遮挡 */
 }
 
 .manage-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  margin-top: 2rem;
 }
 
 .header {
@@ -237,28 +245,42 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 2rem;
   padding-bottom: 1rem;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid rgba(102, 126, 234, 0.2);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 15px;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
 }
 
 .header h1 {
   font-size: 2rem;
-  color: #333;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin: 0;
+  font-weight: 700;
 }
 
 .stats {
   display: flex;
   gap: 2rem;
   font-size: 0.9rem;
-  color: #666;
+  color: #667eea;
+  font-weight: 600;
 }
 
 .loading,
 .empty {
   text-align: center;
   padding: 4rem 2rem;
-  color: #999;
+  color: #667eea;
   font-size: 1.1rem;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 15px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  font-weight: 600;
 }
 
 .image-grid {
@@ -268,16 +290,19 @@ onMounted(() => {
 }
 
 .image-card {
-  background: white;
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 15px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(20px);
 }
 
 .image-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 60px rgba(102, 126, 234, 0.2);
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .image-preview {
@@ -339,21 +364,27 @@ onMounted(() => {
 }
 
 .btn-copy {
-  background: #4CAF50;
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
   color: white;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
 }
 
 .btn-copy:hover {
-  background: #45a049;
+  background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
 }
 
 .btn-delete {
-  background: #f44336;
+  background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
   color: white;
+  box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
 }
 
 .btn-delete:hover {
-  background: #da190b;
+  background: linear-gradient(135deg, #da190b 0%, #c62828 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(244, 67, 54, 0.4);
 }
 
 /* 预览弹窗 */
