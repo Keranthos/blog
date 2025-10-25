@@ -867,6 +867,21 @@ onMounted(() => {
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* 左右分支布局 */
+.left-branch .blog-card {
+  margin-right: auto;
+  margin-left: 0;
+  text-align: left;
+}
+
+.right-branch .blog-card {
+  margin-left: auto;
+  margin-right: 0;
+  text-align: right;
 }
 
 .blog-card:hover {
@@ -900,10 +915,18 @@ onMounted(() => {
   justify-content: space-between;
 }
 
+.right-branch .card-text {
+  text-align: right;
+}
+
 .card-header {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.right-branch .card-header {
+  justify-content: flex-end;
 }
 
 .card-icon {
@@ -941,6 +964,10 @@ onMounted(() => {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid rgba(102, 126, 234, 0.1);
+}
+
+.right-branch .card-meta {
+  flex-direction: row-reverse;
 }
 
 .card-date {
