@@ -75,30 +75,35 @@
               :class="index % 2 === 0 ? 'left-branch' : 'right-branch'"
             >
               <!-- 文章卡片 -->
-              <div
-                class="article-card"
+              <article
+                class="blog-card"
                 @click="goToArticle(article)"
               >
-                <div class="card-header">
-                  <div class="card-type">
-                    <font-awesome-icon :icon="getTypeIcon(article.type)" class="type-icon" />
+                <div class="card-content">
+                  <div class="card-text">
+                    <div class="card-header">
+                      <h4 class="card-title">
+                        <font-awesome-icon :icon="getTypeIcon(article.type)" class="card-icon" />
+                        {{ getArticleTitle(article) }}
+                      </h4>
+                    </div>
+                    <p class="card-excerpt">{{ getArticleExcerpt(article) || '记录成长路上的点点滴滴...' }}</p>
+                    <div class="card-meta">
+                      <div class="card-date">
+                        <i class="date-icon">🕐</i>
+                        <span>{{ formatDate(article.createdAt) }}</span>
+                      </div>
+                      <div class="card-views">
+                        <i class="view-icon">👁️</i>
+                        <span>{{ article.viewCount || 0 }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="article.image" class="card-thumbnail">
+                    <img :src="article.image" :alt="getArticleTitle(article)" />
                   </div>
                 </div>
-                <div class="card-title">{{ getArticleTitle(article) }}</div>
-                <div class="card-footer">
-                  <div class="card-date">{{ formatDate(article.createdAt) }}</div>
-                  <div class="card-views">
-                    <span class="view-icon">👁️</span>
-                    {{ article.viewCount || 0 }}
-                  </div>
-                </div>
-                <div class="card-hover-effect"></div>
-              </div>
-
-              <!-- 对称位置的图片 -->
-              <div v-if="article.image" class="article-image" :class="index % 2 === 0 ? 'right-image' : 'left-image'">
-                <img :src="article.image" :alt="getArticleTitle(article)" />
-              </div>
+              </article>
             </div>
           </div>
         </div>
@@ -181,6 +186,24 @@ const getArticleTitle = (article) => {
   }
 
   return '无标题'
+}
+
+// 获取文章摘要
+const getArticleExcerpt = (article) => {
+  if (article.content) {
+    // 移除markdown标记，获取纯文本
+    const plainText = article.content
+      .replace(/#{1,6}\s+/g, '') // 移除标题标记
+      .replace(/\*\*(.*?)\*\*/g, '$1') // 移除粗体标记
+      .replace(/\*(.*?)\*/g, '$1') // 移除斜体标记
+      .replace(/`(.*?)`/g, '$1') // 移除代码标记
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // 移除链接标记
+      .replace(/\n+/g, ' ') // 替换换行为空格
+      .trim()
+
+    return plainText.length > 100 ? plainText.substring(0, 100) + '...' : plainText
+  }
+  return ''
 }
 
 // 格式化日期
@@ -837,229 +860,176 @@ onMounted(() => {
   gap: 15px;
 }
 
-/* 文章卡片样式 - 恢复原来的样式 */
-.article-card {
-  background: linear-gradient(135deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(255, 255, 255, 0.9) 50%,
-    rgba(248, 250, 252, 0.95) 100%
-  );
-  border-radius: 24px;
-  padding: 24px;
+/* 博客卡片样式 - 与主页保持一致 */
+.blog-card {
+  background: transparent;
+  border-radius: 15px;
+  border: none;
+  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+  transition: all 0.3s ease;
   cursor: pointer;
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.1),
-    0 4px 20px rgba(102, 126, 234, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(20px);
   position: relative;
-  max-width: 400px;
   overflow: hidden;
-  animation: cardFloat 6s ease-in-out infinite;
+  max-width: 400px;
+  margin: 0 auto;
 }
 
-@keyframes cardFloat {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-2px);
-  }
-}
-
-.article-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg,
-    rgba(102, 126, 234, 0.05) 0%,
-    rgba(118, 75, 162, 0.05) 100%
-  );
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  z-index: 1;
-}
-
-.article-card:hover::before {
-  opacity: 1;
-}
-
-.left-branch .article-card {
+/* 左右分支布局 */
+.left-branch .blog-card {
   margin-right: auto;
   margin-left: 0;
   text-align: left;
 }
 
-.right-branch .article-card {
+.right-branch .blog-card {
   margin-left: auto;
   margin-right: 0;
   text-align: right;
 }
 
-.article-card:hover {
-  transform: translateY(-12px) scale(1.03);
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.15),
-    0 8px 30px rgba(102, 126, 234, 0.2),
-    0 4px 15px rgba(118, 75, 162, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  background: linear-gradient(135deg,
-    rgba(255, 255, 255, 0.98) 0%,
-    rgba(248, 250, 252, 0.95) 50%,
-    rgba(240, 245, 255, 0.98) 100%
-  );
+.blog-card:hover {
+  background: linear-gradient(135deg, rgba(248, 249, 255, 0.3) 0%, rgba(240, 242, 255, 0.3) 100%);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.15);
 }
 
-.article-card:hover .card-hover-effect {
-  opacity: 1;
+.card-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding: 20px;
+  min-height: 100px;
+  border-radius: 15px;
+  transition: all 0.3s ease;
 }
 
-/* 卡片头部 */
+/* 左分支：文字在左，图片在右 */
+.left-branch .card-content {
+  flex-direction: row;
+}
+
+/* 右分支：图片在左，文字在右 */
+.right-branch .card-content {
+  flex-direction: row-reverse;
+}
+
+.blog-card:hover .card-content {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.card-text {
+  flex: 0 0 65%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+  justify-content: space-between;
+}
+
+.right-branch .card-text {
+  text-align: right;
+}
+
 .card-header {
   display: flex;
-  justify-content: flex-start;
-  margin-bottom: 12px;
-  position: relative;
-  z-index: 3;
-}
-
-.card-type {
-  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-  border: 1px solid rgba(102, 126, 234, 0.2);
-  transition: all 0.3s ease;
-  flex-shrink: 0;
+  gap: 8px;
 }
 
-.card-type:hover {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
-  transform: scale(1.05);
+.right-branch .card-header {
+  justify-content: flex-end;
 }
 
-.type-icon {
-  font-size: 1.2rem;
+.card-icon {
+  font-size: 1rem;
+  margin-right: 8px;
   color: #667eea;
-  transition: all 0.3s ease;
-}
-
-.card-type:hover .type-icon {
-  color: #5a67d8;
-  transform: scale(1.1);
-}
-
-.card-date {
-  font-size: 0.8rem;
-  color: #666;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.view-icon {
-  font-size: 0.8rem;
-  margin-right: 4px;
-}
-
-.card-views {
-  font-size: 0.8rem;
-  color: #666;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  vertical-align: middle;
 }
 
 .card-title {
   font-size: 1.3rem;
   font-weight: 700;
-  background: linear-gradient(135deg,
-    #2c3e50 0%,
-    #34495e 30%,
-    #2c3e50 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #333;
   line-height: 1.4;
-  margin: 0 0 12px 0;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  position: relative;
-  z-index: 3;
+  margin: 0;
+  text-align: left;
 }
 
-.article-card:hover .card-title {
-  background: linear-gradient(135deg,
-    #667eea 0%,
-    #764ba2 50%,
-    #667eea 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  transform: translateY(-1px);
+.card-excerpt {
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-/* 卡片底部 */
-.card-footer {
+.card-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(106, 27, 154, 0.1);
-  position: relative;
-  z-index: 3;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(102, 126, 234, 0.1);
 }
 
-/* 对称位置的图片样式 */
-.article-image {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 180px;
+.right-branch .card-meta {
+  flex-direction: row-reverse;
+}
+
+.card-date {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.date-icon {
+  font-size: 0.8rem;
+}
+
+.card-views {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.view-icon {
+  font-size: 0.8rem;
+}
+
+/* 图片缩略图样式 */
+.card-thumbnail {
+  flex: 0 0 35%;
   height: 120px;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
   border: 2px solid rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-  z-index: 2;
-  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
 }
 
-.left-image {
-  right: -220px;
-}
-
-.right-image {
-  left: -220px;
-}
-
-.article-image:hover {
-  transform: translateY(-50%) scale(1.05);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
-}
-
-.article-image img {
+.card-thumbnail img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: transform 0.3s ease;
 }
 
-.article-image:hover img {
+.blog-card:hover .card-thumbnail img {
   transform: scale(1.05);
 }
 
