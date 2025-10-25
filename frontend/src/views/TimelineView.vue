@@ -621,75 +621,62 @@ onMounted(() => {
   }
 }
 
+/* 方案1: 简洁的圆点装饰 - 当前使用 */
 .tree-trunk::before {
   content: '';
   position: absolute;
-  top: -30px;
-  left: -6px;
-  width: 20px;
-  height: 30px;
-  background: linear-gradient(to bottom,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(102, 126, 234, 0.9) 30%,
-    rgba(118, 75, 162, 0.8) 70%,
-    rgba(102, 126, 234, 0.9) 100%
+  top: -15px;
+  left: -8px;
+  width: 24px;
+  height: 24px;
+  background: radial-gradient(circle,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(102, 126, 234, 0.8) 30%,
+    rgba(118, 75, 162, 0.6) 70%,
+    rgba(102, 126, 234, 0.4) 100%
   );
-  border-radius: 10px 10px 0 0;
-  box-shadow:
-    0 6px 20px rgba(102, 126, 234, 0.5),
-    0 0 40px rgba(118, 75, 162, 0.3),
-    inset 0 0 8px rgba(255, 255, 255, 0.4);
-  animation: trunkTopGlow 2s ease-in-out infinite alternate;
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
+  animation: topGlow 3s ease-in-out infinite alternate;
 }
 
-@keyframes trunkTopGlow {
+@keyframes topGlow {
   0% {
-    box-shadow:
-      0 6px 20px rgba(102, 126, 234, 0.5),
-      0 0 40px rgba(118, 75, 162, 0.3),
-      inset 0 0 8px rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
+    transform: scale(1);
   }
   100% {
-    box-shadow:
-      0 8px 25px rgba(102, 126, 234, 0.7),
-      0 0 50px rgba(118, 75, 162, 0.5),
-      inset 0 0 12px rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 30px rgba(102, 126, 234, 0.6);
+    transform: scale(1.1);
   }
 }
 
 .tree-trunk::after {
   content: '';
   position: absolute;
-  bottom: -30px;
-  left: -6px;
-  width: 20px;
-  height: 30px;
-  background: linear-gradient(to top,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(118, 75, 162, 0.9) 30%,
-    rgba(102, 126, 234, 0.8) 70%,
-    rgba(118, 75, 162, 0.9) 100%
+  bottom: -15px;
+  left: -8px;
+  width: 24px;
+  height: 24px;
+  background: radial-gradient(circle,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(118, 75, 162, 0.8) 30%,
+    rgba(102, 126, 234, 0.6) 70%,
+    rgba(118, 75, 162, 0.4) 100%
   );
-  border-radius: 0 0 10px 10px;
-  box-shadow:
-    0 -6px 20px rgba(118, 75, 162, 0.5),
-    0 0 40px rgba(102, 126, 234, 0.3),
-    inset 0 0 8px rgba(255, 255, 255, 0.4);
-  animation: trunkBottomGlow 2.5s ease-in-out infinite alternate;
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(118, 75, 162, 0.4);
+  animation: bottomGlow 3s ease-in-out infinite alternate;
 }
 
-@keyframes trunkBottomGlow {
+@keyframes bottomGlow {
   0% {
-    box-shadow:
-      0 -6px 20px rgba(118, 75, 162, 0.5),
-      0 0 40px rgba(102, 126, 234, 0.3),
-      inset 0 0 8px rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 20px rgba(118, 75, 162, 0.4);
+    transform: scale(1);
   }
   100% {
-    box-shadow:
-      0 -8px 25px rgba(118, 75, 162, 0.7),
-      0 0 50px rgba(102, 126, 234, 0.5),
-      inset 0 0 12px rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 30px rgba(118, 75, 162, 0.6);
+    transform: scale(1.1);
   }
 }
 
@@ -1385,6 +1372,119 @@ onMounted(() => {
 .timeline-year:last-child {
   margin-bottom: 0;
 }
+
+/* ========== 其他时间树设计方案 ========== */
+
+/* 方案2: 完全移除顶部和底部装饰 - 最简洁 */
+/*
+.tree-trunk::before,
+.tree-trunk::after {
+  display: none;
+}
+*/
+
+/* 方案3: 叶子形状装饰 */
+/*
+.tree-trunk::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: -10px;
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-bottom: 25px solid rgba(102, 126, 234, 0.8);
+  filter: drop-shadow(0 0 10px rgba(102, 126, 234, 0.4));
+  animation: leafSway 4s ease-in-out infinite alternate;
+}
+
+.tree-trunk::after {
+  content: '';
+  position: absolute;
+  bottom: -20px;
+  left: -10px;
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-top: 25px solid rgba(118, 75, 162, 0.8);
+  filter: drop-shadow(0 0 10px rgba(118, 75, 162, 0.4));
+  animation: leafSway 4s ease-in-out infinite alternate;
+}
+
+@keyframes leafSway {
+  0% { transform: rotate(-5deg); }
+  100% { transform: rotate(5deg); }
+}
+*/
+
+/* 方案4: 星星装饰 */
+/*
+.tree-trunk::before {
+  content: '⭐';
+  position: absolute;
+  top: -20px;
+  left: -12px;
+  font-size: 24px;
+  animation: starTwinkle 2s ease-in-out infinite alternate;
+}
+
+.tree-trunk::after {
+  content: '✨';
+  position: absolute;
+  bottom: -20px;
+  left: -12px;
+  font-size: 24px;
+  animation: starTwinkle 2s ease-in-out infinite alternate;
+}
+
+@keyframes starTwinkle {
+  0% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+  100% {
+    transform: scale(1.2) rotate(180deg);
+    filter: brightness(1.5);
+  }
+}
+*/
+
+/* 方案5: 渐变线条装饰 */
+/*
+.tree-trunk::before {
+  content: '';
+  position: absolute;
+  top: -25px;
+  left: -2px;
+  width: 4px;
+  height: 25px;
+  background: linear-gradient(to bottom,
+    rgba(102, 126, 234, 0.8) 0%,
+    rgba(118, 75, 162, 0.6) 50%,
+    transparent 100%
+  );
+  border-radius: 2px;
+  box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
+}
+
+.tree-trunk::after {
+  content: '';
+  position: absolute;
+  bottom: -25px;
+  left: -2px;
+  width: 4px;
+  height: 25px;
+  background: linear-gradient(to top,
+    rgba(118, 75, 162, 0.8) 0%,
+    rgba(102, 126, 234, 0.6) 50%,
+    transparent 100%
+  );
+  border-radius: 2px;
+  box-shadow: 0 0 15px rgba(118, 75, 162, 0.3);
+}
+*/
 
 .year-header {
   display: flex;
