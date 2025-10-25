@@ -41,7 +41,7 @@
         <!-- 主内容区域 -->
         <div class="main-content">
           <!-- 最新博客 -->
-          <div class="content-section" style="border: none !important; border-right: 2px solid rgba(102, 126, 234, 0.1) !important; border-top: none !important; border-bottom: none !important; border-left: none !important;">
+          <div class="content-section">
             <div class="section-header">
               <h3 class="section-title">
                 <span class="section-icon">📝</span>
@@ -88,7 +88,7 @@
           </div>
 
           <!-- 最新随笔 -->
-          <div class="content-section" style="border: none !important; border-right: 2px solid rgba(102, 126, 234, 0.1) !important; border-top: none !important; border-bottom: none !important; border-left: none !important;">
+          <div class="content-section">
             <div class="section-header">
               <h3 class="section-title">
                 <span class="section-icon">✍️</span>
@@ -135,7 +135,7 @@
           </div>
 
           <!-- 最新项目 -->
-          <div class="content-section" style="border: none !important; border-right: 2px solid rgba(102, 126, 234, 0.1) !important; border-top: none !important; border-bottom: none !important; border-left: none !important;">
+          <div class="content-section">
             <div class="section-header">
               <h3 class="section-title">
                 <span class="section-icon">💼</span>
@@ -713,42 +713,41 @@ onMounted(async () => {
   margin: 0 auto;
   display: grid;
   grid-template-columns: 2fr 1fr;
-  gap: 40px;
+  gap: 0;
   align-items: start;
+  position: relative;
+}
+
+/* 添加竖线分隔 */
+.main-layout::after {
+  content: '';
+  position: absolute;
+  left: calc(66.666% - 1px);
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+  z-index: 1;
 }
 
 .main-content {
   display: flex;
   flex-direction: column;
   gap: 30px;
+  padding-right: 20px;
+  position: relative;
+  z-index: 2;
 }
 
-/* 主内容区域样式 - 只显示右边边框，使用更高优先级 */
+/* 主内容区域样式 - 与背景融为一体，无边框 */
 .modern-content .main-content .content-section {
-  background: rgba(255, 255, 255, 0.25) !important;
-  backdrop-filter: blur(20px) !important;
-  border-radius: 15px !important;
-  padding: 25px !important;
-  /* 强制只显示右边边框 - 使用最高优先级 */
+  background: transparent !important;
+  backdrop-filter: none !important;
+  border-radius: 0 !important;
+  padding: 25px 0 !important;
   border: none !important;
-  border-right: 2px solid rgba(102, 126, 234, 0.1) !important;
-  border-top: none !important;
-  border-bottom: none !important;
-  border-left: none !important;
-  padding-right: 20px !important;
-  margin-right: 20px !important;
-  /* 确保所有框的高度一致 */
-  min-height: 200px !important;
-}
-
-.modern-content .main-content .content-section:last-child {
-  border-right: 2px solid rgba(102, 126, 234, 0.1) !important;
-  border: none !important;
-  border-top: none !important;
-  border-bottom: none !important;
-  border-left: none !important;
-  margin-right: 20px !important;
-  padding-right: 20px !important;
+  margin: 0 !important;
+  min-height: auto !important;
 }
 
 /* 区域标题样式 */
@@ -799,12 +798,11 @@ onMounted(async () => {
   margin-bottom: 40px;
 }
 
-/* 现代化卡片设计 - 与背景融为一体 */
+/* 现代化卡片设计 - 与背景融为一体，无边框 */
 .blog-card {
   background: transparent;
-  border-radius: 15px;
+  border-radius: 0;
   border: none;
-  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
   transition: all 0.3s ease;
   cursor: pointer;
   position: relative;
@@ -812,11 +810,8 @@ onMounted(async () => {
 }
 
 .blog-card:hover {
-  background: linear-gradient(135deg, rgba(248, 249, 255, 0.3) 0%, rgba(240, 242, 255, 0.3) 100%);
-  border: 1px solid rgba(102, 126, 234, 0.2);
-  border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+  background: linear-gradient(135deg, rgba(248, 249, 255, 0.1) 0%, rgba(240, 242, 255, 0.1) 100%);
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.15);
 }
 
 /* 卡片内容布局 - 左右分布，65%文字 + 35%图片 */
@@ -959,6 +954,9 @@ onMounted(async () => {
   gap: 25px;
   position: sticky;
   top: 100px;
+  padding-left: 20px;
+  position: relative;
+  z-index: 2;
 }
 
 .weather-card {
@@ -1133,12 +1131,12 @@ onMounted(async () => {
 }
 
 .sidebar-section {
-  background: rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(20px);
-  border-radius: 15px;
-  padding: 20px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  backdrop-filter: none;
+  border-radius: 0;
+  padding: 20px 0;
+  box-shadow: none;
+  border: none;
 }
 
 .section-title {

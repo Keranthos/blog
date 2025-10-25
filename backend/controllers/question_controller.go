@@ -44,6 +44,11 @@ func CreateQuestion(c *gin.Context) {
 		return
 	}
 
+	// 验证作者字段
+	if question.Author == "" {
+		question.Author = "匿名用户"
+	}
+
 	// 检查是否包含恶意内容
 	if utils.ContainsMaliciousContent(question.Content) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "问题内容包含不当信息"})

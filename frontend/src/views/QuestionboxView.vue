@@ -12,7 +12,7 @@
         <div v-for="question in paginatedQuestions" :key="question.ID" class="question-item">
           <div class="question">
             <p class="author">
-              {{ question.Author }}
+              {{ question.Author || '匿名用户' }}
             </p>
             <p class="question-content">{{ question.Content }}</p>
           </div>
@@ -25,6 +25,10 @@
               待回答
             </p>
             <div v-if="user.level >= 3&&!question.Answer" class="submit-question">
+              <div class="admin-answer-header">
+                <span class="admin-icon">👨‍💼</span>
+                <span class="admin-title">管理员回答</span>
+              </div>
               <textarea v-model="answers[question.ID]" placeholder="输入你的回答..."></textarea>
               <button @click="handleSubmitAnswer(question.ID)">提交回答</button>
             </div>
@@ -342,6 +346,42 @@ onMounted(() => {
   box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
 }
 
+/* 管理员回答区域 */
+.submit-question {
+  margin-top: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  border-radius: 16px;
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  transition: all 0.3s ease;
+}
+
+.submit-question:hover {
+  border-color: rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.12) 100%);
+}
+
+.admin-answer-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+  padding: 10px 15px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 12px;
+  border-left: 4px solid #667eea;
+}
+
+.admin-icon {
+  font-size: 1.2rem;
+}
+
+.admin-title {
+  font-weight: 600;
+  color: #667eea;
+  font-size: 1rem;
+}
+
 .submit-question textarea {
   width: 100%;
   padding: 15px;
@@ -351,6 +391,65 @@ onMounted(() => {
   resize: vertical;
   min-height: 100px;
   font-size: 1rem;
+  font-family: inherit;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.submit-question textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  background: white;
+}
+
+.submit-question button {
+  margin-top: 15px;
+  padding: 12px 30px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 25px;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.submit-question button::before {
+  content: '💬';
+  font-size: 1.1rem;
+}
+
+.submit-question button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.submit-question button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
+}
+
+.submit-question button:hover::after {
+  left: 100%;
+}
+
+.submit-question button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
 }
 
 .loading {
@@ -385,6 +484,26 @@ onMounted(() => {
   .ask-question {
     width: 95%;
     padding: 20px;
+  }
+
+  .submit-question {
+    padding: 15px;
+    margin-top: 15px;
+  }
+
+  .admin-answer-header {
+    padding: 8px 12px;
+    margin-bottom: 12px;
+  }
+
+  .admin-title {
+    font-size: 0.9rem;
+  }
+
+  .submit-question button {
+    width: 100%;
+    padding: 14px 20px;
+    font-size: 0.95rem;
   }
 }
 
