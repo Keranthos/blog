@@ -80,18 +80,11 @@
                 @click="goToArticle(article)"
               >
                 <div class="card-header">
-                  <div class="card-type">{{ getTypeName(article.type) }}</div>
+                  <div class="card-type">
+                    <font-awesome-icon :icon="getTypeIcon(article.type)" class="type-icon" />
+                  </div>
                 </div>
                 <div class="card-title">{{ getArticleTitle(article) }}</div>
-                <div v-if="article.tags && article.tags.length" class="card-tags">
-                  <span
-                    v-for="tag in article.tags.slice(0, 3)"
-                    :key="tag"
-                    class="card-tag"
-                  >
-                    {{ tag }}
-                  </span>
-                </div>
                 <div class="card-footer">
                   <div class="card-date">{{ formatDate(article.createdAt) }}</div>
                   <div class="card-views">
@@ -158,6 +151,17 @@ const getTypeName = (type) => {
     moment: '碎碎念'
   }
   return typeMap[type] || type
+}
+
+// 获取类型图标
+const getTypeIcon = (type) => {
+  const iconMap = {
+    blog: 'blog',
+    project: 'diagram-project',
+    research: 'flask',
+    moment: 'comment-dots'
+  }
+  return iconMap[type] || 'file'
 }
 
 // 获取文章标题，如果没有标题则使用内容的第一行
@@ -942,16 +946,32 @@ onMounted(() => {
 }
 
 .card-type {
-  font-size: 0.8rem;
-  color: #6a1b9a;
-  background: linear-gradient(135deg, rgba(106, 27, 154, 0.1) 0%, rgba(142, 45, 226, 0.1) 100%);
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  border: 1px solid rgba(106, 27, 154, 0.2);
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  transition: all 0.3s ease;
   flex-shrink: 0;
+}
+
+.card-type:hover {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+  transform: scale(1.05);
+}
+
+.type-icon {
+  font-size: 1.2rem;
+  color: #667eea;
+  transition: all 0.3s ease;
+}
+
+.card-type:hover .type-icon {
+  color: #5a67d8;
+  transform: scale(1.1);
 }
 
 .card-date {
@@ -1021,33 +1041,6 @@ onMounted(() => {
 }
 
 /* 卡片标签 */
-.card-tags {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  position: relative;
-  z-index: 3;
-}
-
-.right-branch .card-tags {
-  justify-content: flex-end;
-}
-
-.card-tag {
-  font-size: 0.75rem;
-  color: #6a1b9a;
-  background: linear-gradient(135deg, rgba(106, 27, 154, 0.1) 0%, rgba(142, 45, 226, 0.1) 100%);
-  padding: 4px 10px;
-  border-radius: 10px;
-  font-weight: 500;
-  border: 1px solid rgba(106, 27, 154, 0.15);
-  transition: all 0.3s ease;
-}
-
-.card-tag:hover {
-  background: linear-gradient(135deg, rgba(106, 27, 154, 0.2) 0%, rgba(142, 45, 226, 0.2) 100%);
-  transform: translateY(-1px);
-}
 
 /* 卡片底部 */
 .card-footer {
