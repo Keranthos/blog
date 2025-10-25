@@ -142,16 +142,6 @@ const totalArticles = computed(() => {
   return allArticlesSorted.value.length
 })
 
-// 获取类型名称
-const getTypeName = (type) => {
-  const typeMap = {
-    blog: '博客',
-    project: '项目',
-    research: '科研',
-    moment: '碎碎念'
-  }
-  return typeMap[type] || type
-}
 
 // 获取类型图标
 const getTypeIcon = (type) => {
