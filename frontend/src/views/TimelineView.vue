@@ -99,6 +99,9 @@
                       </div>
                     </div>
                   </div>
+                  <div v-if="article.image" class="card-thumbnail">
+                    <img :src="article.image" :alt="getArticleTitle(article)" />
+                  </div>
                 </div>
               </article>
             </div>
@@ -902,12 +905,22 @@ onMounted(() => {
   transition: all 0.3s ease;
 }
 
+/* 左分支：文字在左，图片在右 */
+.left-branch .card-content {
+  flex-direction: row;
+}
+
+/* 右分支：图片在左，文字在右 */
+.right-branch .card-content {
+  flex-direction: row-reverse;
+}
+
 .blog-card:hover .card-content {
   background: rgba(255, 255, 255, 0.05);
 }
 
 .card-text {
-  flex: 1;
+  flex: 0 0 65%;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -994,6 +1007,30 @@ onMounted(() => {
 
 .view-icon {
   font-size: 0.8rem;
+}
+
+/* 图片缩略图样式 */
+.card-thumbnail {
+  flex: 0 0 35%;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+}
+
+.card-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.blog-card:hover .card-thumbnail img {
+  transform: scale(1.05);
 }
 
 /* 旧的文章卡片样式 - 保留作为备用 */
