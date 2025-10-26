@@ -25,20 +25,20 @@
         </router-link>
 
         <!-- 媒体下拉菜单 -->
-        <div class="menu-item dropdown" @mouseenter="showDropdown" @mouseleave="hideDropdown">
+        <div class="menu-item dropdown" :class="{ active: isMediaActive }" @mouseenter="showDropdown" @mouseleave="hideDropdown">
           <font-awesome-icon icon="ellipsis" class="menu-icon" />
           <span class="menu-text">媒体</span>
           <transition name="dropdown-fade">
             <div v-if="dropdownVisible" class="dropdown-menu">
-              <router-link to="/fragments/books" class="dropdown-item">
+              <router-link to="/fragments/books" class="dropdown-item" active-class="active">
                 <font-awesome-icon icon="bars" />
                 <span>书单</span>
               </router-link>
-              <router-link to="/fragments/novels" class="dropdown-item">
+              <router-link to="/fragments/novels" class="dropdown-item" active-class="active">
                 <font-awesome-icon icon="bookmark" />
                 <span>小说</span>
               </router-link>
-              <router-link to="/fragments/movies" class="dropdown-item">
+              <router-link to="/fragments/movies" class="dropdown-item" active-class="active">
                 <font-awesome-icon icon="film" />
                 <span>电影</span>
               </router-link>
@@ -47,34 +47,38 @@
         </div>
 
         <!-- 其他下拉菜单 -->
-        <div class="menu-item dropdown" @mouseenter="showOtherDropdown" @mouseleave="hideOtherDropdown">
+        <div class="menu-item dropdown" :class="{ active: isOtherActive }" @mouseenter="showOtherDropdown" @mouseleave="hideOtherDropdown">
           <font-awesome-icon icon="bars" class="menu-icon" />
           <span class="menu-text">其他</span>
           <transition name="dropdown-fade">
             <div v-if="otherDropdownVisible" class="dropdown-menu">
-              <router-link to="/questionbox" class="dropdown-item">
+              <router-link to="/questionbox" class="dropdown-item" active-class="active">
                 <font-awesome-icon icon="question" />
                 <span>提问箱</span>
               </router-link>
-              <router-link to="/timeline" class="dropdown-item">
+              <router-link to="/timeline" class="dropdown-item" active-class="active">
                 <font-awesome-icon icon="clock" />
                 <span>时间树</span>
+              </router-link>
+              <router-link to="/presentation" class="dropdown-item" active-class="active">
+                <font-awesome-icon icon="presentation" />
+                <span>讲演</span>
               </router-link>
             </div>
           </transition>
         </div>
 
         <!-- 设置菜单（仅管理员可见） -->
-        <div v-if="userLevel >= 3" class="menu-item dropdown" @mouseenter="showSettingsDropdown" @mouseleave="hideSettingsDropdown">
+        <div v-if="userLevel >= 3" class="menu-item dropdown" :class="{ active: isSettingsActive }" @mouseenter="showSettingsDropdown" @mouseleave="hideSettingsDropdown">
           <font-awesome-icon icon="gear" class="menu-icon" />
           <span class="menu-text">设置</span>
           <transition name="dropdown-fade">
             <div v-if="settingsDropdownVisible" class="dropdown-menu">
-              <router-link to="/images" class="dropdown-item">
+              <router-link to="/images" class="dropdown-item" active-class="active">
                 <font-awesome-icon icon="images" />
                 <span>图片管理</span>
               </router-link>
-              <router-link to="/location-update" class="dropdown-item" @click="settingsDropdownVisible = false">
+              <router-link to="/location-update" class="dropdown-item" active-class="active" @click="settingsDropdownVisible = false">
                 <font-awesome-icon icon="location-dot" />
                 <span>更新位置</span>
               </router-link>
@@ -255,6 +259,22 @@ const userLevel = computed(() => {
   } else {
     return 0
   }
+})
+
+// 检查当前路由是否匹配下拉框中的路径
+const isMediaActive = computed(() => {
+  const mediaPaths = ['/fragments/books', '/fragments/novels', '/fragments/movies']
+  return mediaPaths.includes(route.path)
+})
+
+const isOtherActive = computed(() => {
+  const otherPaths = ['/questionbox', '/timeline', '/presentation']
+  return otherPaths.includes(route.path)
+})
+
+const isSettingsActive = computed(() => {
+  const settingsPaths = ['/images', '/location-update']
+  return settingsPaths.includes(route.path)
 })
 
 const showDropdown = () => {
@@ -540,6 +560,13 @@ watch(() => route.path, () => {
 .dropdown-item:hover {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
   color: #667eea;
+}
+
+.dropdown-item.active {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+  color: #667eea;
+  font-weight: 600;
+  border-left: 3px solid #667eea;
 }
 
 .dropdown-item svg {

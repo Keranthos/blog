@@ -60,6 +60,7 @@ const routes = [
   { path: '/profile', name: 'Profile', component: () => import('@/views/ProfileView.vue') },
   { path: '/images', name: 'ImageManage', component: () => import('@/views/ImageManageView.vue') },
   { path: '/timeline', name: 'Timeline', component: () => import('@/views/TimelineView.vue') },
+  { path: '/presentation', name: 'Presentation', component: () => import('@/views/PresentationView.vue') },
   { path: '/loading-test', name: 'LoadingTest', component: () => import('@/views/LoadingTestView.vue') },
   { path: '/error', name: 'Error', component: () => import('@/views/ErrorView.vue') },
   { path: '/:catchAll(.*)', name: 'NotFound', component: () => import('@/views/NotFoundView.vue') }

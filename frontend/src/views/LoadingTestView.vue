@@ -125,7 +125,7 @@ const simulateLoading = () => {
 
 .test-btn {
   padding: 15px 30px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.5);
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 25px;
   color: white;
@@ -137,14 +137,14 @@ const simulateLoading = () => {
 }
 
 .test-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.6);
   border-color: rgba(255, 255, 255, 0.5);
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
 }
 
 .test-info {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.5);
   border-radius: 15px;
   padding: 30px;
   backdrop-filter: blur(10px);
