@@ -95,6 +95,7 @@ func InitDB() error { // 初始化全局连接池DB
 		&models.User{},
 		&models.Moment{},
 		&models.Weather{},
+		&models.Presentation{},
 	); err != nil {
 		return fmt.Errorf("error migrating database: %v", err)
 	}

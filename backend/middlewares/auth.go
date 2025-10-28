@@ -92,6 +92,7 @@ func Auth(requiredLevel int) gin.HandlerFunc {
 
 		// 将用户信息存入 Context 供后续使用
 		c.Set("user", user)
+		c.Set("user_id", user.ID) // 添加user_id供其他控制器使用
 
 		// 继续请求处理
 		c.Next()

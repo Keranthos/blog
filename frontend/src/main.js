@@ -105,7 +105,10 @@ import {
   faTerminal,
   faDatabase,
   faServer,
-  faCloud
+  faCloud,
+  faChalkboard,
+  faCloudUploadAlt,
+  faFilePowerpoint
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
@@ -216,6 +219,9 @@ library.add(
   faDatabase,
   faServer,
   faCloud,
+  faChalkboard,
+  faCloudUploadAlt,
+  faFilePowerpoint,
   faGithub,
   faGitlab,
   faBitbucket,

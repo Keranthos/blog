@@ -12,15 +12,17 @@ import (
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
-	// 创建天气控制器实例
+	// 创建控制器实例
 	weatherController := controllers.NewWeatherController(config.DB)
+	presentationController := controllers.NewPresentationController(config.DB)
 
 	// 自定义 CORS 配置
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:3002"}, // 允许的前端地址
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Content-Type", "Authorization"}, // 允许的请求头，包括 Authorization
-		AllowCredentials: true,                                      // 允许携带凭证（如 cookies 或授权头）
+		AllowHeaders:     []string{"Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"}, // 允许的请求头
+		AllowCredentials: true,                                                                              // 允许携带凭证（如 cookies 或授权头）
+		MaxAge:           12 * 60 * 60,                                                                      // 预检请求缓存时间
 	}))
 
 	r.OPTIONS("/*path", func(c *gin.Context) {
@@ -85,6 +87,17 @@ func SetupRouter() *gin.Engine {
 		// 天气相关路由
 		api.GET("/weather", weatherController.GetCurrentWeather)                                    // 获取当前天气（公开）
 		api.POST("/weather/update-location", middlewares.Auth(3), weatherController.UpdateLocation) // 更新位置（需要管理员权限）
+
+		// 讲演相关路由
+		api.GET("/presentations", presentationController.GetPresentations)                                // 获取讲演列表（公开）
+		api.GET("/presentations/:id", presentationController.GetPresentation)                             // 获取讲演详情（公开）
+		api.GET("/presentations/:id/download", presentationController.ServePresentationFile)              // 下载讲演文件（公开）
+		api.GET("/presentations/:id/preview", presentationController.PreviewPresentationFile)             // 预览讲演文件（公开）
+		api.GET("/presentations/:id/info", presentationController.GetPresentationInfo)                    // 获取讲演文件信息（公开）
+		api.POST("/presentations/:id/verify-password", presentationController.VerifyPresentationPassword) // 验证讲演密码（公开）
+		api.POST("/presentations", middlewares.Auth(1), presentationController.CreatePresentation)        // 创建讲演需要用户权限
+		api.PUT("/presentations/:id", middlewares.Auth(1), presentationController.UpdatePresentation)     // 更新讲演需要用户权限
+		api.DELETE("/presentations/:id", middlewares.Auth(1), presentationController.DeletePresentation)  // 删除讲演需要用户权限
 	}
 
 	// 静态文件服务（提供上传的图片访问）

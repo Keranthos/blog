@@ -288,19 +288,40 @@ const switchTab = (tab) => {
   activeTab.value = tab
 }
 
-// 计算背景位置和宽度
+// 计算背景位置和宽度 - 动态计算
 const tabBackgroundTransform = computed(() => {
   if (activeTab.value === 'main') {
+    // 第一个标签：图标 + 文本 + 数字
+    const iconWidth = 20 // 📚 图标宽度
+    const textWidth = getTypeName(props.type).length * 16 // 根据字符数估算宽度
+    const countWidth = `(${getArticleCount()})`.length * 12 // 数字部分宽度
+    const padding = 32 // 左右padding
+    const gap = 12 // 元素间距
+    const totalWidth = iconWidth + textWidth + countWidth + padding + gap
+
     return {
       transform: 'translateX(0)',
-      width: '160px'
+      width: `${totalWidth}px`
     }
   } else {
-    // 对于第二个标签，需要计算第一个标签的宽度
-    // 由于标签宽度是自适应的，我们使用一个估算值
+    // 第二个标签：图标 + "所思所想"
+    const iconWidth = 20 // 🌟 图标宽度
+    const textWidth = '所思所想'.length * 16 // 4个字符
+    const padding = 32 // 左右padding
+    const gap = 6 // 元素间距
+    const totalWidth = iconWidth + textWidth + padding + gap
+
+    // 第一个标签的宽度
+    const firstIconWidth = 20
+    const firstTextWidth = getTypeName(props.type).length * 16
+    const firstCountWidth = `(${getArticleCount()})`.length * 12
+    const firstPadding = 32
+    const firstGap = 12
+    const firstTotalWidth = firstIconWidth + firstTextWidth + firstCountWidth + firstPadding + firstGap
+
     return {
-      transform: 'translateX(160px)',
-      width: '120px'
+      transform: `translateX(${firstTotalWidth}px)`,
+      width: `${totalWidth}px`
     }
   }
 })
@@ -332,17 +353,16 @@ watch(() => props.type, async () => {
 .header-section {
   position: relative;
   width: 100%;
-  margin-top: 80px;
+  margin-top: 40px;
   padding: 40px 350px;
   overflow: hidden;
 }
 
 .header-image {
   width: 100%;
-  height: 320px;
-  object-fit: cover;
+  height: auto;
+  object-fit: contain;
   border-radius: 8px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
   transition: transform 0.6s ease;
   position: relative;
   z-index: 1;

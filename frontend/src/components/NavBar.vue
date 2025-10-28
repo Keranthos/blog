@@ -61,7 +61,7 @@
                 <span>时间树</span>
               </router-link>
               <router-link to="/presentation" class="dropdown-item" active-class="active">
-                <font-awesome-icon icon="presentation" />
+                <font-awesome-icon icon="chalkboard" />
                 <span>讲演</span>
               </router-link>
             </div>
@@ -112,7 +112,7 @@
           <transition name="dropdown-fade">
             <div v-if="showCreateMenu" class="create-menu">
               <div class="menu-section">
-                <div class="menu-section-title">📝 写点什么</div>
+                <div class="menu-section-title">📝 文章</div>
                 <button class="create-item" @click="createContent('article', 'blog')">
                   <font-awesome-icon icon="blog" />
                   <span>博客</span>
@@ -136,6 +136,14 @@
                 <button class="create-item" @click="createContent('media', 'movies')">
                   <font-awesome-icon icon="film" />
                   <span>电影</span>
+                </button>
+              </div>
+              <div class="menu-divider"></div>
+              <div class="menu-section">
+                <div class="menu-section-title">📊 其他</div>
+                <button class="create-item" @click="createContent('presentation', 'ppt')">
+                  <font-awesome-icon icon="chalkboard" />
+                  <span>讲演</span>
                 </button>
               </div>
             </div>
@@ -230,6 +238,15 @@ const createContent = (contentType, subType) => {
       query: {
         contentType: 'media',
         mediaType: subType
+      }
+    })
+  } else if (contentType === 'presentation') {
+    // 创建讲演PPT，跳转到讲演编辑页面
+    router.push({
+      path: '/editpresentation',
+      query: {
+        contentType: 'presentation',
+        presentationType: subType
       }
     })
   }
@@ -530,31 +547,47 @@ watch(() => route.path, () => {
 
 .dropdown-menu {
   position: absolute;
-  top: calc(100% + 12px);
-  left: 50%;
-  transform: translateX(-50%);
-  min-width: 140px;
-  background: rgba(255, 255, 255, 0.98);
+  top: calc(100% + 16px);
+  left: 0;
+  min-width: 160px;
+  max-width: 200px;
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
-  border-radius: 8px;
-  padding: 8px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  padding: 4px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   z-index: 2000;
+}
+
+/* 添加箭头 - 位置偏右不在正中 */
+.dropdown-menu::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 15%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 -2px 4px rgba(0, 0, 0, 0.1));
 }
 
 .dropdown-item {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 10px 14px;
   color: #5a5a5a;
   text-decoration: none;
-  border-radius: 10px;
+  border-radius: 6px;
   font-size: 0.9rem;
   font-weight: 500;
   transition: all 0.2s ease;
   white-space: nowrap;
+  text-align: left;
 }
 
 .dropdown-item:hover {
@@ -574,19 +607,38 @@ watch(() => route.path, () => {
 }
 
 /* 下拉菜单过渡动画 */
-.dropdown-fade-enter-active,
+.dropdown-fade-enter-active {
+  transition: all 1.0s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
 .dropdown-fade-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 1, 1);
+  overflow: hidden;
 }
 
 .dropdown-fade-enter-from {
   opacity: 0;
-  transform: translateX(-50%) translateY(-10px);
+  max-height: 2px;
+  clip-path: inset(0 0 100% 0);
+}
+
+.dropdown-fade-enter-to {
+  max-height: 500px;
+  clip-path: inset(0);
+  opacity: 1;
+}
+
+.dropdown-fade-leave-from {
+  max-height: 500px;
+  clip-path: inset(0);
+  opacity: 1;
 }
 
 .dropdown-fade-leave-to {
   opacity: 0;
-  transform: translateX(-50%) translateY(-10px);
+  max-height: 2px;
+  clip-path: inset(0 0 100% 0);
 }
 
 /* 创建内容下拉菜单 */

@@ -50,7 +50,6 @@
                         :href="link.url"
                         :target="link.external ? '_blank' : '_self'"
                         class="project-link"
-                        :title="link.label"
                         @click.stop
                         @mouseenter="hideProjectImage"
                         @mouseleave="showProjectImage(project)"

@@ -909,8 +909,6 @@ const handleDeleteComment = async (commentId) => {
     // 显示看板娘消息（如果可用）
     if (window.showMessage) {
       window.showMessage('评论删除成功～', 3000, 9)
-    } else {
-      alert('删除成功！')
     }
   } catch (error) {
     console.error('删除评论失败:', error)
@@ -918,8 +916,6 @@ const handleDeleteComment = async (commentId) => {
     // 显示看板娘错误消息（如果可用）
     if (window.showMessage) {
       window.showMessage('(｡•́︿•̀｡)<br>删除失败了…请重试吧～', 5000, 10)
-    } else {
-      alert('删除失败，请重试')
     }
   }
 }

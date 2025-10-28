@@ -3,7 +3,7 @@
     <NavBar />
     <div class="header">
       <img
-        src="https://picsum.photos/id/1043/1920/1080"
+        :src="questionBoxBackground"
         alt="Background Image" class="header-image"
       />
     </div>
@@ -74,9 +74,12 @@ import { getQuestions } from '@/api/questionBox/browse'
 import { submitQuestion, submitAnswer } from '@/api/questionBox/edit'
 import { showErrorMessage } from '@/utils/waifuMessage'
 import NavBar from '@/components/NavBar'
+import questionBoxBackgroundImg from '@/assets/questionbox_background.jpg'
 
 const store = useStore()
 const user = store.state.user
+
+const questionBoxBackground = questionBoxBackgroundImg
 
 const questions = ref([])
 const newQuestion = ref('')
@@ -151,24 +154,23 @@ onMounted(() => {
 <style scoped>
 .question-box-view {
   min-height: 100vh;
-  padding-top: 100px;
+  padding-top: 40px;
   padding-bottom: 200px;
 }
 
 .header {
   position: relative;
   width: 100%;
+  padding: 40px 350px;
   margin-bottom: 60px;
   overflow: hidden;
 }
 
 .header-image {
-  width: 90%;
-  max-width: 1200px;
-  height: 350px;
-  object-fit: cover;
-  border-radius: 30px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
   display: block;
   margin: 0 auto;
 }

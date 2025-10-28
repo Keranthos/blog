@@ -2,7 +2,7 @@
   <div class="media-view">
     <NavBar />
     <div class="header">
-      <img src="@/assets/movies_background.webp" alt="Background Image" class="header-image" loading="lazy" />
+      <img :src="moviesBackground" alt="Background Image" class="header-image" loading="lazy" />
     </div>
     <div class="message1">
       <p>这是我的电影</p>
@@ -17,8 +17,11 @@
 import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { getMediaList } from '@/api/media/browse'
 import MediaCard from '@/components/MediaCard.vue'
+import moviesBackgroundImg from '@/assets/movies_background_new.jpg'
+
 const NavBar = defineAsyncComponent(() => import('@/components/NavBar.vue'))
 
+const moviesBackground = moviesBackgroundImg
 const mediaList = ref([])
 const currentPage = ref(1)
 const isLoading = ref(false)
@@ -65,24 +68,23 @@ onMounted(() => {
 <style scoped>
 .media-view {
   min-height: 100vh;
-  padding-top: 100px;
+  padding-top: 40px;
   padding-bottom: 80px;
 }
 
 .header {
   position: relative;
   width: 100%;
+  padding: 40px 350px;
   margin-bottom: 40px;
   overflow: hidden;
 }
 
 .header-image {
-  width: 90%;
-  max-width: 1200px;
-  height: 350px;
-  object-fit: cover;
-  border-radius: 30px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
   display: block;
   margin: 0 auto;
 }

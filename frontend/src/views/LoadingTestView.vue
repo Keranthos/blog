@@ -133,7 +133,8 @@ const simulateLoading = () => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .test-btn:hover {
@@ -147,7 +148,8 @@ const simulateLoading = () => {
   background: rgba(255, 255, 255, 0.5);
   border-radius: 15px;
   padding: 30px;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   text-align: left;
 }
