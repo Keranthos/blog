@@ -245,24 +245,97 @@ function loadWidget(config) {
 			else text = "🦉<br>哇！你是夜猫子吗？这么晚还不睡，明天起得来嘛？";
 		} else if (location.pathname.includes("/blog")) {
 			text = "来看博客啦！📝 主人写的文章都很用心呢～";
-		} else if (location.pathname.includes("/project")) {
-			text = "来看项目啦！🚀 这些都是主人的心血之作哦～";
-		} else if (location.pathname.includes("/research")) {
-			text = "科研日记！🔬 学术的世界也很有趣呢～";
 		} else if (location.pathname.includes("/moments")) {
 			text = "碎碎念～💭 主人的日常小心情都在这里啦！";
-		} else if (location.pathname.includes("/books")) {
+		} else if (location.pathname.includes("/fragments/books")) {
 			text = "书单推荐！📚 这些书都值得一读哦～";
-		} else if (location.pathname.includes("/novels")) {
+		} else if (location.pathname.includes("/fragments/novels")) {
 			text = "小说推荐！📖 主人的品味很不错呢～";
-		} else if (location.pathname.includes("/movies")) {
+		} else if (location.pathname.includes("/fragments/movies")) {
 			text = "电影推荐！🎬 一起来看好电影吧～";
 		} else if (location.pathname.includes("/questionbox")) {
 			text = "💌<br>悄悄话箱～有什么想问的吗？不要害羞哦！";
+		} else if (location.pathname.includes("/timeline")) {
+			text = "时间树来啦！⏰ 看看主人的成长轨迹～";
+		} else if (location.pathname.includes("/presentation")) {
+			text = "讲演展示！🎤 主人的演讲很精彩呢～";
+		} else if (location.pathname.includes("/profile")) {
+			text = "个人资料～👤 来看看主人的自我介绍吧！";
+		} else if (location.pathname.includes("/search")) {
+			text = "搜索功能！🔍 在找什么呢？让我帮你找找～";
 		} else {
 			text = "ヾ(◍°∇°◍)ﾉﾞ<br>欢迎来到主人的小站～";
 		}
 		showMessage(text, 7000, 8);
+	})();
+
+	// 监听路由变化，显示相应页面的欢迎消息
+	(function routeChangeListener() {
+		let currentPath = location.pathname;
+		
+		// 监听popstate事件（浏览器前进后退）
+		window.addEventListener('popstate', () => {
+			if (location.pathname !== currentPath) {
+				currentPath = location.pathname;
+				setTimeout(() => {
+					showPageWelcomeMessage();
+				}, 500); // 延迟500ms确保页面加载完成
+			}
+		});
+		
+		// 监听pushState和replaceState（程序化导航）
+		const originalPushState = history.pushState;
+		const originalReplaceState = history.replaceState;
+		
+		history.pushState = function(...args) {
+			originalPushState.apply(this, args);
+			if (location.pathname !== currentPath) {
+				currentPath = location.pathname;
+				setTimeout(() => {
+					showPageWelcomeMessage();
+				}, 500);
+			}
+		};
+		
+		history.replaceState = function(...args) {
+			originalReplaceState.apply(this, args);
+			if (location.pathname !== currentPath) {
+				currentPath = location.pathname;
+				setTimeout(() => {
+					showPageWelcomeMessage();
+				}, 500);
+			}
+		};
+		
+		function showPageWelcomeMessage() {
+			let text;
+			if (location.pathname === "/") {
+				text = "回到首页啦～欢迎回来！";
+			} else if (location.pathname.includes("/blog")) {
+				text = "来看博客啦！📝 主人写的文章都很用心呢～";
+			} else if (location.pathname.includes("/moments")) {
+				text = "碎碎念～💭 主人的日常小心情都在这里啦！";
+			} else if (location.pathname.includes("/fragments/books")) {
+				text = "书单推荐！📚 这些书都值得一读哦～";
+			} else if (location.pathname.includes("/fragments/novels")) {
+				text = "小说推荐！📖 主人的品味很不错呢～";
+			} else if (location.pathname.includes("/fragments/movies")) {
+				text = "电影推荐！🎬 一起来看好电影吧～";
+			} else if (location.pathname.includes("/questionbox")) {
+				text = "💌<br>悄悄话箱～有什么想问的吗？不要害羞哦！";
+			} else if (location.pathname.includes("/timeline")) {
+				text = "时间树来啦！⏰ 看看主人的成长轨迹～";
+			} else if (location.pathname.includes("/presentation")) {
+				text = "讲演展示！🎤 主人的演讲很精彩呢～";
+			} else if (location.pathname.includes("/profile")) {
+				text = "个人资料～👤 来看看主人的自我介绍吧！";
+			} else if (location.pathname.includes("/search")) {
+				text = "搜索功能！🔍 在找什么呢？让我帮你找找～";
+			} else {
+				text = "ヾ(◍°∇°◍)ﾉﾞ<br>欢迎来到主人的小站～";
+			}
+			showMessage(text, 5000, 7); // 优先级稍低，避免与初始欢迎消息冲突
+		}
 	})();
 
 	function showMessage(text, timeout, priority) {
