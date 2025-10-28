@@ -59,7 +59,14 @@ const errorMessages = {
 
   // 权限相关错误
   insufficient_permissions: '(｡•́︿•̀｡)<br>权限不够呢…联系管理员吧～',
-  resource_not_found: '(｡•́︿•̀｡)<br>找不到这个资源了呢…'
+  resource_not_found: '(｡•́︿•̀｡)<br>找不到这个资源了呢…',
+
+  // 界面相关错误
+  presentation_error: '(｡•́︿•̀｡)<br>讲演加载失败了呢…再试试看？',
+  media_error: '(｡•́︿•̀｡)<br>媒体内容加载失败…检查一下网络？',
+  comment_error: '(｡•́︿•̀｡)<br>评论提交失败…再试一次吧～',
+  timeline_error: '(｡•́︿•̀｡)<br>时间线加载失败了呢…',
+  search_error: '(｡•́︿•̀｡)<br>搜索功能出问题了…'
 }
 
 /**
@@ -75,7 +82,12 @@ const successMessages = {
   logout: '再见啦～记得常回来看看！',
   register: '注册成功！欢迎加入～',
   comment: '评论发表成功！主人会很开心的～',
-  copy: '复制成功！记得注明出处哦～'
+  copy: '复制成功！记得注明出处哦～',
+  presentation: '讲演内容加载成功！',
+  media: '媒体内容加载成功！',
+  search: '搜索完成！找到相关内容啦～',
+  timeline: '时间线加载成功！',
+  profile: '个人资料加载成功！'
 }
 
 /**
@@ -86,7 +98,10 @@ const warningMessages = {
   delete_confirm: '真的要删除吗？删了就找不回来了…',
   network_slow: '网络有点慢呢…请耐心等待～',
   file_too_large: '文件太大了！换个小一点的吧～',
-  invalid_file_type: '文件类型不对哦～'
+  invalid_file_type: '文件类型不对哦～',
+  empty_search: '搜索框是空的哦～输入点什么吧！',
+  long_content: '内容有点长呢…慢慢看哦～',
+  unsaved_changes: '还有内容没保存哦，确定要离开吗？'
 }
 
 /**
