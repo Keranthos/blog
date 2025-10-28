@@ -78,8 +78,8 @@ apiClient.interceptors.request.use(
 // 响应拦截器
 apiClient.interceptors.response.use(
   (response) => {
-    // 请求成功，显示成功消息
-    if (window.showMessage && response.data.message) {
+    // 请求成功，只对明确标记需要看板娘提示的响应才显示消息
+    if (window.showMessage && response.data.message && response.data.userToast === true) {
       window.showMessage(response.data.message, 3000, 8)
     }
     return response

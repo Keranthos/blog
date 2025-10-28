@@ -112,7 +112,10 @@ func DeleteImage(c *gin.Context) {
 		dir = filepath.Dir(dir)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Image deleted successfully"})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Image deleted successfully",
+		"userToast": true, // 需要看板娘提示
+	})
 }
 
 // RandomImageRequest 随机图片请求

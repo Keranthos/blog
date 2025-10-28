@@ -177,6 +177,7 @@ func (wc *WeatherController) UpdateLocation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "位置更新成功",
+		"userToast": true, // 需要看板娘提示
 	})
 }
 

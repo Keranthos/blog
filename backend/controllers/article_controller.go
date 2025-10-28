@@ -423,5 +423,6 @@ func GetTopArticles(c *gin.Context) {
 		"success": true,
 		"data":    topArticles,
 		"message": "Top articles retrieved successfully",
+		"userToast": false, // 不需要看板娘提示
 	})
 }
