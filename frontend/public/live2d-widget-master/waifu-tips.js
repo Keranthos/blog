@@ -247,11 +247,11 @@ function loadWidget(config) {
 			text = "来看博客啦！📝 主人写的文章都很用心呢～";
 		} else if (location.pathname.includes("/moments")) {
 			text = "碎碎念～💭 主人的日常小心情都在这里啦！";
-		} else if (location.pathname.includes("/fragments/books")) {
+		} else if (location.pathname === "/fragments/books") {
 			text = "书单推荐！📚 这些书都值得一读哦～";
-		} else if (location.pathname.includes("/fragments/novels")) {
+		} else if (location.pathname === "/fragments/novels") {
 			text = "小说推荐！📖 主人的品味很不错呢～";
-		} else if (location.pathname.includes("/fragments/movies")) {
+		} else if (location.pathname === "/fragments/movies") {
 			text = "电影推荐！🎬 一起来看好电影吧～";
 		} else if (location.pathname.includes("/questionbox")) {
 			text = "💌<br>悄悄话箱～有什么想问的吗？不要害羞哦！";
@@ -315,11 +315,11 @@ function loadWidget(config) {
 				text = "来看博客啦！📝 主人写的文章都很用心呢～";
 			} else if (location.pathname.includes("/moments")) {
 				text = "碎碎念～💭 主人的日常小心情都在这里啦！";
-			} else if (location.pathname.includes("/fragments/books")) {
+			} else if (location.pathname === "/fragments/books") {
 				text = "书单推荐！📚 这些书都值得一读哦～";
-			} else if (location.pathname.includes("/fragments/novels")) {
+			} else if (location.pathname === "/fragments/novels") {
 				text = "小说推荐！📖 主人的品味很不错呢～";
-			} else if (location.pathname.includes("/fragments/movies")) {
+			} else if (location.pathname === "/fragments/movies") {
 				text = "电影推荐！🎬 一起来看好电影吧～";
 			} else if (location.pathname.includes("/questionbox")) {
 				text = "💌<br>悄悄话箱～有什么想问的吗？不要害羞哦！";
@@ -334,7 +334,7 @@ function loadWidget(config) {
 			} else {
 				text = "ヾ(◍°∇°◍)ﾉﾞ<br>欢迎来到主人的小站～";
 			}
-			showMessage(text, 5000, 7); // 优先级稍低，避免与初始欢迎消息冲突
+			showMessage(text, 5000, 9); // 提高优先级到9，确保路由变化消息能显示
 		}
 	})();
 
