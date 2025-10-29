@@ -60,7 +60,7 @@ onUnmounted(() => {
 .back-to-top-container {
   position: fixed;
   bottom: 30px;
-  right: 30px;
+  left: 30px;
   z-index: 1000;
   display: flex;
   align-items: flex-end;
@@ -127,7 +127,7 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .back-to-top-container {
     bottom: 20px;
-    right: 20px;
+    left: 20px;
     gap: 10px;
   }
 
@@ -145,7 +145,7 @@ onUnmounted(() => {
 @media (max-width: 480px) {
   .back-to-top-container {
     bottom: 15px;
-    right: 15px;
+    left: 15px;
     gap: 8px;
   }
 

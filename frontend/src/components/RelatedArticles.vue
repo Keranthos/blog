@@ -107,6 +107,42 @@ const formatDate = (dateStr) => {
   return date.toLocaleDateString('zh-CN')
 }
 
+// 去除 Markdown 语法标记
+const stripMarkdown = (text) => {
+  if (!text) return ''
+
+  // 移除 Markdown 语法标记
+  return text
+    // 移除标题标记 (##, ###等)
+    .replace(/^#{1,6}\s+/gm, '')
+    // 移除粗体 (**text** 或 __text__)
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    // 移除斜体 (*text* 或 _text_)
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    // 移除删除线 (~~text~~)
+    .replace(/~~([^~]+)~~/g, '$1')
+    // 移除行内代码 (`code`)
+    .replace(/`([^`]+)`/g, '$1')
+    // 移除链接 [text](url) -> text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // 移除图片 ![alt](url) -> alt
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    // 移除引用 (> text)
+    .replace(/^>\s+/gm, '')
+    // 移除列表标记 (-, *, +, 数字.)
+    .replace(/^[\s]*[-*+]\s+/gm, '')
+    .replace(/^[\s]*\d+\.\s+/gm, '')
+    // 移除代码块标记 (```language 或 ```)
+    .replace(/```[\w]*\n[\s\S]*?```/g, '')
+    // 移除水平线 (---, ***)
+    .replace(/^[-*]{3,}$/gm, '')
+    // 移除多余的空行
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 // 计算文章相似度
 const calculateSimilarity = (article1, article2) => {
   let score = 0
@@ -171,30 +207,37 @@ const getRelatedArticles = async () => {
         let articles = []
         if (type === 'moment') {
           const response = await getMomentsList(1, 50)
-          articles = response.data.map(item => ({
-            id: item.ID,
-            type: 'moment',
-            title: item.Title,
-            content: item.Content,
-            image: item.Image,
-            tags: [],
-            time: item.CreatedAt,
-            viewCount: item.ViewCount || 0,
-            excerpt: item.Content ? item.Content.substring(0, 100) + '...' : ''
-          }))
+          articles = response.data.map(item => {
+            const cleanContent = stripMarkdown(item.Content || '')
+            return {
+              id: item.ID,
+              type: 'moment',
+              title: item.Title,
+              content: item.Content,
+              image: item.Image,
+              tags: [],
+              time: item.CreatedAt,
+              viewCount: item.ViewCount || 0,
+              excerpt: cleanContent ? cleanContent.substring(0, 100) + (cleanContent.length > 100 ? '...' : '') : ''
+            }
+          })
         } else {
           const response = await getArticlesList(type, 1, 50)
-          articles = response.data.map(item => ({
-            id: item.ID,
-            type,
-            title: item.title,
-            content: item.content || item.abstract || '',
-            image: item.image,
-            tags: item.tags || [],
-            time: item.CreatedAt,
-            viewCount: item.viewCount || 0,
-            excerpt: (item.content || item.abstract || '').substring(0, 100) + '...'
-          }))
+          articles = response.data.map(item => {
+            const rawContent = item.content || item.abstract || ''
+            const cleanContent = stripMarkdown(rawContent)
+            return {
+              id: item.ID,
+              type,
+              title: item.title,
+              content: rawContent,
+              image: item.image,
+              tags: item.tags || [],
+              time: item.CreatedAt,
+              viewCount: item.viewCount || 0,
+              excerpt: cleanContent ? cleanContent.substring(0, 100) + (cleanContent.length > 100 ? '...' : '') : ''
+            }
+          })
         }
 
         allArticles.push(...articles)

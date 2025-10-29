@@ -58,19 +58,20 @@ function loadWidget(config) {
 			"眼睛累了吗？看看远处吧～",
 			"今天过得开心吗？"
 		];
-	window.addEventListener("mousemove", () => userAction = true);
-	window.addEventListener("keydown", () => userAction = true);
-	setInterval(() => {
-		if (userAction) {
-			userAction = false;
-			clearInterval(userActionTimer);
-			userActionTimer = null;
-		} else if (!userActionTimer) {
-			userActionTimer = setInterval(() => {
-				showMessage(randomSelection(messageArray), 6000, 9);
-			}, 20000);
-		}
-	}, 1000);
+	// 禁用空闲消息显示
+	// window.addEventListener("mousemove", () => userAction = true);
+	// window.addEventListener("keydown", () => userAction = true);
+	// setInterval(() => {
+	// 	if (userAction) {
+	// 		userAction = false;
+	// 		clearInterval(userActionTimer);
+	// 		userActionTimer = null;
+	// 	} else if (!userActionTimer) {
+	// 		userActionTimer = setInterval(() => {
+	// 			showMessage(randomSelection(messageArray), 6000, 9);
+	// 		}, 20000);
+	// 	}
+	// }, 1000);
 
 	(function registerEventListener() {
 		// 等待DOM元素创建后再绑定事件
@@ -242,9 +243,9 @@ function loadWidget(config) {
 		window.addEventListener("copy", () => {
 			showMessage("你复制了什么？记得注明出处哦～", 6000, 9);
 		});
-		window.addEventListener("visibilitychange", () => {
-			if (!document.hidden) showMessage("(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧<br>哇，你终于回来了～好想你呀！", 6000, 9);
-		});
+		// window.addEventListener("visibilitychange", () => {
+		// 	if (!document.hidden) showMessage("(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧<br>哇，你终于回来了～好想你呀！", 6000, 9);
+		// });
 	})();
 
 	(function welcomeMessage() {
@@ -270,7 +271,7 @@ function loadWidget(config) {
 			const momentsMessages = [
 				"一些散落在过去时光中的故事与感想，好故事可是昂贵的，我的朋友",
 				"你说有没有可能，正在看这个网站的你，已经或将要为我带来某一篇随笔的些许想法呢？",
-				"文章只是一张地图，找到回忆还需要跋山涉水"
+				"文章只是一张地图，找到回忆还需要翻山越岭"
 			];
 			text = momentsMessages[Math.floor(Math.random() * momentsMessages.length)];
 		} else if (location.pathname === "/fragments/books") {
@@ -387,7 +388,7 @@ function loadWidget(config) {
 				const momentsMessages = [
 					"一些散落在过去时光中的故事与感想，好故事可是昂贵的，我的朋友",
 					"你说有没有可能，正在看这个网站的你，已经或将要为我带来某一篇随笔的些许想法呢？",
-					"文章只是一张地图，找到回忆还需要跋山涉水",
+					"文章只是一张地图，找到回忆还需要翻山越岭"
 				];
 				text = momentsMessages[Math.floor(Math.random() * momentsMessages.length)];
 			} else if (location.pathname === "/fragments/books") {
@@ -549,8 +550,10 @@ function loadWidget(config) {
 			const targetModel = nepgearLocalModels[textureIndex] || nepgearLocalModels[0];
 			const currentModelName = nepgearNames[textureIndex] || nepgearNames[0];
 
-			// 显示当前模型名称
-			showMessage(`${message || '欢迎来到我的小站～'}`, 4000, 10);
+			// 显示当前模型名称（如果提供了消息）
+			if (message !== null && message !== undefined) {
+				showMessage(`${message || '欢迎来到我的小站～'}`, 4000, 10);
+			}
 
 			// 构建模型URL
 			const modelUrl = `${targetModel}/index.json`;
@@ -586,8 +589,7 @@ function loadWidget(config) {
 			const nextTextureId = (currentTextureId + 1) % 3; // 0, 1, 2 循环
 
 			const textureNames = ["普通版", "特别版", "泳装版"];
-			showMessage(`✨<br>换上${textureNames[nextTextureId]}！`, 3000, 10);
-			loadModel(9, nextTextureId, "✨<br>我的新衣服好看吗？");
+			loadModel(9, nextTextureId, null);
 	}
 
 	async function loadOtherModel() {
@@ -641,7 +643,7 @@ function initWidget(config, apiPath) {
 		// 延迟加载模型，等待loadWidget完成
 		setTimeout(() => {
 			if (window.loadModel) {
-				window.loadModel(9, 0, "ヾ(◍°∇°◍)ﾉﾞ<br>欢迎来到我的小站～");
+				window.loadModel(9, 0, "ヾ(◍°∇°◍)ﾉﾞ<br>欢迎来到我的小窝～");
 			}
 		}, 1500);
 	}

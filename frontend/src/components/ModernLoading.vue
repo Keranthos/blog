@@ -107,11 +107,6 @@ onUnmounted(() => {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-image: url('@/assets/background-image.jpg');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -120,6 +115,7 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+/* 使用现有的背景图片并添加模糊效果 */
 .modern-loading-container::before {
   content: '';
   position: absolute;
@@ -127,16 +123,35 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
+  background-image: url('@/assets/background-image.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  filter: blur(6px);
+  z-index: -2;
+  height: 100%;
+  width: 100vw;
+}
+
+/* 添加白蒙蒙的叠加层效果 */
+.modern-loading-container::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: linear-gradient(
     to bottom,
-    rgba(255, 255, 255, 0.8) 0%,
+    rgba(255, 255, 255, 0.7) 0%,
     rgba(255, 255, 255, 0.6) 30%,
-    rgba(255, 255, 255, 0.4) 60%,
-    rgba(255, 255, 255, 0.2) 100%
+    rgba(255, 255, 255, 0.5) 60%,
+    rgba(255, 255, 255, 0.4) 100%
   );
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   z-index: -1;
+  height: 100vh;
+  width: 100vw;
 }
 
 /* 背景动画已移除，使用主页背景 */

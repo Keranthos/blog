@@ -28,6 +28,8 @@
         <div class="menu-item dropdown" :class="{ active: isMediaActive }" @mouseenter="showDropdown" @mouseleave="hideDropdown">
           <font-awesome-icon icon="ellipsis" class="menu-icon" />
           <span class="menu-text">媒体</span>
+          <!-- 箭头 - 独立于过渡动画，立即显示，指向"媒体"文本 -->
+          <div v-if="dropdownVisible" class="dropdown-menu-arrow media-arrow"></div>
           <transition name="dropdown-fade">
             <div v-if="dropdownVisible" class="dropdown-menu">
               <router-link to="/fragments/books" class="dropdown-item" active-class="active">
@@ -50,6 +52,8 @@
         <div class="menu-item dropdown" :class="{ active: isOtherActive }" @mouseenter="showOtherDropdown" @mouseleave="hideOtherDropdown">
           <font-awesome-icon icon="bars" class="menu-icon" />
           <span class="menu-text">其他</span>
+          <!-- 箭头 - 独立于过渡动画，立即显示，指向"其他"文本 -->
+          <div v-if="otherDropdownVisible" class="dropdown-menu-arrow other-arrow"></div>
           <transition name="dropdown-fade">
             <div v-if="otherDropdownVisible" class="dropdown-menu">
               <router-link to="/questionbox" class="dropdown-item" active-class="active">
@@ -72,6 +76,8 @@
         <div v-if="userLevel >= 3" class="menu-item dropdown" :class="{ active: isSettingsActive }" @mouseenter="showSettingsDropdown" @mouseleave="hideSettingsDropdown">
           <font-awesome-icon icon="gear" class="menu-icon" />
           <span class="menu-text">设置</span>
+          <!-- 箭头 - 独立于过渡动画，立即显示，指向"设置"文本 -->
+          <div v-if="settingsDropdownVisible" class="dropdown-menu-arrow settings-arrow"></div>
           <transition name="dropdown-fade">
             <div v-if="settingsDropdownVisible" class="dropdown-menu">
               <router-link to="/images" class="dropdown-item" active-class="active">
@@ -104,11 +110,14 @@
         </div>
 
         <!-- 创建内容下拉菜单 -->
-        <div v-if="userLevel >= 3" class="create-dropdown" @mouseenter="showCreateMenuHandler" @mouseleave="hideCreateMenu">
-          <button class="action-btn edit-btn" title="写点什么">
-            <font-awesome-icon icon="pen-to-square" />
-            <span>写点什么</span>
-          </button>
+        <div v-if="userLevel >= 3" class="create-dropdown menu-item dropdown" @mouseenter="showCreateMenuHandler" @mouseleave="hideCreateMenu">
+          <svg class="menu-icon write-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+          </svg>
+          <span class="menu-text">写点什么</span>
+          <!-- 箭头 - 独立于过渡动画，立即显示，指向"写点什么"文本 -->
+          <div v-if="showCreateMenu" class="create-menu-arrow"></div>
           <transition name="dropdown-fade">
             <div v-if="showCreateMenu" class="create-menu">
               <div class="menu-section">
@@ -150,6 +159,59 @@
           </transition>
         </div>
 
+        <!-- 评论下拉菜单 -->
+        <div class="comments-dropdown menu-item dropdown" @mouseenter="showCommentsMenu" @mouseleave="hideCommentsMenu">
+          <svg class="menu-icon comment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <line x1="8" y1="10" x2="8" y2="10.01" />
+            <line x1="12" y1="10" x2="12" y2="10.01" />
+            <line x1="16" y1="10" x2="16" y2="10.01" />
+          </svg>
+          <span class="menu-text">评论</span>
+          <!-- 箭头 - 独立于过渡动画，立即显示 -->
+          <div v-if="showCommentsDropdown" class="comments-menu-arrow"></div>
+          <transition name="dropdown-fade">
+            <div v-if="showCommentsDropdown" class="comments-menu-wrapper" @mouseenter="showCommentsMenu" @mouseleave="hideCommentsMenu">
+              <div class="comments-menu">
+                <div v-if="commentsLoading" class="comments-loading">
+                  <div class="spinner"></div>
+                  <span>加载中...</span>
+                </div>
+                <div v-else-if="recentComments.length === 0" class="comments-empty">
+                  <span>暂无评论</span>
+                </div>
+                <div v-else class="comments-list">
+                  <div
+                    v-for="comment in recentComments"
+                    :key="comment.ID"
+                    class="comment-item"
+                    @click="goToCommentArticle(comment)"
+                  >
+                    <div class="comment-bubble">
+                      <div class="comment-avatar-col">
+                        <div class="avatar-square">{{ (comment.username || 'U').charAt(0).toUpperCase() }}</div>
+                      </div>
+                      <div class="comment-content-col">
+                        <div class="comment-meta-row">
+                          <span class="comment-author">{{ comment.username || '匿名用户' }}</span>
+                          <span class="comment-time">{{ formatCommentTime(comment.CreatedAt) }}</span>
+                        </div>
+                        <div class="comment-article-row">
+                          <font-awesome-icon :icon="getArticleTypeIcon(comment.articleType)" class="article-type-icon" />
+                          <span class="article-title-text">
+                            {{ comment.articleTitle || '未知文章' }}
+                          </span>
+                        </div>
+                        <div class="comment-text">{{ stripMarkdown(comment.content || '') }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </transition>
+        </div>
+
         <!-- 用户头像 -->
         <div class="user-menu" @click="goToAuthUser">
           <div v-if="!user.isLogged" class="user-avatar login-prompt">
@@ -168,6 +230,7 @@
 import { computed, ref, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter, useRoute } from 'vue-router'
+import { getAllComments } from '@/api/Comments/browse'
 
 const store = useStore()
 const router = useRouter()
@@ -178,11 +241,15 @@ const dropdownVisible = ref(false)
 const otherDropdownVisible = ref(false)
 const settingsDropdownVisible = ref(false)
 const showCreateMenu = ref(false)
+const showCommentsDropdown = ref(false)
 const searchExpanded = ref(false)
 const searchQuery = ref('')
+const recentComments = ref([])
+const commentsLoading = ref(false)
 let timeout = null
 let otherTimeout = null
 let settingsTimeout = null
+let commentsTimeout = null
 
 const generateDefaultAvatar = (username) => {
   const canvas = document.createElement('canvas')
@@ -290,6 +357,7 @@ const showDropdown = () => {
   otherDropdownVisible.value = false
   settingsDropdownVisible.value = false
   showCreateMenu.value = false
+  showCommentsDropdown.value = false
   dropdownVisible.value = true
 }
 
@@ -305,6 +373,7 @@ const showOtherDropdown = () => {
   dropdownVisible.value = false
   showCreateMenu.value = false
   settingsDropdownVisible.value = false
+  showCommentsDropdown.value = false
   otherDropdownVisible.value = true
 }
 
@@ -320,6 +389,7 @@ const showSettingsDropdown = () => {
   dropdownVisible.value = false
   showCreateMenu.value = false
   otherDropdownVisible.value = false
+  showCommentsDropdown.value = false
   settingsDropdownVisible.value = true
 }
 
@@ -334,11 +404,124 @@ const showCreateMenuHandler = () => {
   dropdownVisible.value = false
   otherDropdownVisible.value = false
   settingsDropdownVisible.value = false
+  showCommentsDropdown.value = false
   showCreateMenu.value = true
 }
 
 const hideCreateMenu = () => {
   showCreateMenu.value = false
+}
+
+// 加载最近评论
+const loadRecentComments = async () => {
+  // 如果正在加载，不重复加载
+  if (commentsLoading.value) return
+
+  try {
+    commentsLoading.value = true
+    const res = await getAllComments()
+    console.log('获取到的评论响应:', res)
+    // 后端返回格式为 {data: [...]}，getAllComments 已经返回了 res.data，所以需要再取 .data
+    const data = res?.data || []
+    console.log('获取到的评论数据:', data)
+    // 只取最近的评论，最多显示10条
+    recentComments.value = (Array.isArray(data) ? data : []).slice(0, 10)
+    console.log('处理后的评论数据:', recentComments.value)
+  } catch (error) {
+    console.error('加载评论失败:', error)
+    recentComments.value = []
+  } finally {
+    // 确保加载状态被重置
+    commentsLoading.value = false
+  }
+}
+
+// 显示评论菜单
+const showCommentsMenu = () => {
+  clearTimeout(commentsTimeout)
+  // 关闭其他下拉框
+  dropdownVisible.value = false
+  otherDropdownVisible.value = false
+  settingsDropdownVisible.value = false
+  showCreateMenu.value = false
+
+  // 先显示下拉框
+  showCommentsDropdown.value = true
+
+  // 只有在没有评论数据且不在加载中时才加载
+  if (recentComments.value.length === 0 && !commentsLoading.value) {
+    loadRecentComments()
+  }
+}
+
+// 隐藏评论菜单
+const hideCommentsMenu = () => {
+  clearTimeout(commentsTimeout)
+  commentsTimeout = setTimeout(() => {
+    showCommentsDropdown.value = false
+    // 不清空评论数据，保留以便下次快速显示
+  }, 200)
+}
+
+// 格式化评论时间
+const formatCommentTime = (timestamp) => {
+  if (!timestamp) return '未知时间'
+  const date = new Date(timestamp)
+  const year = date.getFullYear()
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const day = date.getDate().toString().padStart(2, '0')
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}`
+}
+
+// 去除Markdown语法
+const stripMarkdown = (text) => {
+  if (!text) return ''
+  // 移除Markdown语法标记
+  return text
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // 链接
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1') // 图片
+    .replace(/#{1,6}\s+/g, '') // 标题
+    .replace(/\*\*([^*]+)\*\*/g, '$1') // 粗体
+    .replace(/\*([^*]+)\*/g, '$1') // 斜体
+    .replace(/`([^`]+)`/g, '$1') // 行内代码
+    .replace(/```[\s\S]*?```/g, '') // 代码块
+    .replace(/>\s+/g, '') // 引用
+    .replace(/^\s*[-*+]\s+/gm, '') // 列表
+    .replace(/^\s*\d+\.\s+/gm, '') // 有序列表
+    .trim()
+    .substring(0, 100) // 限制长度
+}
+
+// 获取文章类型图标
+const getArticleTypeIcon = (type) => {
+  const iconMap = {
+    blog: 'blog',
+    project: 'code',
+    research: 'flask',
+    moment: 'pen-to-square'
+  }
+  return iconMap[type] || 'file'
+}
+
+// 跳转到评论所属的文章
+const goToCommentArticle = (comment) => {
+  if (!comment.articleType || !comment.blogID) return
+
+  let path = '/'
+  if (comment.articleType === 'moment') {
+    path = `/moments/${comment.blogID}`
+  } else if (comment.articleType === 'blog') {
+    path = `/blog/${comment.blogID}`
+  } else if (comment.articleType === 'research') {
+    path = `/research/${comment.blogID}`
+  } else if (comment.articleType === 'project') {
+    path = `/project/${comment.blogID}`
+  }
+
+  router.push(path)
+  showCommentsDropdown.value = false
 }
 
 // 搜索功能
@@ -371,6 +554,7 @@ watch(() => route.path, () => {
   otherDropdownVisible.value = false
   settingsDropdownVisible.value = false
   showCreateMenu.value = false
+  showCommentsDropdown.value = false
   searchExpanded.value = false
 
   // 清理所有timeout
@@ -385,6 +569,10 @@ watch(() => route.path, () => {
   if (settingsTimeout) {
     clearTimeout(settingsTimeout)
     settingsTimeout = null
+  }
+  if (commentsTimeout) {
+    clearTimeout(commentsTimeout)
+    commentsTimeout = null
   }
 })
 
@@ -490,6 +678,14 @@ watch(() => route.path, () => {
   transition: all 0.3s ease;
 }
 
+/* 简洁图标样式 */
+.write-icon,
+.comment-icon {
+  width: 1.2rem;
+  height: 1.2rem;
+  stroke: currentColor;
+}
+
 .menu-text {
   font-size: 0.85rem;
   transition: all 0.3s ease;
@@ -549,19 +745,36 @@ watch(() => route.path, () => {
   z-index: 2000;
 }
 
-/* 添加箭头 - 位置偏右不在正中 */
-.dropdown-menu::before {
-  content: '';
+/* 下拉菜单箭头 - 独立于过渡动画，立即显示，指向菜单项文本 */
+.dropdown-menu-arrow {
   position: absolute;
-  top: -6px;
-  left: 15%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-bottom: 6px solid rgba(255, 255, 255, 0.95);
-  filter: drop-shadow(0 -2px 4px rgba(0, 0, 0, 0.1));
+  top: calc(100% + 10px);
+  width: 12px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom: none;
+  border-right: none;
+  transform: rotate(45deg);
+  transform-origin: center center;
+  z-index: 2001;
+  pointer-events: none;
+  box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 媒体箭头 - 指向"媒体"文本中心 */
+.media-arrow {
+  left: 35%;
+}
+
+/* 其他箭头 - 指向"其他"文本中心 */
+.other-arrow {
+  left: 35%;
+}
+
+/* 设置箭头 - 指向"设置"文本中心 */
+.settings-arrow {
+  left: 35%;
 }
 
 .dropdown-item {
@@ -596,39 +809,68 @@ watch(() => route.path, () => {
   font-size: 0.9rem;
 }
 
-/* 下拉菜单过渡动画 */
+/* 下拉菜单过渡动画 - 从扁平压缩逐渐撑开到正常高度 */
 .dropdown-fade-enter-active {
-  transition: all 1.0s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
   overflow: hidden;
 }
 
 .dropdown-fade-leave-active {
-  transition: all 0.2s cubic-bezier(0.4, 0, 1, 1);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 1, 1), opacity 0.15s ease;
   overflow: hidden;
 }
 
 .dropdown-fade-enter-from {
-  opacity: 0;
-  max-height: 2px;
-  clip-path: inset(0 0 100% 0);
+  opacity: 1;
+  transform: scaleY(0);
+  transform-origin: top center;
+  /* 初始状态：所有内容都被压缩成扁平（垂直方向缩放为0） */
 }
 
 .dropdown-fade-enter-to {
-  max-height: 500px;
-  clip-path: inset(0);
   opacity: 1;
+  transform: scaleY(1);
+  transform-origin: top center;
+  /* 最终状态：完全展开到正常高度 */
 }
 
 .dropdown-fade-leave-from {
-  max-height: 500px;
-  clip-path: inset(0);
   opacity: 1;
+  transform: scaleY(1);
+  transform-origin: top center;
 }
 
 .dropdown-fade-leave-to {
   opacity: 0;
-  max-height: 2px;
-  clip-path: inset(0 0 100% 0);
+  transform: scaleY(0);
+  transform-origin: top center;
+}
+
+/* 箭头在过渡动画中立即显示，不受 scaleY 影响 */
+.dropdown-fade-enter-from .comments-menu-arrow,
+.dropdown-fade-enter-active .comments-menu-arrow,
+.dropdown-fade-enter-to .comments-menu-arrow,
+.dropdown-fade-leave-from .comments-menu-arrow,
+.dropdown-fade-leave-active .comments-menu-arrow,
+.dropdown-fade-leave-to .comments-menu-arrow {
+  opacity: 1 !important;
+  transform: rotate(45deg) scaleY(1) !important;
+  transform-origin: center center !important;
+  transition: none !important;
+  /* 确保箭头不受父元素的 scaleY 影响，强制 scaleY(1) */
+}
+
+/* 创建菜单箭头也立即显示 */
+.dropdown-fade-enter-from .create-menu-arrow,
+.dropdown-fade-enter-active .create-menu-arrow,
+.dropdown-fade-enter-to .create-menu-arrow,
+.dropdown-fade-leave-from .create-menu-arrow,
+.dropdown-fade-leave-active .create-menu-arrow,
+.dropdown-fade-leave-to .create-menu-arrow {
+  opacity: 1 !important;
+  transform: rotate(45deg) !important;
+  transform-origin: center center !important;
+  transition: none !important;
 }
 
 /* 创建内容下拉菜单 */
@@ -638,8 +880,8 @@ watch(() => route.path, () => {
 
 .create-menu {
   position: absolute;
-  top: calc(100% + 12px);
-  right: 0;
+  top: calc(100% + 16px);
+  right: -20px; /* 右侧菜单项，下拉框向右移动20px */
   min-width: 200px;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(20px);
@@ -648,6 +890,25 @@ watch(() => route.path, () => {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.3);
   z-index: 2000;
+}
+
+/* 箭头 - 独立于过渡动画，立即显示，指向"写点什么"文本 */
+.create-menu-arrow {
+  position: absolute;
+  top: calc(100% + 10px); /* 下拉框在100%+16px，箭头在下拉框上方6px，所以是16-6=10px */
+  right: calc(65% - 15px); /* 菜单项文本中心大约在35%位置，从右边计算是65%，再向右移动20px */
+  width: 12px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom: none;
+  border-right: none;
+  transform: rotate(45deg);
+  transform-origin: center center;
+  z-index: 2001;
+  pointer-events: none;
+  box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.1);
+  /* 箭头相对于"写点什么"菜单项定位，在下拉框顶部上方6px */
 }
 
 .menu-section {
@@ -755,26 +1016,222 @@ watch(() => route.path, () => {
   color: #999;
 }
 
-/* 操作按钮 */
-.action-btn {
+/* 评论下拉菜单和创建内容下拉菜单现在使用 menu-item 样式 */
+.comments-dropdown {
+  position: relative;
+}
+
+/* 箭头 - 独立于过渡动画，立即显示，相对于评论菜单项定位 */
+.comments-menu-arrow {
+  position: absolute;
+  top: calc(100% + 10px); /* 下拉框在100%+16px，箭头在下拉框上方6px，所以是16-6=10px */
+  right: calc(65% - 15px); /* 菜单项文本中心大约在35%位置，从右边计算是65%，再向右移动20px */
+  width: 12px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom: none;
+  border-right: none;
+  transform: rotate(45deg);
+  transform-origin: center center;
+  z-index: 2001;
+  pointer-events: none;
+  box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.1);
+  /* 箭头相对于评论菜单项定位，在下拉框顶部上方6px */
+}
+
+/* 下拉框包装器 - 包含箭头和下拉框 */
+.comments-menu-wrapper {
+  position: absolute;
+  top: calc(100% + 16px);
+  right: -20px; /* 评论下拉框向右移动20px */
+  z-index: 2000;
+  transform-origin: top center;
+}
+
+.comments-menu {
+  width: 500px;
+  max-height: 500px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  overflow-y: auto !important; /* 强制启用滚动 */
+  scrollbar-width: thin !important; /* Firefox */
+}
+
+.comments-loading,
+.comments-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border-radius: 12px;
-  border: none;
-  background: rgba(102, 126, 234, 0.1);
-  color: #667eea;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.9rem;
-  font-weight: 500;
+  padding: 40px 20px;
+  color: #999;
+  gap: 12px;
 }
 
-.action-btn:hover {
-  background: #667eea;
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(102, 126, 234, 0.1);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.comment-item {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.comment-item:hover {
+  transform: translateY(-2px);
+}
+
+.comment-item:hover .comment-bubble {
+  background: #F0F0F0; /* 悬停时深灰色（原来的浅灰色） */
+  transform: translateY(-1px);
+}
+
+.comment-bubble {
+  background: #F8F8F8; /* 普通状态更浅的灰色 */
+  border-radius: 5px;
+  padding: 1.2rem 1.4rem; /* 增大内边距使卡片更大 */
+  border-top: 1.5px solid rgba(200, 200, 200, 0.4);
+  border-left: 1.5px solid rgba(200, 200, 200, 0.4);
+  border-bottom: 1px solid rgba(200, 200, 200, 0.15);
+  border-right: 1px solid rgba(200, 200, 200, 0.15);
+  transition: all 0.2s ease;
+  display: flex;
+  gap: 16px; /* 增大间距 */
+  align-items: flex-start;
+}
+
+.comment-avatar-col {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+}
+
+.avatar-square {
+  width: 48px; /* 增大头像尺寸 */
+  height: 48px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px; /* 增大头像文字 */
+  font-weight: 600;
+}
+
+.comment-content-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* 增大内容间距 */
+}
+
+.comment-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.comment-author {
+  font-size: 1rem; /* 增大字体 */
+  font-weight: 600;
+  color: #2b2b2b;
+}
+
+.comment-time {
+  font-size: 0.85rem; /* 增大字体 */
+  color: #999;
+}
+
+.comment-article-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.article-type-icon {
+  font-size: 1rem; /* 增大图标 */
+  color: #667eea;
+  flex-shrink: 0;
+}
+
+.article-title-text {
+  font-size: 1rem; /* 增大字体 */
+  font-weight: 500;
+  color: #667eea;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.comment-text {
+  font-size: 0.95rem; /* 增大字体 */
+  color: #2b2b2b;
+  line-height: 1.6;
+  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-align: left;
+}
+
+/* 滚动条样式 - 使用 !important 覆盖全局隐藏 */
+.comments-menu::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+  background: transparent !important;
+  display: block !important; /* 覆盖全局的 display: none */
+}
+
+.comments-menu::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-radius: 3px !important;
+  display: block !important;
+}
+
+.comments-menu::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.3) !important;
+  border-radius: 3px !important;
+  display: block !important;
+}
+
+.comments-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.5) !important;
+}
+
+/* 确保滚动条可见 - 覆盖所有可能的全局样式 */
+.comments-menu::-webkit-scrollbar-corner,
+.comments-menu::-webkit-scrollbar-button,
+.comments-menu::-webkit-scrollbar-track-piece {
+  display: block !important;
 }
 
 /* 用户菜单 */

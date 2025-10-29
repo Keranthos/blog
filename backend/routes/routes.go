@@ -51,6 +51,7 @@ func SetupRouter() *gin.Engine {
 		api.DELETE("/articles/:id", middlewares.Auth(3), controllers.DeleteArticle) // 删除文章需要管理员权限
 
 		// 评论相关路由，权限: 0 (所有用户)
+		api.GET("/comments", controllers.GetAllComments) // 获取所有评论
 		api.GET("/comments/:blogID", controllers.GetComments)
 		api.POST("/comments", controllers.CreateComment)
 		api.DELETE("/comments/:commentId", middlewares.Auth(3), controllers.DeleteComment) // 删除评论需要管理员权限

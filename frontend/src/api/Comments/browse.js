@@ -15,4 +15,19 @@ async function getCommentsByID (type, blogID) {
   }
 }
 
-export { getCommentsByID }
+async function getAllComments () {
+  try {
+    const res = await requestFunc('/comments', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }, false)
+    return res.data
+  } catch (error) {
+    console.error(error)
+    throw error
+  }
+}
+
+export { getCommentsByID, getAllComments }

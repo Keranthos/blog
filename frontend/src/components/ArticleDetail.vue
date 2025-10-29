@@ -142,24 +142,86 @@
       <section class="comments-section">
         <div class="section-header">
           <h2>
-            <font-awesome-icon icon="comment" class="section-icon" />
-            评论区
+            <svg class="comment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            评论
             <span v-if="comments.length" class="comment-count">({{ comments.length }})</span>
           </h2>
         </div>
 
+        <!-- 发表评论 -->
+        <div class="comment-editor">
+          <div class="editor-wrapper">
+            <textarea
+              v-model="newComment"
+              placeholder="支持 Markdown 语法"
+              class="comment-input"
+              :maxlength="300"
+              @keydown.ctrl.enter="submitComment"
+              @focus="handleInputFocus"
+            ></textarea>
+            <div class="editor-actions">
+              <div v-if="replyingTo" class="reply-indicator">
+                <span class="reply-label">回复 @{{ getReplyTargetName() }}</span>
+                <button class="cancel-reply-btn" @click="cancelReply">
+                  <font-awesome-icon icon="times" />
+                </button>
+              </div>
+              <div class="action-buttons">
+                <span class="tip">Ctrl + Enter 快速发布</span>
+                <span class="char-count">{{ newComment.length }}/300</span>
+                <button class="preview-btn" @click="togglePreview">
+                  <font-awesome-icon icon="eye" />
+                  预览
+                </button>
+                <button class="submit-btn" :disabled="!newComment.trim()" @click="submitComment">
+                  <font-awesome-icon icon="paper-plane" />
+                  发布
+                </button>
+              </div>
+            </div>
+            <!-- 预览评论 -->
+            <div v-if="previewVisible" class="preview-comment">
+              <div class="preview-label">预览效果</div>
+              <div class="comment-item preview-item">
+                <div class="comment-avatar">
+                  <div class="avatar-circle">{{ (user.value?.name || user.value?.username) ? (user.value?.name || user.value?.username).charAt(0) : 'U' }}</div>
+                </div>
+                <div class="comment-body">
+                  <div class="comment-header">
+                    <span class="comment-author">{{ user.value?.name || user.value?.username || '当前用户' }}</span>
+                    <span v-if="replyingTo" class="reply-tag">@{{ getReplyTargetName() }}</span>
+                    <span class="comment-time">刚刚</span>
+                  </div>
+                  <div class="comment-bubble" v-if="newComment.trim()">
+                    <div class="comment-content" v-html="renderedPreview"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 评论列表 -->
         <div v-if="Array.isArray(comments) && comments.length > 0" class="comments-list">
-          <div v-for="comment in comments" :key="comment.ID" class="comment-item">
+          <div v-for="comment in getAllCommentsInOrder()" :key="comment.ID" class="comment-item" :class="{ 'reply-comment': comment.parent_id }">
             <div class="comment-avatar">
-              <div class="avatar-circle">{{ comment.username.charAt(0) }}</div>
+              <div class="avatar-circle" :class="{ 'small': comment.parent_id }">{{ comment.username.charAt(0) }}</div>
             </div>
-            <div class="comment-body">
+            <div class="comment-body" :class="{ 'selected': replyingTo === comment.ID }">
               <div class="comment-header">
                 <span class="comment-author">{{ comment.username }}</span>
+                <span v-if="comment.parent_id" class="reply-tag">@{{ getParentCommentUsername(comment.parent_id) }}</span>
                 <span class="comment-time">{{ formatCommentTime(comment.CreatedAt) }}</span>
+                <button class="hover-reply-btn" @click="startReply(comment.ID, comment.username)">
+                  <font-awesome-icon icon="reply" />
+                  回复
+                </button>
               </div>
-              <div class="comment-content">{{ comment.content }}</div>
+              <div class="comment-bubble">
+                <div class="comment-content">{{ comment.content }}</div>
+              </div>
             </div>
             <button v-if="user.level >= 3" class="delete-btn" @click="handleDeleteComment(comment.ID)">
               <font-awesome-icon icon="trash" />
@@ -171,26 +233,6 @@
         <div v-else class="empty-comments">
           <font-awesome-icon icon="comment-slash" class="empty-icon" />
           <p>还没有评论，来抢沙发吧！</p>
-        </div>
-
-        <!-- 发表评论 -->
-        <div class="comment-editor">
-          <h3>发表评论</h3>
-          <div class="editor-wrapper">
-            <textarea
-              v-model="newComment"
-              placeholder="说说你的想法..."
-              class="comment-input"
-              @keydown.ctrl.enter="submitComment"
-            ></textarea>
-            <div class="editor-actions">
-              <span class="tip">Ctrl + Enter 快速发布</span>
-              <button class="submit-btn" :disabled="!newComment.trim()" @click="submitComment">
-                <font-awesome-icon icon="paper-plane" />
-                发布评论
-              </button>
-            </div>
-          </div>
         </div>
       </section>
     </div>
@@ -228,7 +270,7 @@ const props = defineProps({
 
 const store = useStore()
 const route = useRoute()
-const user = store.state.user
+const user = computed(() => store.state.user)
 
 // 添加复制按钮到代码块
 const addCopyButton = (codeBlock) => {
@@ -291,7 +333,7 @@ const addCopyButton = (codeBlock) => {
   checkAndAddButton()
 }
 
-// 精确调整目录位置 - 确保固定在屏幕右侧
+// 精确调整目录位置 - 确保固定在屏幕左侧
 const adjustTocPosition = () => {
   nextTick(() => {
     const tocElement = document.querySelector('.floating-toc')
@@ -299,11 +341,11 @@ const adjustTocPosition = () => {
 
     if (!tocElement || !contentContainer) return
 
-    // 清除任何可能冲突的left属性
-    tocElement.style.left = 'auto'
+    // 清除任何可能冲突的right属性
+    tocElement.style.right = 'auto'
 
-    // 确保目录固定在屏幕右侧
-    tocElement.style.right = '20px'
+    // 确保目录固定在屏幕左侧
+    tocElement.style.left = '20px'
     tocElement.style.top = '80px'
     tocElement.style.position = 'fixed'
 
@@ -566,6 +608,11 @@ const updateTocScrollPosition = () => {
     if (targetTocLink) {
       const tocVisibleHeight = tocNav.clientHeight
       const currentScrollTop = tocNav.scrollTop
+      const maxScrollTop = tocNav.scrollHeight - tocVisibleHeight
+
+      // 如果目录已经滚动到底部，且当前标题在最后几个位置，不要强制滚动
+      const isNearBottom = currentScrollTop >= maxScrollTop - 5 // 允许5px的误差
+      const isLastFewItems = closestHeading.index >= toc.value.length - 3
 
       // 获取目录项的实际位置和尺寸
       const tocItemRect = targetTocLink.getBoundingClientRect()
@@ -575,12 +622,14 @@ const updateTocScrollPosition = () => {
       const itemTop = tocItemRect.top - tocNavRect.top + currentScrollTop
       const itemBottom = itemTop + tocItemRect.height
 
-      // 检查当前标题是否在可视区域内
-      const isItemVisible = itemTop >= currentScrollTop &&
-                           itemBottom <= currentScrollTop + tocVisibleHeight
+      // 检查当前标题是否在可视区域内（允许一些误差）
+      const tolerance = 2 // 允许2px的误差
+      const isItemVisible = itemTop >= currentScrollTop - tolerance &&
+                           itemBottom <= currentScrollTop + tocVisibleHeight + tolerance
 
       // 如果不在可视区域内，则滚动到合适位置
-      if (!isItemVisible) {
+      // 但如果目录已经接近底部且当前是最后几个标题，不要强制滚动
+      if (!isItemVisible && !(isNearBottom && isLastFewItems)) {
         let targetScrollTop
 
         // 如果标题在可视区域上方，滚动到标题位置
@@ -589,17 +638,26 @@ const updateTocScrollPosition = () => {
         } else if (itemBottom > currentScrollTop + tocVisibleHeight) {
           // 如果标题在可视区域下方，滚动到标题底部
           targetScrollTop = itemBottom - tocVisibleHeight
+        } else {
+          // 如果已经在可视区域内，不需要滚动
+          return
         }
 
         // 处理边界值
-        const maxScrollTop = Math.max(0, tocNav.scrollHeight - tocVisibleHeight)
-        const finalScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop))
+        const safeMaxScrollTop = Math.max(0, maxScrollTop)
 
-        // 立即滚动到目标位置，确保目录跟随
-        tocNav.scrollTo({
-          top: finalScrollTop,
-          behavior: 'instant'
-        })
+        // 确保 targetScrollTop 已定义且有效
+        if (targetScrollTop !== undefined && !isNaN(targetScrollTop)) {
+          const finalScrollTop = Math.max(0, Math.min(targetScrollTop, safeMaxScrollTop))
+
+          // 只有目标位置与当前位置不同时才滚动（允许1px的误差）
+          if (Math.abs(finalScrollTop - currentScrollTop) > 1) {
+            tocNav.scrollTo({
+              top: finalScrollTop,
+              behavior: 'instant'
+            })
+          }
+        }
       }
     }
 
@@ -697,6 +755,9 @@ const content = ref('')
 const renderedContent = ref('')
 const comments = ref([])
 const newComment = ref('')
+const previewVisible = ref(false)
+const replyingTo = ref(null)
+const replyTargetName = ref('')
 const viewCount = ref(0)
 const toc = ref([]) // 文章目录
 const showShareMenu = ref(false) // 显示分享菜单
@@ -805,6 +866,16 @@ const loadDetail = async () => {
     smartypants: false
   })
 
+  // 在博客/随笔文章详情页显示加载成功消息（1/5概率）
+  if (props.type === 'blog' || props.type === 'moment') {
+    if (window.showMessage && title.value) {
+      // 1/5 概率显示消息
+      if (Math.random() < 0.2) {
+        window.showMessage(`《${title.value}》加载成功，好像没有出现bug，好耶！`, 3000, 10)
+      }
+    }
+  }
+
   // 后处理：修复没有被正确渲染的粗体语法
   // 将 **text:** 这样的模式手动转换为 <strong>text:</strong>
   renderedContent.value = renderedContent.value.replace(/\*\*([^*:]+:\**)\*\*/g, '<strong>$1</strong>')
@@ -864,26 +935,133 @@ const loadComments = async () => {
   }
 }
 
+// 开始回复
+const startReply = (commentId, username) => {
+  replyingTo.value = commentId
+  replyTargetName.value = username
+  // 聚焦到输入框
+  nextTick(() => {
+    const textarea = document.querySelector('.comment-editor textarea')
+    if (textarea) {
+      textarea.focus()
+    }
+  })
+}
+
+// 取消回复
+const cancelReply = () => {
+  replyingTo.value = null
+  replyTargetName.value = ''
+}
+
+// 获取回复目标名称
+const getReplyTargetName = () => {
+  return replyTargetName.value
+}
+
+// 处理输入框聚焦
+const handleInputFocus = () => {
+  // 如果当前没有在回复状态，清空回复状态
+  if (!replyingTo.value) {
+    cancelReply()
+  }
+}
+
+// 预览切换
+const togglePreview = () => {
+  previewVisible.value = !previewVisible.value
+  if (previewVisible.value) {
+    nextTick(() => {
+      document.querySelectorAll('.preview-comment pre code').forEach((block) => {
+        try { hljs.highlightElement(block) } catch (e) {}
+      })
+    })
+  }
+}
+
+// 预览渲染（Markdown -> HTML）
+const renderedPreview = computed(() => {
+  if (!newComment.value) return ''
+
+  // 先处理换行符，将 \n 转换为 <br>
+  const content = newComment.value.replace(/\n/g, '<br>')
+
+  // 然后使用 marked 渲染 Markdown
+  return marked(content, {
+    breaks: false, // 我们已经手动处理了换行
+    gfm: true,
+    headerIds: false,
+    mangle: false,
+    pedantic: false,
+    sanitize: false,
+    smartLists: true,
+    smartypants: false
+  })
+})
+
+// 获取所有评论按正确顺序排列（回复紧跟父评论）
+const getAllCommentsInOrder = () => {
+  const result = []
+
+  // 遍历所有顶级评论
+  for (const comment of comments.value) {
+    // 添加顶级评论
+    result.push(comment)
+
+    // 添加该评论的所有回复（按时间倒序）
+    if (comment.replies && comment.replies.length > 0) {
+      // 对回复按时间排序（最新的在前）
+      const sortedReplies = [...comment.replies].sort((a, b) =>
+        new Date(b.CreatedAt) - new Date(a.CreatedAt)
+      )
+      result.push(...sortedReplies)
+    }
+  }
+
+  return result
+}
+
+// 获取父评论用户名
+const getParentCommentUsername = (parentId) => {
+  // 在所有评论中查找父评论（包括顶级评论和回复）
+  const allComments = getAllCommentsInOrder()
+  for (const comment of allComments) {
+    if (comment.ID === parentId) {
+      return comment.username
+    }
+  }
+  return '未知用户'
+}
+
 // 提交评论
 const submitComment = async () => {
   if (!newComment.value.trim()) return
 
   const id = props.articleId || route.params.id
-  const user = store.state.user
 
   if (!id || id === 'undefined') {
     showErrorMessage('文章ID无效，无法提交评论')
     return
   }
 
-  if (!user || !user.token) {
+  if (!user.value || !user.value.isLogged || !store.state.token) {
+    console.log('登录状态检查失败:', {
+      user: user.value,
+      isLogged: user.value?.isLogged,
+      token: store.state.token,
+      tokenLength: store.state.token?.length
+    })
     showErrorMessage('401')
     return
   }
 
   try {
-    await createComment(user, id, props.type, newComment.value)
+    // 如果是回复，使用parentId
+    const parentId = replyingTo.value || null
+    await createComment(user.value, id, props.type, newComment.value, parentId, store.state.token)
+
     newComment.value = ''
+    cancelReply() // 清空回复状态
     await loadComments()
     showSuccessMessage('comment')
   } catch (error) {
@@ -903,7 +1081,7 @@ const handleDeleteComment = async (commentId) => {
 
   try {
     const user = store.state.user
-    await deleteCommentAPI(user, commentId)
+    await deleteCommentAPI(user, commentId, store.state.token)
     comments.value = comments.value.filter((comment) => comment.ID !== commentId)
 
     // 显示看板娘消息（如果可用）
@@ -1311,19 +1489,18 @@ const fixResidualBoldInDOM = () => {
 
 /* 评论区 */
 .comments-section {
-  background: rgba(255, 255, 255, 0.5);
+  background: transparent;
   border-radius: 0;
-  padding: 30px;
+  padding: 30px 0;
   box-shadow: none;
   border: none;
   margin-bottom: 30px;
-  backdrop-filter: blur(25px);
 }
 
 .section-header {
   margin-bottom: 25px;
   padding-bottom: 15px;
-  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.1);
 }
 
 .section-header h2 {
@@ -1336,9 +1513,10 @@ const fixResidualBoldInDOM = () => {
   font-weight: 600;
 }
 
-.section-icon {
-  color: #667eea;
-  font-size: 1.5rem;
+.comment-icon {
+  width: 24px;
+  height: 24px;
+  color: #8b5cf6;
 }
 
 .comment-count {
@@ -1355,21 +1533,15 @@ const fixResidualBoldInDOM = () => {
 .comment-item {
   display: flex;
   gap: 15px;
-  padding: 16px 20px;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 0;
-  margin-bottom: 12px;
+  padding: 0;
+  margin-bottom: 2rem;
   transition: all 0.3s ease;
-  border: none;
-  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
-  backdrop-filter: blur(15px);
+  position: relative;
+  align-items: flex-start;
 }
 
 .comment-item:hover {
-  background: rgba(255, 255, 255, 0.18);
-  border-bottom-color: rgba(102, 126, 234, 0.2);
-  box-shadow: none;
-  backdrop-filter: blur(20px);
+  transform: translateY(-1px);
 }
 
 .comment-avatar {
@@ -1377,22 +1549,80 @@ const fixResidualBoldInDOM = () => {
 }
 
 .avatar-circle {
-  width: 45px;
-  height: 45px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #00BFFF;
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 600;
   text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(0, 191, 255, 0.3);
+  transition: transform 0.2s ease;
+}
+
+.avatar-circle:hover {
+  transform: scale(1.05);
 }
 
 .comment-body {
   flex: 1;
   min-width: 0;
+  max-width: calc(100% - 60px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.comment-bubble {
+  background: white;
+  border-radius: 12px;
+  padding: 0.85rem 1.05rem;
+  border-top: 1.5px solid rgba(139, 92, 246, 0.4);
+  border-left: 1.5px solid rgba(139, 92, 246, 0.4);
+  border-bottom: 1px solid #f0f0f0;
+  border-right: 1px solid #f0f0f0;
+  box-shadow:
+    0 4px 12px rgba(139, 92, 246, 0.2),
+    0 2px 6px rgba(139, 92, 246, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.05);
+  position: relative;
+  word-wrap: break-word;
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 0.3rem;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* 箭头外层边框（包含顶部紫色边框） */
+.comment-bubble::after {
+  content: '';
+  position: absolute;
+  left: -9px;
+  top: 11px;
+  width: 0;
+  height: 0;
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+  border-right: 9px solid rgba(139, 92, 246, 0.4);
+  z-index: 0;
+}
+
+/* 箭头内层白色填充 */
+.comment-bubble::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 12px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 8px solid white;
+  z-index: 1;
 }
 
 .comment-header {
@@ -1400,6 +1630,47 @@ const fixResidualBoldInDOM = () => {
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
+  position: relative;
+}
+
+.hover-reply-btn {
+  opacity: 0;
+  padding: 0.2rem 0.5rem;
+  background: #8b5cf6;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.comment-item:hover .hover-reply-btn {
+  opacity: 1;
+}
+
+.comment-body.selected {
+  background: rgba(139, 92, 246, 0.1);
+  border-radius: 8px;
+  padding: 0.5rem;
+  margin: -0.5rem;
+}
+
+.reply-tag {
+  background: #8b5cf6;
+  color: white;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin: 0 0.3rem;
+  display: inline-block;
+  white-space: nowrap;
 }
 
 .comment-author {
@@ -1414,10 +1685,41 @@ const fixResidualBoldInDOM = () => {
 }
 
 .comment-content {
-  color: #555;
+  color: #2b2b2b;
   line-height: 1.6;
   word-wrap: break-word;
   font-size: 0.95rem;
+  margin: 0;
+  text-align: left;
+}
+
+/* 内联代码样式 */
+.comment-content :deep(code) {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 0.85em;
+  border: 1px solid #e2e8f0;
+  font-weight: 500;
+}
+
+/* 代码块样式 */
+.comment-content :deep(pre) {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 0.5rem 0;
+  overflow-x: auto;
+}
+
+.comment-content :deep(pre code) {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #1e293b;
 }
 
 .delete-btn {
@@ -1463,11 +1765,11 @@ const fixResidualBoldInDOM = () => {
 .comment-editor {
   margin-top: 30px;
   padding-top: 30px;
-  border-top: 1px solid rgba(102, 126, 234, 0.1);
-  background: rgba(255, 255, 255, 0.15);
+  border-top: 1px solid rgba(139, 92, 246, 0.1);
+  background: transparent;
   border-radius: 0;
-  padding: 30px;
-  backdrop-filter: blur(25px);
+  padding: 30px 0;
+  box-shadow: none;
 }
 
 .comment-editor h3 {
@@ -1477,49 +1779,110 @@ const fixResidualBoldInDOM = () => {
 }
 
 .editor-wrapper {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 0;
-  padding: 20px;
+  background: transparent;
+  border-radius: 12px;
+  padding: 0;
   border: none;
-  border-bottom: 1px solid rgba(102, 126, 234, 0.1);
   transition: all 0.3s ease;
-  backdrop-filter: blur(15px);
 }
 
 .editor-wrapper:focus-within {
   border-bottom-color: rgba(102, 126, 234, 0.3);
-  background: rgba(255, 255, 255, 0.18);
+  background: transparent; /* 仅输入框变色，容器不变色 */
   box-shadow: none;
-  backdrop-filter: blur(20px);
+  backdrop-filter: none;
 }
 
 .comment-input {
   width: 100%;
   min-height: 120px;
   padding: 15px;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  font-size: 0.95rem;
   line-height: 1.6;
   resize: vertical;
-  background: transparent;
+  background: white;
   color: #333;
   font-family: inherit;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .comment-input:focus {
   outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
 }
 
 .comment-input::placeholder {
-  color: #aaa;
+  color: #9ca3af;
 }
 
 .editor-actions {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   margin-top: 15px;
+}
+
+.reply-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #8b5cf6;
+  border-radius: 8px;
+  color: white;
+}
+
+.reply-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.cancel-reply-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.8rem;
+  transition: background 0.3s ease;
+}
+
+.cancel-reply-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.char-count {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.preview-btn {
+  padding: 12px 24px;
+  background: #8b5cf6;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+}
+
+.preview-btn:hover {
+  background: #7c3aed;
 }
 
 .tip {
@@ -1578,8 +1941,8 @@ pre:hover .copy-btn {
 .floating-toc {
   position: fixed;
   top: 80px;
-  right: 20px; /* 向屏幕右边靠近 */
-  width: 200px;
+  left: 20px; /* 向屏幕左边靠近 */
+  width: 300px;
   max-height: 70vh;
   z-index: 10;
   transition: all 0.3s ease;
@@ -1701,6 +2064,9 @@ pre:hover .copy-btn {
   margin: 2px 0;
   z-index: 2;
   background: transparent !important;
+  overflow: hidden;
+  width: 100%;
+  text-align: left; /* 强制左对齐 */
 }
 
 .toc-link:hover {
@@ -1722,10 +2088,11 @@ pre:hover .copy-btn {
 
 .toc-text {
   display: block;
-  overflow: visible;
-  text-overflow: unset;
-  white-space: normal;
-  word-wrap: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  text-align: left; /* 强制左对齐 */
 }
 
 /* 层级样式 - 透明背景 */
@@ -1805,7 +2172,7 @@ pre:hover .copy-btn {
 /* 平板端优化 */
 @media (min-width: 769px) and (max-width: 1024px) {
   .floating-toc {
-    width: 140px;
+    width: 210px;
     /* 定位完全由JS控制 */
   }
 }
@@ -1815,7 +2182,7 @@ pre:hover .copy-btn {
 /* 超大屏幕优化 */
 @media (min-width: 1600px) {
   .floating-toc {
-    width: 160px;
+    width: 240px;
     /* 定位完全由JS控制 */
   }
 }
@@ -1938,20 +2305,50 @@ pre:hover .copy-btn {
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
   color: white;
   border: none;
-  border-radius: 25px;
+  border-radius: 12px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+}
+
+/* 回复评论样式 - 缩进一个头像宽度 */
+.reply-comment {
+  margin-left: 60px; /* 一个头像宽度 + 间距 */
+}
+
+.reply-comment .comment-avatar {
+  margin-top: 0.1rem; /* 稍微调整头像位置 */
+}
+
+.preview-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #8b5cf6;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.preview-item {
+  opacity: 0.8;
+  transform: scale(0.98);
+  transition: all 0.3s ease;
+}
+
+.preview-item:hover {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .submit-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4);
 }
 
 .submit-btn:disabled {

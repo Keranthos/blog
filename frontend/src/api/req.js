@@ -63,10 +63,10 @@ apiClient.interceptors.request.use(
       }
     }
 
-    // 添加loading状态
-    if (window.showMessage) {
-      window.showMessage('正在请求数据...', 1000, 5)
-    }
+    // 不再显示"正在请求数据"消息
+    // if (window.showMessage) {
+    //   window.showMessage('正在请求数据...', 1000, 5)
+    // }
     return config
   },
   (error) => {
