@@ -420,9 +420,9 @@ func GetTopArticles(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    topArticles,
-		"message": "Top articles retrieved successfully",
+		"success":   true,
+		"data":      topArticles,
+		"message":   "Top articles retrieved successfully",
 		"userToast": false, // 不需要看板娘提示
 	})
 }

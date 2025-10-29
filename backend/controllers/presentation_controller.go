@@ -146,8 +146,8 @@ func (pc *PresentationController) CreatePresentation(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "讲演创建成功",
-		"data":    presentation.ToResponse(),
+		"message":   "讲演创建成功",
+		"data":      presentation.ToResponse(),
 		"userToast": true, // 需要看板娘提示
 	})
 }
@@ -281,8 +281,8 @@ func (pc *PresentationController) UpdatePresentation(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "讲演更新成功",
-		"data":    presentation.ToResponse(),
+		"message":   "讲演更新成功",
+		"data":      presentation.ToResponse(),
 		"userToast": true, // 需要看板娘提示
 	})
 }
@@ -325,7 +325,7 @@ func (pc *PresentationController) DeletePresentation(c *gin.Context) {
 	// }
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "讲演删除成功",
+		"message":   "讲演删除成功",
 		"userToast": true, // 需要看板娘提示
 	})
 }
@@ -475,8 +475,8 @@ func (pc *PresentationController) VerifyPresentationPassword(c *gin.Context) {
 	// 验证密码
 	if passwordData.Password == presentation.Password {
 		c.JSON(http.StatusOK, gin.H{
-			"success": true, 
-			"message": "密码验证成功",
+			"success":   true,
+			"message":   "密码验证成功",
 			"userToast": true, // 需要看板娘提示
 		})
 	} else {

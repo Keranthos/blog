@@ -400,46 +400,6 @@ onMounted(() => {
   font-weight: 500;
 }
 
-/* 暗色模式适配 */
-[data-theme="dark"] .related-articles {
-  background: rgba(26, 33, 62, 0.8);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-[data-theme="dark"] .related-header h3 {
-  color: #e0e0e0;
-}
-
-[data-theme="dark"] .related-subtitle {
-  color: #b0b0b0;
-}
-
-[data-theme="dark"] .related-item {
-  background: rgba(26, 33, 62, 0.6);
-}
-
-[data-theme="dark"] .related-item:hover {
-  background: rgba(26, 33, 62, 0.8);
-  border-color: rgba(102, 126, 234, 0.3);
-}
-
-[data-theme="dark"] .related-title {
-  color: #e0e0e0;
-}
-
-[data-theme="dark"] .related-excerpt {
-  color: #b0b0b0;
-}
-
-[data-theme="dark"] .meta-item {
-  color: #999;
-}
-
-[data-theme="dark"] .tag {
-  background: rgba(102, 126, 234, 0.2);
-  color: #8be9fd;
-}
-
 /* 响应式设计 */
 @media (max-width: 768px) {
   .related-articles {

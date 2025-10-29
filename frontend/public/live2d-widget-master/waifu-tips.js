@@ -32,11 +32,6 @@ function loadWidget(config) {
 		document.body.insertAdjacentHTML("beforeend", `<div id="waifu">
 			<div id="waifu-tips"></div>
 			<canvas id="live2d" width="800" height="800"></canvas>
-			<div id="waifu-tool">
-				<span class="tool-icon" title="小游戏">🎮</span>
-				<span class="tool-icon" title="换装">👗</span>
-				<span class="tool-icon" title="关闭">❌</span>
-			</div>
 		</div>`);
 	console.log('看板娘DOM元素已创建');
 	// https://stackoverflow.com/questions/24148403/trigger-css-transition-on-appended-element
@@ -80,9 +75,20 @@ function loadWidget(config) {
 	(function registerEventListener() {
 		// 等待DOM元素创建后再绑定事件
 		setTimeout(() => {
-			const toolIcons = document.querySelectorAll("#waifu-tool .tool-icon");
-			if (toolIcons.length >= 3) {
-				toolIcons[0].addEventListener("click", () => { // 🎮 小游戏
+			const live2dCanvas = document.getElementById("live2d");
+			if (live2dCanvas) {
+				// 左键点击看板娘 - 换装
+				live2dCanvas.addEventListener("click", (event) => {
+					if (event.button === 0) { // 左键
+						if (window.loadRandModel) {
+							window.loadRandModel();
+						}
+					}
+				});
+
+				// 右键点击看板娘 - 游戏
+				live2dCanvas.addEventListener("contextmenu", (event) => {
+					event.preventDefault(); // 阻止默认右键菜单
 					try {
 						console.log('=== 游戏启动调试信息 ===');
 						console.log('检查Asteroids函数:', typeof Asteroids);
@@ -200,12 +206,23 @@ function loadWidget(config) {
 						showMessage("游戏启动失败，请稍后再试～", 2000, 9);
 					}
 				});
-				toolIcons[1].addEventListener("click", () => { // 👗 换装
-					if (window.loadRandModel) {
-						window.loadRandModel();
-					}
+			}
+
+			// ESC键消失功能
+			let isHoveringWaifu = false;
+			const waifuElement = document.getElementById("waifu");
+			if (waifuElement) {
+				waifuElement.addEventListener("mouseenter", () => {
+					isHoveringWaifu = true;
 				});
-				toolIcons[2].addEventListener("click", () => { // ❌ 关闭
+				waifuElement.addEventListener("mouseleave", () => {
+					isHoveringWaifu = false;
+				});
+			}
+
+			// 监听ESC键
+			document.addEventListener("keydown", (event) => {
+				if (event.key === "Escape" && isHoveringWaifu) {
 					localStorage.setItem("waifu-display", Date.now());
 					showMessage("(｡•́︿•̀｡)<br>呜呜…记得要回来看我哦！", 2000, 11);
 					document.getElementById("waifu").style.bottom = "-500px";
@@ -214,9 +231,8 @@ function loadWidget(config) {
 						const toggle = document.getElementById("waifu-toggle");
 						if (toggle) toggle.classList.add("waifu-toggle-active");
 					}, 3000);
+				}
 				});
-				console.log('看板娘工具栏事件已绑定');
-			}
 		}, 100);
 		const devtools = () => {};
 		console.log("%c", devtools);
@@ -235,36 +251,82 @@ function loadWidget(config) {
 		let text;
 		if (location.pathname === "/") { // 如果是主页
 			const now = new Date().getHours();
-			if (now > 5 && now <= 7) text = "早上好呀！☀️ 新的一天开始啦，要元气满满哦！";
-			else if (now > 7 && now <= 11) text = "上午好～工作顺利吗？记得多喝水，不要久坐哦！";
-			else if (now > 11 && now <= 13) text = "中午啦！🍱 该吃午饭了，要好好吃饭才有力气呢～";
-			else if (now > 13 && now <= 17) text = "下午好～☕ 午后容易犯困，要不要起来活动一下？";
-			else if (now > 17 && now <= 19) text = "傍晚了！🌆 今天辛苦啦，窗外的夕阳很美呢～";
-			else if (now > 19 && now <= 21) text = "晚上好呀！🌙 今天过得开心吗？";
-			else if (now > 21 && now <= 23) text = ["😴<br>已经很晚了呢，早点休息吧，晚安～", "夜深了，要爱护眼睛哦！"];
-			else text = "🦉<br>哇！你是夜猫子吗？这么晚还不睡，明天起得来嘛？";
+			if (now > 5 && now <= 7) text = "早上好，一日之计在于晨，很高兴在这时候看到你，朋友";
+			else if (now > 7 && now <= 11) text = "上午好，希望你有快乐的一天，而我现在一般在考虑中午吃什么";
+			else if (now > 11 && now <= 13) text = "中午到了，午饭和午觉对我都是不可或缺的";
+			else if (now > 13 && now <= 17) text = "下午好，很快就可以到令人愉悦的晚上了，我的朋友";
+			else if (now > 17 && now <= 19) text = "傍晚了，今天很辛苦，也许可以考虑喝一杯奶茶？";
+			else if (now > 19 && now <= 21) text = "晚上好呀，现在可以稍微放松一下了，宁静的夜晚总是让我惬意";
+			else if (now > 21 && now <= 23) text = ["😴已经很晚了呢，明天又是崭新的一天，晚安玛卡巴卡", "夜深了，要爱护眼睛哦"];
+			else text = "🦉注意身体，请尽快休息，我的朋友";
 		} else if (location.pathname.includes("/blog")) {
-			text = "来看博客啦！📝 主人写的文章都很用心呢～";
+			const blogMessages = [
+				"我努力想探寻世界上所有好玩的东西，这里留着一点足迹",
+				"这里除了代码，还有很多有趣的事情",
+				"这是我自己一点点搭建的博客，也许只是想在虚拟的网络中拥有一点属于自己的东西"
+			];
+			text = blogMessages[Math.floor(Math.random() * blogMessages.length)];
 		} else if (location.pathname.includes("/moments")) {
-			text = "碎碎念～💭 主人的日常小心情都在这里啦！";
+			const momentsMessages = [
+				"一些散落在过去时光中的故事与感想，好故事可是昂贵的，我的朋友",
+				"你说有没有可能，正在看这个网站的你，已经或将要为我带来某一篇随笔的些许想法呢？",
+				"文章只是一张地图，找到回忆还需要跋山涉水"
+			];
+			text = momentsMessages[Math.floor(Math.random() * momentsMessages.length)];
 		} else if (location.pathname === "/fragments/books") {
-			text = "书单推荐！📚 这些书都值得一读哦～";
+			const booksMessages = [
+				"您有多久没有完整读过一本书？那里面有与我们共鸣的灵魂",
+				"我记不清上一次打开非专业的纸质书是什么时候了，但它们一定组成了我的一部分",
+				"也许您有好书要推荐给我，朋友？",
+				"我会永远怀念小时候和亲人朋友在书店里面打发的时光，哪怕那时候的书店朴实的只有书"
+			];
+			text = booksMessages[Math.floor(Math.random() * booksMessages.length)];
 		} else if (location.pathname === "/fragments/novels") {
-			text = "小说推荐！📖 主人的品味很不错呢～";
+			const novelsMessages = [
+				"仔细回想，小说已经贯穿了我到现在为止超过一半的人生",
+				"虚构的故事里藏着最真实的情感，欢迎来到想象的世界",
+				"我们在小说中寻找想象里的自己，但不要忘了自己不是找到的，而是创造的"
+			];
+			text = novelsMessages[Math.floor(Math.random() * novelsMessages.length)];
 		} else if (location.pathname === "/fragments/movies") {
-			text = "电影推荐！🎬 一起来看好电影吧～";
+			const moviesMessages = [
+				"无关乎题材与风格，我总是痴迷于所有的好电影",
+				"我喜欢有年代感的电影，它里面有时代的影子",
+				"好的电影不厌百回看，也许现在是时候翻出你最爱的电影了，朋友"
+			];
+			text = moviesMessages[Math.floor(Math.random() * moviesMessages.length)];
 		} else if (location.pathname.includes("/questionbox")) {
-			text = "💌<br>悄悄话箱～有什么想问的吗？不要害羞哦！";
+			const questionMessages = [
+				"知无不言，言无不尽",
+				"每一个问题都是成长的契机，欢迎交流"
+			];
+			text = questionMessages[Math.floor(Math.random() * questionMessages.length)];
 		} else if (location.pathname.includes("/timeline")) {
-			text = "时间树来啦！⏰ 看看主人的成长轨迹～";
+			const timelineMessages = [
+				"朋友，你觉得时间轴应该是一支箭，还是一棵树？",
+				"现在的我依然是菜菜的，但是三十年河东三十年河西，莫欺少年穷、莫欺中年穷、莫欺老年穷、似者为大，朋友"
+			];
+			text = timelineMessages[Math.floor(Math.random() * timelineMessages.length)];
 		} else if (location.pathname.includes("/presentation")) {
-			text = "讲演展示！🎤 主人的演讲很精彩呢～";
+			const presentationMessages = [
+				"作为一个很讨厌麻烦的i人，我必须承认讲演时常困扰我",
+				"我想尝试一下Slidev,做PPT实在太麻烦了"
+			];
+			text = presentationMessages[Math.floor(Math.random() * presentationMessages.length)];
 		} else if (location.pathname.includes("/profile")) {
-			text = "个人资料～👤 来看看主人的自我介绍吧！";
+			const profileMessages = [
+				"想要知道我的故事？也许您可以直接问问我",
+				"真正了解一个人就像开包抽卡，谁也不知道开出来的是金色传说还是白色普通，但只要开的够多总能开出来的。你觉得呢，我的朋友？"
+			];
+			text = profileMessages[Math.floor(Math.random() * profileMessages.length)];
 		} else if (location.pathname.includes("/search")) {
-			text = "搜索功能！🔍 在找什么呢？让我帮你找找～";
+			const searchMessages = [
+				"如果在这里也没有的话，可以试试催更",
+				"现在这个搜索支持了标题、标签与内容搜索，如果依然没找到那也许就是我的知识盲区"
+			];
+			text = searchMessages[Math.floor(Math.random() * searchMessages.length)];
 		} else {
-			text = "ヾ(◍°∇°◍)ﾉﾞ<br>欢迎来到主人的小站～";
+			text = "ヾ(◍°∇°◍)ﾉﾞ<br>可以随便逛逛，也许有不一样的小彩蛋或者新发现呢";
 		}
 		showMessage(text, 7000, 8);
 	})();
@@ -272,7 +334,7 @@ function loadWidget(config) {
 	// 监听路由变化，显示相应页面的欢迎消息
 	(function routeChangeListener() {
 		let currentPath = location.pathname;
-		
+
 		// 监听popstate事件（浏览器前进后退）
 		window.addEventListener('popstate', () => {
 			if (location.pathname !== currentPath) {
@@ -282,11 +344,11 @@ function loadWidget(config) {
 				}, 500); // 延迟500ms确保页面加载完成
 			}
 		});
-		
+
 		// 监听pushState和replaceState（程序化导航）
 		const originalPushState = history.pushState;
 		const originalReplaceState = history.replaceState;
-		
+
 		history.pushState = function(...args) {
 			originalPushState.apply(this, args);
 			if (location.pathname !== currentPath) {
@@ -296,7 +358,7 @@ function loadWidget(config) {
 				}, 500);
 			}
 		};
-		
+
 		history.replaceState = function(...args) {
 			originalReplaceState.apply(this, args);
 			if (location.pathname !== currentPath) {
@@ -306,33 +368,82 @@ function loadWidget(config) {
 				}, 500);
 			}
 		};
-		
+
 		function showPageWelcomeMessage() {
 			let text;
-			if (location.pathname === "/") {
-				text = "回到首页啦～欢迎回来！";
+		if (location.pathname === "/") {
+			const homeMessages = [
+				"回到首页啦～欢迎回来，朋友"
+			];
+			text = homeMessages[Math.floor(Math.random() * homeMessages.length)];
 			} else if (location.pathname.includes("/blog")) {
-				text = "来看博客啦！📝 主人写的文章都很用心呢～";
+				const blogMessages = [
+					"我努力想探寻世界上所有好玩的东西，这里留着一点足迹",
+					"这里除了代码，还有很多有趣的事情",
+					"这是我自己一点点搭建的博客，也许只是想在虚拟的网络中拥有一点属于自己的东西"
+				];
+				text = blogMessages[Math.floor(Math.random() * blogMessages.length)];
 			} else if (location.pathname.includes("/moments")) {
-				text = "碎碎念～💭 主人的日常小心情都在这里啦！";
+				const momentsMessages = [
+					"一些散落在过去时光中的故事与感想，好故事可是昂贵的，我的朋友",
+					"你说有没有可能，正在看这个网站的你，已经或将要为我带来某一篇随笔的些许想法呢？",
+					"文章只是一张地图，找到回忆还需要跋山涉水",
+				];
+				text = momentsMessages[Math.floor(Math.random() * momentsMessages.length)];
 			} else if (location.pathname === "/fragments/books") {
-				text = "书单推荐！📚 这些书都值得一读哦～";
+				const booksMessages = [
+					"您有多久没有完整读过一本书？那里面有与我们共鸣的灵魂",
+					"我记不清上一次打开非专业的纸质书是什么时候了，但它们一定组成了我的一部分",
+					"也许您有好书要推荐给我，朋友？",
+					"我会永远怀念小时候和亲人朋友在书店里面打发的时光，哪怕那时候的书店朴实的只有书"
+				];
+				text = booksMessages[Math.floor(Math.random() * booksMessages.length)];
 			} else if (location.pathname === "/fragments/novels") {
-				text = "小说推荐！📖 主人的品味很不错呢～";
+				const novelsMessages = [
+					"仔细回想，小说已经贯穿了我到现在为止超过一半的人生",
+					"虚构的故事里藏着最真实的情感，欢迎来到想象的世界",
+					"我们在小说中寻找想象里的自己，但不要忘了自己不是找到的，而是创造的"
+				];
+				text = novelsMessages[Math.floor(Math.random() * novelsMessages.length)];
 			} else if (location.pathname === "/fragments/movies") {
-				text = "电影推荐！🎬 一起来看好电影吧～";
+				const moviesMessages = [
+					"无关乎题材与风格，我总是痴迷于所有的好电影",
+					"我喜欢有年代感的电影，它里面有时代的影子",
+					"好的电影不厌百回看，也许现在是时候翻出你最爱的电影了，朋友"
+				];
+				text = moviesMessages[Math.floor(Math.random() * moviesMessages.length)];
 			} else if (location.pathname.includes("/questionbox")) {
-				text = "💌<br>悄悄话箱～有什么想问的吗？不要害羞哦！";
+				const questionMessages = [
+					"知无不言，言无不尽",
+					"每一个问题都是成长的契机，欢迎交流"
+				];
+				text = questionMessages[Math.floor(Math.random() * questionMessages.length)];
 			} else if (location.pathname.includes("/timeline")) {
-				text = "时间树来啦！⏰ 看看主人的成长轨迹～";
+				const timelineMessages = [
+					"朋友，你觉得时间轴应该是一支箭，还是一棵树？",
+					"现在的我依然是菜菜的，但是三十年河东三十年河西，莫欺少年穷、莫欺中年穷、莫欺老年穷、似者为大，朋友"
+				];
+				text = timelineMessages[Math.floor(Math.random() * timelineMessages.length)];
 			} else if (location.pathname.includes("/presentation")) {
-				text = "讲演展示！🎤 主人的演讲很精彩呢～";
+				const presentationMessages = [
+					"作为一个很讨厌麻烦的i人，我必须承认讲演时常困扰我",
+					"我想尝试一下Slidev,做PPT实在太麻烦了"
+				];
+				text = presentationMessages[Math.floor(Math.random() * presentationMessages.length)];
 			} else if (location.pathname.includes("/profile")) {
-				text = "个人资料～👤 来看看主人的自我介绍吧！";
+				const profileMessages = [
+					"想要知道我的故事？也许您可以直接问问我",
+					"真正了解一个人就像开包抽卡，谁也不知道开出来的是金色传说还是白色普通，但只要开的够多总能开出来的。你觉得呢，我的朋友？"
+				];
+				text = profileMessages[Math.floor(Math.random() * profileMessages.length)];
 			} else if (location.pathname.includes("/search")) {
-				text = "搜索功能！🔍 在找什么呢？让我帮你找找～";
+				const searchMessages = [
+					"如果在这里也没有的话，可以试试催更",
+					"现在这个搜索支持了标题、标签与内容搜索，如果依然没找到那也许就是我的知识盲区"
+				];
+				text = searchMessages[Math.floor(Math.random() * searchMessages.length)];
 			} else {
-				text = "ヾ(◍°∇°◍)ﾉﾞ<br>欢迎来到主人的小站～";
+				text = "ヾ(◍°∇°◍)ﾉﾞ<br>可以随便逛逛，也许有不一样的小彩蛋或者新发现呢";
 			}
 			showMessage(text, 5000, 9); // 提高优先级到9，确保路由变化消息能显示
 		}
@@ -418,137 +529,15 @@ function loadWidget(config) {
 			});
 	})();
 
-	async function loadModelList() {
-		try {
-			const response = await fetch(`${cdnPath}model_list.json`);
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}`);
-			}
-			modelList = await response.json();
-		} catch (error) {
-			console.warn('Live2D 模型列表加载失败:', error);
-			// 设置一个默认的模型列表
-			modelList = {
-				models: [
-					["chitose"],
-					["haruto"],
-					["hibiki"],
-					["hijiki"],
-					["izumi"],
-					["koharu"],
-					["shizuku"],
-					["tororo"],
-					["tsumiki"],
-					["unitychan"],
-					["wanko"]
-				],
-				messages: [
-					"嗨，很高兴见到你！",
-					"你好呀！",
-					"很高兴认识你！",
-					"欢迎来到我的世界！",
-					"很高兴见到你！",
-					"你好！",
-					"欢迎！",
-					"很高兴认识你！",
-					"你好呀！",
-					"欢迎来到我的世界！",
-					"很高兴见到你！"
-				]
-			};
-		}
-	}
-
 	async function loadModel(modelId, modelTexturesId, message) {
 		localStorage.setItem("modelId", modelId);
 		localStorage.setItem("modelTexturesId", modelTexturesId);
 
-		// 显示当前模型名称
-		if (!modelList) await loadModelList();
-
 		try {
-			// 根据modelId动态选择模型
 			console.log('开始加载Live2D模型...');
-			console.log('CDN路径:', cdnPath);
 			console.log('loadlive2d函数存在:', typeof loadlive2d);
 
-			// 完整的模型映射表（根据CDN实际可用的模型）
-			const modelGroups = {
-				0: { // Potion-Maker系列
-					base: "Potion-Maker/Pio",
-					textures: ["Pio"],
-					names: ["Pio"]
-				},
-				1: { // Potion-Maker系列
-					base: "Potion-Maker/Tia",
-					textures: ["Tia"],
-					names: ["Tia"]
-				},
-				2: { // bilibili-live系列
-					base: "bilibili-live/22",
-					textures: ["22"],
-					names: ["22"]
-				},
-				3: { // bilibili-live系列
-					base: "bilibili-live/33",
-					textures: ["33"],
-					names: ["33"]
-				},
-				4: { // ShizukuTalk系列
-					base: "ShizukuTalk",
-					textures: ["shizuku-48", "shizuku-pajama"],
-					names: ["Shizuku", "Shizuku睡衣"]
-				},
-				5: { // HyperdimensionNeptunia系列 - Neptune
-					base: "HyperdimensionNeptunia",
-					textures: ["neptune_classic", "nepnep", "neptune_santa", "nepmaid", "nepswim"],
-					names: ["Neptune经典", "Neptune普通", "Neptune圣诞", "Neptune女仆", "Neptune泳装"]
-				},
-				6: { // HyperdimensionNeptunia系列 - Noir
-					base: "HyperdimensionNeptunia",
-					textures: ["noir_classic", "noir", "noir_santa", "noireswim"],
-					names: ["Noir经典", "Noir普通", "Noir圣诞", "Noir泳装"]
-				},
-				7: { // HyperdimensionNeptunia系列 - Blanc
-					base: "HyperdimensionNeptunia",
-					textures: ["blanc_classic", "blanc_normal", "blanc_swimwear"],
-					names: ["Blanc经典", "Blanc普通", "Blanc泳装"]
-				},
-				8: { // HyperdimensionNeptunia系列 - Vert
-					base: "HyperdimensionNeptunia",
-					textures: ["vert_classic", "vert_normal", "vert_swimwear"],
-					names: ["Vert经典", "Vert普通", "Vert泳装"]
-				},
-				9: { // HyperdimensionNeptunia系列 - Nepgear
-					base: "HyperdimensionNeptunia",
-					textures: ["nepgear", "nepgear_extra", "nepgearswim"],
-					names: ["Nepgear", "Nepgear特别", "Nepgear泳装"]
-				},
-				10: { // HyperdimensionNeptunia系列 - Histoire
-					base: "HyperdimensionNeptunia",
-					textures: ["histoire", "histoirenohover"],
-					names: ["Histoire", "Histoire无悬停"]
-				},
-				11: { // KantaiCollection系列
-					base: "KantaiCollection/murakumo",
-					textures: ["murakumo"],
-					names: ["Murakumo"]
-				}
-			};
-
-			// 根据modelId和modelTexturesId选择模型
-			const modelGroup = modelGroups[modelId];
-			let targetModel = "Potion-Maker/Pio"; // 默认模型
-			let currentModelName = `模型${modelId}`;
-
-			if (modelGroup) {
-				const textureIndex = Math.min(modelTexturesId, modelGroup.textures.length - 1);
-				const textureName = modelGroup.textures[textureIndex];
-				const displayName = modelGroup.names[textureIndex];
-
-				// 优先使用本地模型
-				if (modelId === 9) {
-					// Nepgear本地模型系列
+			// 只支持本地Nepgear模型系列
 					const nepgearLocalModels = [
 						"/live2d-widget-master/models/HyperdimensionNeptunia/nepgear", // 普通版
 						"/live2d-widget-master/models/HyperdimensionNeptunia/nepgear_extra", // 特别版
@@ -556,33 +545,15 @@ function loadWidget(config) {
 					];
 					const nepgearNames = ["Nepgear (本地)", "Nepgear特别 (本地)", "Nepgear泳装 (本地)"];
 
-					targetModel = nepgearLocalModels[textureIndex] || nepgearLocalModels[0];
-					currentModelName = nepgearNames[textureIndex] || nepgearNames[0];
-				} else {
-					// 构建完整的模型路径（CDN）
-					if (modelGroup.base.includes("/")) {
-						// 直接路径模型（如 Potion-Maker/Pio）
-						targetModel = modelGroup.base;
-					} else {
-						// 需要组合路径的模型（如 HyperdimensionNeptunia）
-						targetModel = `${modelGroup.base}/${textureName}`;
-					}
-					currentModelName = displayName;
-				}
-			}
+			const textureIndex = Math.min(modelTexturesId, nepgearLocalModels.length - 1);
+			const targetModel = nepgearLocalModels[textureIndex] || nepgearLocalModels[0];
+			const currentModelName = nepgearNames[textureIndex] || nepgearNames[0];
 
 			// 显示当前模型名称
-			showMessage(`${message || '欢迎来到主人的小站～'}<br>当前模型: ${currentModelName}`, 4000, 10);
+			showMessage(`${message || '欢迎来到我的小站～'}`, 4000, 10);
 
 			// 构建模型URL
-			let modelUrl;
-			if (targetModel.startsWith("/")) {
-				// 本地模型路径
-				modelUrl = `${targetModel}/index.json`;
-			} else {
-				// CDN模型路径
-				modelUrl = `${cdnPath}model/${targetModel}/index.json`;
-			}
+			const modelUrl = `${targetModel}/index.json`;
 
 			console.log('完整URL:', modelUrl);
 
@@ -590,14 +561,13 @@ function loadWidget(config) {
 				loadlive2d("live2d", modelUrl);
 				console.log(`正在加载模型: ${currentModelName}`);
 				console.log(`模型路径: ${targetModel}`);
-				window.modelLoaded = true; // 在真正加载后才标记
+				window.modelLoaded = true;
 			} else {
 				console.error('loadlive2d函数不存在！');
 				showMessage("Live2D库未加载", 3000, 9);
 			}
 		} catch (error) {
 			console.error('Live2D 模型加载失败:', error);
-			// 显示错误信息帮助调试
 			showMessage("模型加载失败，请检查控制台", 3000, 9);
 		}
 	}
@@ -611,47 +581,24 @@ function loadWidget(config) {
 		const modelId = localStorage.getItem("modelId"),
 			modelTexturesId = localStorage.getItem("modelTexturesId");
 
-		// 只对Nepgear模型(9)进行本地换装
-		if (modelId == 9) {
+		// 只支持本地Nepgear模型换装
 			const currentTextureId = parseInt(modelTexturesId) || 0;
 			const nextTextureId = (currentTextureId + 1) % 3; // 0, 1, 2 循环
 
 			const textureNames = ["普通版", "特别版", "泳装版"];
 			showMessage(`✨<br>换上${textureNames[nextTextureId]}！`, 3000, 10);
 			loadModel(9, nextTextureId, "✨<br>我的新衣服好看吗？");
-		} else {
-			// 其他模型使用CDN换装
-			if (useCDN) {
-				if (!modelList) await loadModelList();
-				const target = randomSelection(modelList.models[modelId]);
-				loadlive2d("live2d", `${cdnPath}model/${target}/index.json`);
-				showMessage("我的新衣服好看嘛？", 4000, 10);
-			} else {
-				// 可选 "rand"(随机), "switch"(顺序)
-				fetch(`${apiPath}rand_textures/?id=${modelId}-${modelTexturesId}`)
-					.then(response => response.json())
-					.then(result => {
-						if (result.textures.id === 1 && (modelTexturesId === 1 || modelTexturesId === 0)) showMessage("(｡•́︿•̀｡)<br>我还没有其他衣服呢！", 4000, 10);
-						else loadModel(modelId, result.textures.id, "✨<br>我的新衣服好看吗？");
-					});
-			}
-		}
 	}
 
 	async function loadOtherModel() {
-		let modelId = localStorage.getItem("modelId");
-		if (useCDN) {
-			if (!modelList) await loadModelList();
-			const index = (++modelId >= modelList.models.length) ? 0 : modelId;
-			loadModel(index, 0, modelList.messages[index]);
-		} else {
-			fetch(`${apiPath}switch/?id=${modelId}`)
-				.then(response => response.json())
-				.then(result => {
-					loadModel(result.model.id, 0, result.model.message);
-				});
-		}
+		// 只支持本地Nepgear模型，不需要切换其他模型
+		showMessage("(｡•́︿•̀｡)<br>我只有这一套衣服呢！", 4000, 10);
 	}
+
+	// 将函数暴露到全局作用域
+	window.loadModel = loadModel;
+	window.loadRandModel = loadRandModel;
+	window.loadOtherModel = loadOtherModel;
 }
 
 function initWidget(config, apiPath) {
@@ -694,7 +641,7 @@ function initWidget(config, apiPath) {
 		// 延迟加载模型，等待loadWidget完成
 		setTimeout(() => {
 			if (window.loadModel) {
-				window.loadModel(9, 0, "ヾ(◍°∇°◍)ﾉﾞ<br>欢迎来到主人的小站～");
+				window.loadModel(9, 0, "ヾ(◍°∇°◍)ﾉﾞ<br>欢迎来到我的小站～");
 			}
 		}, 1500);
 	}

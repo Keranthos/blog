@@ -150,11 +150,6 @@
           </transition>
         </div>
 
-        <!-- 主题切换按钮 -->
-        <button class="theme-toggle-btn" :title="currentTheme === 'light' ? '切换到暗色模式' : '切换到亮色模式'" @click="toggleTheme">
-          <font-awesome-icon :icon="currentTheme === 'light' ? 'moon' : 'sun'" />
-        </button>
-
         <!-- 用户头像 -->
         <div class="user-menu" @click="goToAuthUser">
           <div v-if="!user.isLogged" class="user-avatar login-prompt">
@@ -178,7 +173,6 @@ const store = useStore()
 const router = useRouter()
 const route = useRoute()
 const user = computed(() => store.state.user)
-const currentTheme = computed(() => store.state.theme)
 
 const dropdownVisible = ref(false)
 const otherDropdownVisible = ref(false)
@@ -264,10 +258,6 @@ const goToAuthUser = () => {
 
 const goToProfile = () => {
   router.push('/profile')
-}
-
-const toggleTheme = () => {
-  store.dispatch('toggleTheme')
 }
 
 const userLevel = computed(() => {
@@ -785,39 +775,6 @@ watch(() => route.path, () => {
 .action-btn:hover {
   background: #667eea;
   color: white;
-}
-
-/* 主题切换按钮 */
-.theme-toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  border: none;
-  background: rgba(255, 193, 7, 0.1);
-  color: #ffc107;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 1rem;
-  margin-right: 12px;
-}
-
-.theme-toggle-btn:hover {
-  background: #ffc107;
-  color: white;
-}
-
-/* 暗色模式下的主题切换按钮 */
-[data-theme="dark"] .theme-toggle-btn {
-  background: rgba(255, 193, 7, 0.2);
-  color: #ffc107;
-}
-
-[data-theme="dark"] .theme-toggle-btn:hover {
-  background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
-  color: #333;
 }
 
 /* 用户菜单 */

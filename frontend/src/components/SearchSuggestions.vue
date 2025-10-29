@@ -406,46 +406,6 @@ onUnmounted(() => {
   margin: 0;
 }
 
-/* 暗色模式适配 */
-[data-theme="dark"] .search-suggestions {
-  background: rgba(26, 33, 62, 0.95);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-[data-theme="dark"] .section-header {
-  background: rgba(102, 126, 234, 0.1);
-  color: #b0b0b0;
-}
-
-[data-theme="dark"] .suggestion-item:hover,
-[data-theme="dark"] .suggestion-item.active {
-  background: rgba(102, 126, 234, 0.15);
-}
-
-[data-theme="dark"] .item-text {
-  color: #e0e0e0;
-}
-
-[data-theme="dark"] .item-icon {
-  color: #999;
-}
-
-[data-theme="dark"] .remove-btn {
-  color: #999;
-}
-
-[data-theme="dark"] .remove-btn:hover {
-  color: #ff6b6b;
-}
-
-[data-theme="dark"] .no-suggestions {
-  color: #b0b0b0;
-}
-
-[data-theme="dark"] .no-suggestions-icon {
-  color: #666;
-}
-
 /* 滚动条样式 */
 .search-suggestions::-webkit-scrollbar {
   width: 6px;

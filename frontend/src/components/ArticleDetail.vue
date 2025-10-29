@@ -1602,23 +1602,6 @@ pre:hover .copy-btn {
   padding: 16px;
 }
 
-/* 暗色模式适配 */
-[data-theme="dark"] .toc-content {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: none;
-  backdrop-filter: blur(20px);
-}
-
-/* 暗色模式下的树形结构连接线 */
-[data-theme="dark"] .toc-link::before {
-  background: #4a5568 !important; /* 暗色模式的水平连接线颜色 */
-}
-
-[data-theme="dark"] .vertical-line {
-  background: #4a5568 !important; /* 暗色模式的垂直线颜色 */
-}
-
 /* 隐藏目录头部 */
 .toc-header {
   display: none !important;
@@ -1810,63 +1793,6 @@ pre:hover .copy-btn {
 /* 五级和六级标题指示器已移除，由动态样式控制 */
 
 /* 树形结构连接线样式由动态CSS生成 */
-
-/* 暗色模式适配 */
-[data-theme="dark"] .toc-content {
-  background: #2d3748;
-  border-color: #4a5568;
-}
-
-[data-theme="dark"] .toc-header {
-  background: #1a202c;
-  border-bottom-color: #4a5568;
-}
-
-[data-theme="dark"] .toc-title {
-  color: #e2e8f0;
-}
-
-[data-theme="dark"] .toc-count {
-  background: #4a5568;
-  color: #a0aec0;
-}
-
-[data-theme="dark"] .toc-link {
-  color: #a0aec0;
-}
-
-[data-theme="dark"] .toc-link:hover {
-  color: #e2e8f0;
-  background: #4a5568;
-  border-left-color: #63b3ed;
-}
-
-[data-theme="dark"] .toc-link.active {
-  background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
-  color: #e2e8f0;
-  border-left-color: #a0aec0;
-  box-shadow: 0 2px 8px rgba(160, 174, 192, 0.2);
-}
-
-/* 目录切换按钮暗色模式样式已移除 */
-
-[data-theme="dark"] .toc-level-1 .toc-link::before {
-  color: #63b3ed;
-}
-
-[data-theme="dark"] .toc-level-2 .toc-link::before {
-  color: #a0aec0;
-}
-
-[data-theme="dark"] .toc-level-3 .toc-link::before {
-  color: #718096;
-}
-
-[data-theme="dark"] .toc-level-4 .toc-link::before,
-[data-theme="dark"] .toc-level-5 .toc-link::before,
-[data-theme="dark"] .toc-level-6 .toc-link::before {
-  color: #4a5568;
-}
 
 /* 响应式设计 */
 @media (max-width: 768px) {

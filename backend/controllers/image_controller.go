@@ -113,7 +113,7 @@ func DeleteImage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Image deleted successfully",
+		"message":   "Image deleted successfully",
 		"userToast": true, // 需要看板娘提示
 	})
 }

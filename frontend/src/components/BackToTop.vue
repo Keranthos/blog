@@ -111,25 +111,6 @@ onUnmounted(() => {
   transform: translateY(-1px) scale(1.05);
 }
 
-/* 暗色模式适配 */
-[data-theme="dark"] .scroll-progress {
-  background: rgba(255, 193, 7, 0.2);
-}
-
-[data-theme="dark"] .progress-bar {
-  background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
-}
-
-[data-theme="dark"] .back-to-top {
-  background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
-  box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
-}
-
-[data-theme="dark"] .back-to-top:hover {
-  background: linear-gradient(135deg, #ff9800 0%, #ffc107 100%);
-  box-shadow: 0 8px 25px rgba(255, 193, 7, 0.6);
-}
-
 /* 淡入淡出动画 */
 .fade-enter-active,
 .fade-leave-active {

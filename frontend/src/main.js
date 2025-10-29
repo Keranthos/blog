@@ -13,7 +13,6 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import store from './store'
 import './assets/styles/github-markdown.css'
 import './assets/styles/github-highlight.css'
-import './assets/styles/dark-theme.css'
 import {
   faHouse,
   faBlog,

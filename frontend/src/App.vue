@@ -16,11 +16,8 @@ import { onMounted } from 'vue'
 import { resetSEO } from '@/utils/seo'
 import BackToTop from '@/components/BackToTop.vue'
 
-// 初始化主题
+// 初始化
 onMounted(() => {
-  const savedTheme = localStorage.getItem('theme') || 'light'
-  document.documentElement.setAttribute('data-theme', savedTheme)
-
   // 重置SEO信息
   resetSEO()
 })

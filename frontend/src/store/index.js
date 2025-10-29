@@ -12,8 +12,7 @@ const store = createStore({
       level: 1,
       avatar: ''
     },
-    token: localStorage.getItem('jwt') || '',
-    theme: localStorage.getItem('theme') || 'light' // 主题状态
+    token: localStorage.getItem('jwt') || ''
   },
   mutations: {
     setUser (state, user) {
@@ -36,12 +35,6 @@ const store = createStore({
       state.token = ''
       localStorage.removeItem('jwt')
       localStorage.removeItem('vuex') // 清除 vuex 持久化数据
-    },
-    setTheme (state, theme) {
-      state.theme = theme
-      localStorage.setItem('theme', theme)
-      // 应用主题到 HTML
-      document.documentElement.setAttribute('data-theme', theme)
     }
   },
   plugins: [createPersistedState()], // 启用持久化插件
@@ -63,10 +56,6 @@ const store = createStore({
     },
     logout ({ commit }) {
       commit('logout')
-    },
-    toggleTheme ({ commit, state }) {
-      const newTheme = state.theme === 'light' ? 'dark' : 'light'
-      commit('setTheme', newTheme)
     }
   }
 })
