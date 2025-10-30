@@ -65,22 +65,22 @@
                       </h4>
                     </div>
                     <p class="card-excerpt">{{ getPlainText(blog.content) || '记录成长路上的点点滴滴...' }}</p>
-                    <div class="card-meta">
-                      <div class="card-date">
-                        <i class="date-icon">🕐</i>
-                        <span>{{ formatDateTime(blog.CreatedAt) }}</span>
-                      </div>
-                      <div class="card-tags">
-                        <i class="tag-icon">🔖</i>
-                        <template v-if="blog.tags && blog.tags.length > 0">
-                          <span v-for="tag in blog.tags" :key="tag" class="tag">{{ tag }}</span>
-                        </template>
-                        <span v-else class="tag">山角函兽懒得加标签了</span>
-                      </div>
-                    </div>
                   </div>
                   <div class="card-thumbnail">
                     <img :src="blog.image" :alt="blog.title" />
+                  </div>
+                  <div class="card-meta">
+                    <div class="card-date">
+                      <i class="date-icon">🕐</i>
+                      <span>{{ formatDateTime(blog.CreatedAt) }}</span>
+                    </div>
+                    <div class="card-tags">
+                      <i class="tag-icon">🔖</i>
+                      <template v-if="blog.tags && blog.tags.length > 0">
+                        <span v-for="tag in blog.tags" :key="tag" class="tag">{{ tag }}</span>
+                      </template>
+                      <span v-else class="tag">山角函兽懒得加标签了</span>
+                    </div>
                   </div>
                 </div>
               </article>
@@ -112,22 +112,22 @@
                       </h4>
                     </div>
                     <p class="card-excerpt">{{ getPlainText(moment.content) || '记录生活的点点滴滴...' }}</p>
-                    <div class="card-meta">
-                      <div class="card-date">
-                        <i class="date-icon">🕐</i>
-                        <span>{{ formatDateTime(moment.CreatedAt) }}</span>
-                      </div>
-                      <div class="card-tags">
-                        <i class="tag-icon">🔖</i>
-                        <template v-if="moment.tags && moment.tags.length > 0">
-                          <span v-for="tag in moment.tags" :key="tag" class="tag">{{ tag }}</span>
-                        </template>
-                        <span v-else class="tag">山角函兽懒得加标签了</span>
-                      </div>
-                    </div>
                   </div>
                   <div class="card-thumbnail">
                     <img :src="moment.image" :alt="moment.title" />
+                  </div>
+                  <div class="card-meta">
+                    <div class="card-date">
+                      <i class="date-icon">🕐</i>
+                      <span>{{ formatDateTime(moment.CreatedAt) }}</span>
+                    </div>
+                    <div class="card-tags">
+                      <i class="tag-icon">🔖</i>
+                      <template v-if="moment.tags && moment.tags.length > 0">
+                        <span v-for="tag in moment.tags" :key="tag" class="tag">{{ tag }}</span>
+                      </template>
+                      <span v-else class="tag">山角函兽懒得加标签了</span>
+                    </div>
                   </div>
                 </div>
               </article>
@@ -159,22 +159,22 @@
                       </h4>
                     </div>
                     <p class="card-excerpt">{{ getPlainText(project.content) || '展示我的项目作品...' }}</p>
-                    <div class="card-meta">
-                      <div class="card-date">
-                        <i class="date-icon">🕐</i>
-                        <span>{{ formatDateTime(project.CreatedAt) }}</span>
-                      </div>
-                      <div class="card-tags">
-                        <i class="tag-icon">🔖</i>
-                        <template v-if="project.tags && project.tags.length > 0">
-                          <span v-for="tag in project.tags" :key="tag" class="tag">{{ tag }}</span>
-                        </template>
-                        <span v-else class="tag">山角函兽懒得加标签了</span>
-                      </div>
-                    </div>
                   </div>
                   <div class="card-thumbnail">
                     <img :src="project.image" :alt="project.title" />
+                  </div>
+                  <div class="card-meta">
+                    <div class="card-date">
+                      <i class="date-icon">🕐</i>
+                      <span>{{ formatDateTime(project.CreatedAt) }}</span>
+                    </div>
+                    <div class="card-tags">
+                      <i class="tag-icon">🔖</i>
+                      <template v-if="project.tags && project.tags.length > 0">
+                        <span v-for="tag in project.tags" :key="tag" class="tag">{{ tag }}</span>
+                      </template>
+                      <span v-else class="tag">山角函兽懒得加标签了</span>
+                    </div>
                   </div>
                 </div>
               </article>
@@ -890,6 +890,12 @@ onMounted(async () => {
   margin-top: auto;
   padding-top: 15px;
   border-top: 1px solid rgba(168, 85, 247, 0.1);
+  width: 100%;
+  /* 让分割线铺满卡片内容宽度（抵消内边距）*/
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
 }
 
 .card-date {
@@ -909,7 +915,8 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* 与图标同一行，不换行 */
+  overflow: hidden;  /* 超出隐藏，配合单行显示 */
 }
 
 .tag-icon {
@@ -1345,6 +1352,20 @@ onMounted(async () => {
   /* 浮动按钮已删除 */
 }
 
+/* 当窗口 <= 1330px（或相当于最大布局宽度的 2/3）时，隐藏右侧栏与分隔线，仅显示左侧内容 */
+@media (max-width: 1330px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+  }
+  .main-layout::after { display: none; }
+  .sidebar { display: none; }
+  .main-content {
+    padding-right: 0;
+    width: 66.666%;
+    margin: 0 auto;
+  }
+}
+
 @media (max-width: 768px) {
   .hero-title {
     font-size: 2rem;
@@ -1371,6 +1392,11 @@ onMounted(async () => {
   .main-layout {
     gap: 20px;
   }
+  /* 手机端也保持主体 2/3 宽度，左右留边距 */
+  .main-content {
+    width: 66.666%;
+    margin: 0 auto;
+  }
 
   .blog-cards {
     gap: 15px;
@@ -1381,28 +1407,49 @@ onMounted(async () => {
     padding: 15px;
     min-height: 80px;
     border-radius: 12px;
+    display: flex;
+    flex-direction: column; /* 垂直布局，便于重排 */
   }
 
-  .card-text {
-    flex: 0 0 70%;
-  }
+  .card-text { order: 1; }
 
   .card-thumbnail {
-    flex: 0 0 30%;
-    height: 105px;
+    order: 2; /* 图片位于简介与底部行之间 */
+    width: 100%;
+    height: auto;
+    /* 不超过卡片高度的 2/5（若父级有高度时生效）；并提供基于视口宽度的兜底限制 */
+    max-height: 40%;
+    max-height: min(40vw, 200px);
+    border-radius: 10px;
   }
+  .card-thumbnail img { width: 100%; height: 100%; object-fit: cover; max-height: inherit; }
 
   .card-title {
     font-size: 1.1rem;
   }
 
   .card-meta {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
+    order: 3; /* 底部行 */
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
     margin-top: 10px;
     padding-top: 10px;
+    /* 移动端内边距为15px，分割线同样需要满宽 */
+    margin-left: -15px;
+    margin-right: -15px;
+    padding-left: 15px;
+    padding-right: 15px;
   }
+  /* 标签容器固定占 2/5 宽，靠右并保持与图标同一行 */
+  .card-tags {
+    flex: 0 0 40%;
+    justify-content: flex-end;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .card-tags .tag { display: inline; padding: 0 6px; }
 
   .sidebar-section {
     padding: 15px;
@@ -1445,7 +1492,7 @@ onMounted(async () => {
   }
 
   .card-thumbnail {
-    height: 120px;
+    height: 140px; /* 略大一些，位于中间更协调 */
   }
 
   .card-title {
