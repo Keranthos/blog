@@ -5,6 +5,8 @@ import (
 	"backend/models"
 	"backend/utils"
 	"fmt"
+	"os"
+	"path/filepath"
 	"net/http"
 	"sort"
 	"strconv"
@@ -357,6 +359,42 @@ func DeleteArticle(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Article deleted"})
+}
+
+// MigrateArticleImages 批量本地化历史外链封面，并替换指定文章封面
+func MigrateArticleImages(c *gin.Context) {
+    // 1) 批量本地化 blog/research/project/moment 中的外链图片
+    type item struct{ table string }
+    tables := []item{{"blog_articles"}, {"research_articles"}, {"project_articles"}, {"moments"}}
+    for _, t := range tables {
+        // 仅选择 id 与 image 字段
+        rows, err := config.DB.Table(t.table).Select("id, image").Rows()
+        if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}); return }
+        defer rows.Close()
+        for rows.Next() {
+            var id uint
+            var image string
+            if err := rows.Scan(&id, &image); err != nil { continue }
+            if !utils.IsExternalImageURL(image) { continue }
+            if newURL, err := utils.FetchAndStoreImage(image); err == nil && newURL != "" {
+                config.DB.Table(t.table).Where("id = ?", id).Update("image", newURL)
+            }
+        }
+    }
+
+    // 2) 指定文章替换封面
+    var blog models.BlogArticle
+    if err := config.DB.Where("title = ?", "建立一个项目2_GORM入门").First(&blog).Error; err == nil {
+        // 找到前端博客顶部图片（相对后端目录）
+        root, _ := os.Getwd() // backend 目录
+        // 上级到项目根，再到 frontend/src/assets/blog_background.jpg
+        asset := filepath.Join(root, "..", "frontend", "src", "assets", "blog_background.jpg")
+        if newURL, err := utils.StoreLocalImageFromPath(asset); err == nil && newURL != "" {
+            config.DB.Model(&blog).Update("image", newURL)
+        }
+    }
+
+    c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 // 获取置顶文章

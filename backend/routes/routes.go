@@ -49,6 +49,7 @@ func SetupRouter() *gin.Engine {
 		api.POST("/articles", middlewares.Auth(3), controllers.CreateArticle)       // 创建文章需要管理员权限
 		api.PUT("/articles/:id", middlewares.Auth(3), controllers.UpdateArticle)    // 更新文章需要管理员权限
 		api.DELETE("/articles/:id", middlewares.Auth(3), controllers.DeleteArticle) // 删除文章需要管理员权限
+		api.POST("/articles/migrate-images", middlewares.Auth(3), controllers.MigrateArticleImages) // 批量本地化历史封面并替换指定文章
 
 		// 评论相关路由，权限: 0 (所有用户)
 		api.GET("/comments", controllers.GetAllComments) // 获取所有评论
