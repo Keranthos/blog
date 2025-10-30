@@ -186,6 +186,11 @@ func CreateArticle(c *gin.Context) {
 			return
 		}
 
+		// 外链封面本地化
+		if newURL, err := utils.FetchAndStoreImage(blogArticle.Image); err == nil && newURL != "" {
+			blogArticle.Image = newURL
+		}
+
 		article = blogArticle
 	case "research":
 		var researchArticle models.ResearchArticle
@@ -212,6 +217,10 @@ func CreateArticle(c *gin.Context) {
 			return
 		}
 
+		if newURL, err := utils.FetchAndStoreImage(researchArticle.Image); err == nil && newURL != "" {
+			researchArticle.Image = newURL
+		}
+
 		article = researchArticle
 	case "project":
 		var projectArticle models.ProjectArticle
@@ -236,6 +245,10 @@ func CreateArticle(c *gin.Context) {
 		if err := utils.ValidateImageURL(projectArticle.Image); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
+		}
+
+		if newURL, err := utils.FetchAndStoreImage(projectArticle.Image); err == nil && newURL != "" {
+			projectArticle.Image = newURL
 		}
 
 		article = projectArticle
@@ -269,6 +282,9 @@ func UpdateArticle(c *gin.Context) {
 			return
 		}
 		fmt.Printf("博客文章数据: %+v\n", blogArticle)
+		if newURL, err := utils.FetchAndStoreImage(blogArticle.Image); err == nil && newURL != "" {
+			blogArticle.Image = newURL
+		}
 		if err := config.DB.Model(&models.BlogArticle{}).Where("id = ?", id).Updates(blogArticle).Error; err != nil {
 			fmt.Printf("数据库更新错误: %v\n", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update article"})
@@ -282,6 +298,9 @@ func UpdateArticle(c *gin.Context) {
 			return
 		}
 		fmt.Printf("研究文章数据: %+v\n", researchArticle)
+		if newURL, err := utils.FetchAndStoreImage(researchArticle.Image); err == nil && newURL != "" {
+			researchArticle.Image = newURL
+		}
 		if err := config.DB.Model(&models.ResearchArticle{}).Where("id = ?", id).Updates(researchArticle).Error; err != nil {
 			fmt.Printf("研究文章数据库更新错误: %v\n", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update article"})
@@ -295,6 +314,9 @@ func UpdateArticle(c *gin.Context) {
 			return
 		}
 		fmt.Printf("项目文章数据: %+v\n", projectArticle)
+		if newURL, err := utils.FetchAndStoreImage(projectArticle.Image); err == nil && newURL != "" {
+			projectArticle.Image = newURL
+		}
 		if err := config.DB.Model(&models.ProjectArticle{}).Where("id = ?", id).Updates(projectArticle).Error; err != nil {
 			fmt.Printf("项目文章数据库更新错误: %v\n", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update article"})

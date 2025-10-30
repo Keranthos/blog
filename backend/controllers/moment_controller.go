@@ -3,6 +3,7 @@ package controllers
 import (
 	"backend/config"
 	"backend/models"
+	"backend/utils"
 	"net/http"
 	"strconv"
 
@@ -68,6 +69,10 @@ func CreateMoment(c *gin.Context) {
 		return
 	}
 
+	if newURL, err := utils.FetchAndStoreImage(moment.Image); err == nil && newURL != "" {
+		moment.Image = newURL
+	}
+
 	if err := config.DB.Create(&moment).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create moment"})
 		return
@@ -90,6 +95,10 @@ func UpdateMoment(c *gin.Context) {
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	if newURL, err := utils.FetchAndStoreImage(updateData.Image); err == nil && newURL != "" {
+		updateData.Image = newURL
 	}
 
 	if err := config.DB.Model(&moment).Updates(updateData).Error; err != nil {
