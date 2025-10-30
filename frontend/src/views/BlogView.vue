@@ -8,7 +8,7 @@
 
 <script setup>
 import ArticleList from '@/components/ArticleList.vue'
-import blogBackgroundImg from '@/assets/blog_background.jpg'
+import booksBackgroundImg from '@/assets/books_background.jpg'
 
-const blogBackground = blogBackgroundImg
+const blogBackground = booksBackgroundImg
 </script>

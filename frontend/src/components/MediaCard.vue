@@ -1,39 +1,90 @@
 <template>
   <div class="media-card-wrapper">
-  <div class="media-card" @click="openMediaModal">
-    <div class="poster" :style="{ backgroundImage: `url(${props.media.Poster})` }"></div>
-    <div class="content">
-      <h2>{{ props.media.Name }}</h2>
-      <p class="date">创建日期: {{ formattedTime }}</p>
-      <div v-if="props.media.Rating" class="rating-stars">
-        <span>{{ '⭐'.repeat(Math.round(props.media.Rating / 2)) }}</span>
+    <div class="media-card" :class="{ 'media-row': props.variant === 'row' }" @click="openMediaModal">
+      <div v-if="props.variant !== 'row'" class="poster" :style="{ backgroundImage: `url(${props.media.Poster})` }"></div>
+      <div class="content">
+        <template v-if="props.variant === 'row'">
+          <div class="row-header">
+            <h2 class="row-title">
+              <font-awesome-icon :icon="mediaTypeIcon" class="type-fa-icon" />
+              {{ props.media.Name }}
+            </h2>
+            <div v-if="props.media.Rating" class="row-rating">
+              <span class="stars">
+                <span v-for="(s, idx) in starArray" :key="'s-'+idx" class="star-wrap">
+                  <span v-if="s.cls === 'half-star'" class="star-half-wrap">
+                    <font-awesome-icon :icon="['far','star']" class="star-icon empty-star" :style="{ color: '#e0e0e0' }" />
+                    <font-awesome-icon :icon="'star'" class="star-icon full-star star-half-overlay" :style="{ color: '#ffd700' }" />
+                  </span>
+                  <font-awesome-icon v-else-if="s.cls === 'full-star'" :icon="s.icon" class="star-icon full-star" :style="{ color: '#ffd700' }" />
+                  <font-awesome-icon v-else :icon="s.icon" class="star-icon empty-star" :style="{ color: '#e0e0e0' }" />
+                </span>
+              </span>
+              <span class="rating-text">{{ props.media.Rating }}/10</span>
+            </div>
+          </div>
+          <div class="row-meta">
+            <span class="date">Modify {{ formattedTime }}</span>
+          </div>
+        </template>
+        <template v-else>
+          <h2>
+            <font-awesome-icon :icon="mediaTypeIcon" class="type-fa-icon" />
+            {{ props.media.Name }}
+          </h2>
+          <p class="date">Modify {{ formattedTime }}</p>
+          <div v-if="props.media.Rating" class="rating-stars">
+            <span class="stars">
+              <span v-for="(s, idx) in starArray" :key="'m-'+idx" class="star-wrap">
+                <span v-if="s.cls === 'half-star'" class="star-half-wrap">
+                  <font-awesome-icon :icon="['far','star']" class="star-icon empty-star" :style="{ color: '#e0e0e0' }" />
+                  <font-awesome-icon :icon="'star'" class="star-icon full-star star-half-overlay" :style="{ color: '#ffd700' }" />
+                </span>
+                <font-awesome-icon v-else-if="s.cls === 'full-star'" :icon="s.icon" class="star-icon full-star" :style="{ color: '#ffd700' }" />
+                <font-awesome-icon v-else :icon="s.icon" class="star-icon empty-star" :style="{ color: '#e0e0e0' }" />
+              </span>
+            </span>
+          </div>
+        </template>
       </div>
     </div>
 
-  </div>
-
-  <!-- 媒体详情模态框 - 与搜索模态风格一致 -->
-  <Teleport to="body">
-    <transition name="media-modal-fade">
-      <div v-if="showMediaModal" class="media-modal-overlay" @click="closeMediaModal">
-        <div class="media-modal-container" @click.stop>
-          <div class="media-modal-header">
-            <h3 class="media-modal-title">{{ props.media.Name }}</h3>
-            <button v-if="userLevel >= 3" class="media-modal-edit" @click="goToEdit">编辑</button>
-          </div>
-          <div class="media-modal-body">
-            <div class="media-modal-content">
-              <div v-if="props.media.Rating" class="media-modal-rating">
-                <span class="stars">{{ '⭐'.repeat(Math.round(props.media.Rating / 2)) }}</span>
-                <span class="rating-text">{{ props.media.Rating }}/10</span>
+    <!-- 媒体详情模态框 - 与搜索模态风格一致 -->
+    <Teleport to="body">
+      <transition name="media-modal-fade">
+        <div v-if="showMediaModal" class="media-modal-overlay" @click="closeMediaModal">
+          <div class="media-modal-container" @click.stop>
+            <div class="media-modal-header">
+              <div v-if="props.media.Poster" class="modal-thumb">
+                <img :src="props.media.Poster" :alt="props.media.Name" />
               </div>
-              <div class="media-modal-review markdown-body" v-html="renderedReview"></div>
+              <div class="media-modal-headinfo">
+                <h3 class="media-modal-title">{{ props.media.Name }}</h3>
+                <div v-if="props.media.Rating" class="media-modal-rating">
+                  <span class="stars modal-stars">
+                    <span v-for="(s, idx) in starArray" :key="'d-'+idx" class="star-wrap">
+                      <span v-if="s.cls === 'half-star'" class="star-half-wrap">
+                        <font-awesome-icon :icon="['far','star']" class="star-icon empty-star" />
+                        <font-awesome-icon :icon="'star'" class="star-icon full-star star-half-overlay" />
+                      </span>
+                      <font-awesome-icon v-else-if="s.cls === 'full-star'" :icon="s.icon" class="star-icon full-star" />
+                      <font-awesome-icon v-else :icon="s.icon" class="star-icon empty-star" />
+                    </span>
+                  </span>
+                  <span class="rating-text">{{ props.media.Rating }}/10</span>
+                </div>
+              </div>
+              <button v-if="userLevel >= 3" class="media-modal-edit" @click="goToEdit">编辑</button>
+            </div>
+            <div class="media-modal-body">
+              <div class="media-modal-content">
+                <div class="media-modal-review markdown-body" v-html="renderedReview"></div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </transition>
-  </Teleport>
+      </transition>
+    </Teleport>
   </div>
 </template>
 
@@ -46,7 +97,15 @@ import DOMPurify from 'dompurify'
 
 const props = defineProps({
   media: Object,
-  type: String
+  type: String,
+  variant: { type: String, default: 'card' } // 'card' | 'row'
+})
+const mediaTypeIcon = computed(() => {
+  const t = (props.type || '').toLowerCase()
+  if (t === 'books') return 'book'
+  if (t === 'novels') return 'bookmark'
+  if (t === 'movies') return 'film'
+  return 'box'
 })
 
 // 无对外事件
@@ -66,6 +125,20 @@ const formattedTime = computed(() => {
   const month = (date.getMonth() + 1).toString().padStart(2, '0')
   const day = date.getDate().toString().padStart(2, '0')
   return `${year}-${month}-${day}`
+})
+
+// 评分转为 5 颗星（每星2分）：满/半/空
+const starArray = computed(() => {
+  const rating = Number(props.media.Rating || 0)
+  const stars = Math.max(0, Math.min(5, rating / 2))
+  const full = Math.floor(stars)
+  const hasHalf = stars - full >= 0.5 ? 1 : 0
+  const empty = 5 - full - hasHalf
+  const arr = []
+  for (let i = 0; i < full; i++) arr.push({ icon: 'star', cls: 'full-star' })
+  if (hasHalf) arr.push({ icon: 'star-half-stroke', cls: 'half-star' })
+  for (let i = 0; i < empty; i++) arr.push({ icon: ['far', 'star'], cls: 'empty-star' })
+  return arr
 })
 
 // 渲染 Markdown
@@ -121,18 +194,70 @@ const goToEdit = () => {
 .media-card {
   position: relative;
   cursor: pointer;
-  border-radius: 16px;
-  overflow: hidden;
-  background: white;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border-radius: 0;
+  overflow: visible;
+  background: transparent; /* 融入背景 */
+  box-shadow: none;
   height: 450px;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+.media-card.media-row {
+  display: flex;
+  align-items: center;
+  height: auto;
+  min-height: 84px;
+  padding: 14px 18px;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .media-card:hover {
-  transform: translateY(-10px);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  transform: none;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* 流光边框效果 */
+.media-card::before,
+.media-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  border-radius: inherit;
+}
+
+.media-card::before {
+  /* 顶边（自左向右） + 右边（自上而下） */
+  background:
+    linear-gradient(90deg, rgba(168,85,247,0.9), rgba(168,85,247,0.9)) top left / 0% 2px no-repeat,
+    linear-gradient(180deg, rgba(124,58,237,0.9), rgba(124,58,237,0.9)) top right / 2px 0% no-repeat;
+}
+
+.media-card::after {
+  /* 底边（自右向左） + 左边（自下而上） */
+  background:
+    linear-gradient(90deg, rgba(168,85,247,0.9), rgba(168,85,247,0.9)) bottom right / 0% 2px no-repeat,
+    linear-gradient(180deg, rgba(124,58,237,0.9), rgba(124,58,237,0.9)) bottom left / 2px 0% no-repeat;
+}
+
+.media-card:hover::before,
+.media-card:hover::after { opacity: 1; }
+.media-card:hover::before { animation: edgesTopRight 0.6s linear forwards; }
+.media-card:hover::after { animation: edgesBottomLeft 0.6s linear forwards; }
+
+@keyframes edgesTopRight {
+  0% { background-size: 0% 2px, 2px 0%; }
+  100% { background-size: 100% 2px, 2px 100%; }
+}
+
+@keyframes edgesBottomLeft {
+  0% { background-size: 0% 2px, 2px 0%; }
+  100% { background-size: 100% 2px, 2px 100%; }
 }
 
 .poster {
@@ -206,15 +331,18 @@ const goToEdit = () => {
   margin-bottom: 15px;
 }
 
-.stars {
-  font-size: 1.2rem;
-}
+.stars { font-size: 1.1rem; line-height: 1; display: inline-flex; align-items: center; }
+.star-wrap { position: relative; display: inline-block; width: 1em; height: 1em; margin-right: 2px; }
+.star-wrap svg { width: 100%; height: 100%; display: block; }
+.stars .empty-star svg { color: #e0e0e0; }
+.modal-stars .empty-star { color: #ffd700; } /* 弹框内的空星显示黄色描边 */
+.modal-stars .full-star, .modal-stars .star-half-overlay { color: #ffd700; }
+.stars .full-star svg { color: #ffd700; }
+.star-half-wrap { position: relative; display: block; width: 100%; height: 100%; }
+.star-half-wrap .empty-star, .star-half-wrap .full-star { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.star-half-overlay { position: absolute; left: 0; top: 0; width: 100%; height: 100%; clip-path: inset(0 50% 0 0); }
 
-.rating-text {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #ffd700;
-}
+.rating-text { font-size: 0.9rem; font-weight: 600; color: #666; }
 
 .overlay-content p {
   line-height: 1.8;
@@ -341,13 +469,14 @@ const goToEdit = () => {
   cursor: default;
 }
 
-.media-modal-header {
-  position: relative;
-  min-height: 28px;
-}
+.media-modal-header { position: relative; min-height: 28px; display: grid; grid-template-columns: 60px 1fr auto; align-items: stretch; gap: 10px; }
 
-.media-modal-title { position: absolute; left: 50%; top: 0; transform: translateX(-50%); margin: 0; font-size: 1.1rem; font-weight: 700; color: #333; text-align: center; }
-.media-modal-edit { position: absolute; right: 0; top: -2px; border: none; background: transparent; color: #a855f7; font-size: 0.9rem; cursor: pointer; padding: 2px 6px; }
+.modal-thumb { width: 60px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,0.08); background: #fff; display: flex; align-items: center; justify-content: center; }
+.modal-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.media-modal-headinfo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.media-modal-title { margin: 0; font-size: 1.1rem; font-weight: 700; color: #333; text-align: center; }
+.media-modal-edit { justify-self: end; border: none; background: transparent; color: #a855f7; font-size: 0.9rem; cursor: pointer; padding: 2px 6px; }
 .media-modal-edit:hover { color: #7c3aed; }
 
 .media-modal-body {
@@ -395,6 +524,18 @@ const goToEdit = () => {
   background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.95));
 }
 
+.media-card.media-row .content {
+  height: auto;
+  padding: 0;
+  align-items: flex-start;
+  background: transparent;
+  width: 100%;
+}
+.row-header { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 12px; }
+.row-title { margin: 0; font-size: 1rem; line-height: 1.3; font-weight: 600; color: #333; display: flex; align-items: center; gap: 6px; }
+.row-rating { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; color: inherit; white-space: nowrap; }
+.row-meta { margin-top: 6px; font-size: 0.85rem; color: #999; }
+
 h2 {
   margin: 0 0 8px 0;
   font-size: 1.3em;
@@ -407,6 +548,15 @@ h2 {
   overflow: hidden;
 }
 
+.type-fa-icon { color: #a855f7; margin-right: 6px; }
+
+.media-card.media-row h2 {
+  font-size: 1rem;
+  line-height: 1.3;
+  text-align: left;
+  margin-bottom: 4px;
+}
+
 .date {
   margin-top: 5px;
   color: #999;
@@ -416,13 +566,16 @@ h2 {
   gap: 5px;
 }
 
-.date::before {
-  content: '📅';
-}
+.date::before { content: none; }
 
 .rating-stars {
   margin-top: 8px;
   font-size: 1rem;
+}
+
+.media-card.media-row .rating-stars {
+  margin-top: 2px;
+  font-size: 0.9rem;
 }
 
 .rating-stars span {

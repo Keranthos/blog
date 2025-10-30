@@ -933,8 +933,8 @@ const saveMedia = async () => {
       showSuccessMessage('submit')
     }
 
-    // 跳转到对应媒体页面
-    router.push(`/${mediaData.value.type}`)
+    // 跳转到对应媒体页面（统一媒体入口在 /fragments/...）
+    router.push(`/fragments/${mediaData.value.type}`)
   } catch (error) {
     showErrorMessage(error)
   }

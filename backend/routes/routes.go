@@ -45,10 +45,10 @@ func SetupRouter() *gin.Engine {
 		api.GET("/articles", controllers.GetArticles)
 		api.GET("/articles/count", controllers.GetArticleCount)
 		api.GET("/articles/:id", controllers.GetArticleById)
-		api.GET("/articles/top", controllers.GetTopArticles)                        // 获取置顶文章
-		api.POST("/articles", middlewares.Auth(3), controllers.CreateArticle)       // 创建文章需要管理员权限
-		api.PUT("/articles/:id", middlewares.Auth(3), controllers.UpdateArticle)    // 更新文章需要管理员权限
-		api.DELETE("/articles/:id", middlewares.Auth(3), controllers.DeleteArticle) // 删除文章需要管理员权限
+		api.GET("/articles/top", controllers.GetTopArticles)                                        // 获取置顶文章
+		api.POST("/articles", middlewares.Auth(3), controllers.CreateArticle)                       // 创建文章需要管理员权限
+		api.PUT("/articles/:id", middlewares.Auth(3), controllers.UpdateArticle)                    // 更新文章需要管理员权限
+		api.DELETE("/articles/:id", middlewares.Auth(3), controllers.DeleteArticle)                 // 删除文章需要管理员权限
 		api.POST("/articles/migrate-images", middlewares.Auth(3), controllers.MigrateArticleImages) // 批量本地化历史封面并替换指定文章
 
 		// 评论相关路由，权限: 0 (所有用户)
@@ -62,7 +62,8 @@ func SetupRouter() *gin.Engine {
 		api.GET("/media/:mediaId", controllers.GetMediaByID)
 		api.POST("/media", middlewares.Auth(3), controllers.CreateMedia)
 		api.PUT("/media/:mediaId", middlewares.Auth(3), controllers.UpdateMedia)
-		api.DELETE("/media/:mediaId", middlewares.Auth(3), controllers.DeleteMedia) // 删除媒体需要管理员权限
+		api.DELETE("/media/:mediaId", middlewares.Auth(3), controllers.DeleteMedia)            // 删除媒体需要管理员权限
+		api.POST("/media/migrate-images", middlewares.Auth(3), controllers.MigrateMediaImages) // 批量本地化媒体封面
 
 		// 问题相关路由，权限: 0 (所有用户)
 		api.GET("/questions", controllers.GetQuestions)

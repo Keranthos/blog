@@ -17,15 +17,15 @@
         <p class="hero-subtitle">记录生活 · 分享技术 · 探索未知</p>
         <div class="hero-stats">
           <div class="stat-item">
-            <span class="stat-number">{{ latestBlogs.length }}</span>
+            <span class="stat-number">{{ blogCount }}</span>
             <span class="stat-label">博客文章</span>
           </div>
           <div class="stat-item">
-            <span class="stat-number">{{ latestMoments.length }}</span>
+            <span class="stat-number">{{ momentCount }}</span>
             <span class="stat-label">随笔</span>
           </div>
           <div class="stat-item">
-            <span class="stat-number">{{ latestProjects.length }}</span>
+            <span class="stat-number">{{ projectCount }}</span>
             <span class="stat-label">项目</span>
           </div>
         </div>
@@ -47,7 +47,7 @@
                 <span class="section-icon">📝</span>
                 <span class="section-text">博客</span>
               </h3>
-              <div class="section-count">{{ latestBlogs.length }} 篇文章</div>
+              <div class="section-count">{{ blogCount }} 篇文章</div>
             </div>
             <div class="blog-cards">
               <article
@@ -94,7 +94,7 @@
                 <span class="section-icon">✍️</span>
                 <span class="section-text">随笔</span>
               </h3>
-              <div class="section-count">{{ latestMoments.length }} 篇随笔</div>
+              <div class="section-count">{{ momentCount }} 篇随笔</div>
             </div>
             <div class="blog-cards">
               <article
@@ -141,7 +141,7 @@
                 <span class="section-icon">💼</span>
                 <span class="section-text">项目</span>
               </h3>
-              <div class="section-count">{{ latestProjects.length }} 个项目</div>
+              <div class="section-count">{{ projectCount }} 个项目</div>
             </div>
             <div class="blog-cards">
               <article
@@ -273,7 +273,7 @@
 import { ref, onMounted } from 'vue'
 import NavBar from '@/components/NavBar'
 import ModernLoading from '@/components/ModernLoading.vue'
-import { getArticlesList, getTopArticles } from '@/api/Articles/browse'
+import { getArticlesList, getTopArticles, getArticlesNum } from '@/api/Articles/browse'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
 const typingText = '欢迎来到山角函兽的小窝'
@@ -284,6 +284,9 @@ const openExternal = (url) => {
 const latestBlogs = ref([])
 const latestMoments = ref([])
 const latestProjects = ref([])
+const blogCount = ref(0)
+const momentCount = ref(0)
+const projectCount = ref(0)
 const topArticles = ref([])
 const weatherInfo = ref({
   location: '获取中...',
@@ -306,14 +309,20 @@ const typeText = async () => {
 
 const loadLatestData = async () => {
   try {
-    const [blogs, moments, projects] = await Promise.all([
+    const [blogs, moments, projects, blogNum, momentNum, projectNum] = await Promise.all([
       getArticlesList('blog', 1, 3),
       getArticlesList('moment', 1, 3),
-      getArticlesList('project', 1, 3)
+      getArticlesList('project', 1, 3),
+      getArticlesNum('blog'),
+      getArticlesNum('moment'),
+      getArticlesNum('project')
     ])
     latestBlogs.value = blogs.data
     latestMoments.value = moments.data
     latestProjects.value = projects.data
+    blogCount.value = (blogNum && (blogNum.total || blogNum.count || blogNum.num)) ? (blogNum.total || blogNum.count || blogNum.num) : (blogs.total || blogs.count || blogs.data?.length || 0)
+    momentCount.value = (momentNum && (momentNum.total || momentNum.count || momentNum.num)) ? (momentNum.total || momentNum.count || momentNum.num) : (moments.total || moments.count || moments.data?.length || 0)
+    projectCount.value = (projectNum && (projectNum.total || projectNum.count || projectNum.num)) ? (projectNum.total || projectNum.count || projectNum.num) : (projects.total || projects.count || projects.data?.length || 0)
   } catch (error) {
     console.error('Failed to load latest data:', error)
   }

@@ -26,28 +26,10 @@
               <span class="menu-text">随笔</span>
             </div>
 
-            <!-- 媒体下拉菜单 -->
-            <div class="menu-item dropdown" :class="{ active: isMediaActive }" @mouseenter="showDropdown" @mouseleave="hideDropdown">
+            <!-- 书影集：直接进入统一页面，无下拉 -->
+            <div class="menu-item" :class="{ active: isMediaActive }" @click="navigateToNovels">
               <font-awesome-icon icon="ellipsis" class="menu-icon" />
-              <span class="menu-text">媒体</span>
-              <!-- 箭头 - 独立于过渡动画，立即显示，指向"媒体"文本 -->
-              <div v-if="dropdownVisible" class="dropdown-menu-arrow media-arrow"></div>
-              <transition name="dropdown-fade">
-                <div v-if="dropdownVisible" class="dropdown-menu">
-                  <div class="dropdown-item" :class="{ active: route.path === '/fragments/books' }" @click="navigateToBooks">
-                    <font-awesome-icon icon="book" />
-                    <span>书单</span>
-                  </div>
-                  <div class="dropdown-item" :class="{ active: route.path === '/fragments/novels' }" @click="navigateToNovels">
-                    <font-awesome-icon icon="bookmark" />
-                    <span>小说</span>
-                  </div>
-                  <div class="dropdown-item" :class="{ active: route.path === '/fragments/movies' }" @click="navigateToMovies">
-                    <font-awesome-icon icon="film" />
-                    <span>电影</span>
-                  </div>
-                </div>
-              </transition>
+              <span class="menu-text">书影集</span>
             </div>
 
             <!-- 其他下拉菜单 -->
@@ -129,41 +111,18 @@
             <div v-if="showCreateMenu" class="create-menu-arrow"></div>
             <transition name="dropdown-fade">
               <div v-if="showCreateMenu" class="create-menu">
-                <div class="menu-section">
-                  <div class="menu-section-title">📝 文章</div>
-                  <button class="create-item" @click="createContent('article', 'blog')">
-                    <font-awesome-icon icon="blog" />
-                    <span>博客</span>
-                  </button>
-                  <button class="create-item" @click="createContent('article', 'moment')">
-                    <font-awesome-icon icon="comment-dots" />
-                    <span>随笔</span>
-                  </button>
-                </div>
-                <div class="menu-divider"></div>
-                <div class="menu-section">
-                  <div class="menu-section-title">🎬 媒体卡片</div>
-                  <button class="create-item" @click="createContent('media', 'books')">
-                    <font-awesome-icon icon="bars" />
-                    <span>书单</span>
-                  </button>
-                  <button class="create-item" @click="createContent('media', 'novels')">
-                    <font-awesome-icon icon="bookmark" />
-                    <span>小说</span>
-                  </button>
-                  <button class="create-item" @click="createContent('media', 'movies')">
-                    <font-awesome-icon icon="film" />
-                    <span>电影</span>
-                  </button>
-                </div>
-                <div class="menu-divider"></div>
-                <div class="menu-section">
-                  <div class="menu-section-title">📊 其他</div>
-                  <button class="create-item" @click="createContent('presentation', 'ppt')">
-                    <font-awesome-icon icon="chalkboard" />
-                    <span>讲演</span>
-                  </button>
-                </div>
+                <button class="create-item" @click="createContent('article', 'blog')">
+                  <font-awesome-icon icon="blog" />
+                  <span>文章</span>
+                </button>
+                <button class="create-item" @click="createContent('media', 'books')">
+                  <font-awesome-icon icon="film" />
+                  <span>书影评</span>
+                </button>
+                <button class="create-item" @click="createContent('presentation', 'ppt')">
+                  <font-awesome-icon icon="chalkboard" />
+                  <span>讲演</span>
+                </button>
               </div>
             </transition>
           </div>
@@ -325,22 +284,10 @@
                 <font-awesome-icon icon="pen-to-square" /> 随笔
               </button>
 
-              <!-- 多级：媒体 -->
-              <button class="nav-more-item has-children" @click="toggleExpand('media')">
-                <font-awesome-icon icon="ellipsis" /> 媒体
-                <span class="chevron" :class="{ open: expand.media }">›</span>
+              <!-- 书影集：直接进入统一页面，无子菜单 -->
+              <button class="nav-more-item" @click="goAndClose('/fragments/novels')">
+                <font-awesome-icon icon="ellipsis" /> 书影集
               </button>
-              <div v-if="expand.media" class="nav-more-sublist">
-                <button class="nav-more-subitem" @click="goAndClose('/fragments/books')">
-                  <font-awesome-icon icon="book" /> 书单
-                </button>
-                <button class="nav-more-subitem" @click="goAndClose('/fragments/novels')">
-                  <font-awesome-icon icon="bookmark" /> 小说
-                </button>
-                <button class="nav-more-subitem" @click="goAndClose('/fragments/movies')">
-                  <font-awesome-icon icon="film" /> 电影
-                </button>
-              </div>
 
               <!-- 多级：其他 -->
               <button class="nav-more-item has-children" @click="toggleExpand('other')">
@@ -559,16 +506,8 @@ const navigateToMoments = () => {
   router.push('/moments')
 }
 
-const navigateToBooks = () => {
-  router.push('/fragments/books')
-}
-
 const navigateToNovels = () => {
   router.push('/fragments/novels')
-}
-
-const navigateToMovies = () => {
-  router.push('/fragments/movies')
 }
 
 const navigateToQuestionbox = () => {
@@ -616,21 +555,7 @@ const isSettingsActive = computed(() => {
   return settingsPaths.includes(route.path)
 })
 
-const showDropdown = () => {
-  clearTimeout(timeout)
-  // 关闭其他下拉框
-  otherDropdownVisible.value = false
-  settingsDropdownVisible.value = false
-  showCreateMenu.value = false
-  showCommentsDropdown.value = false
-  dropdownVisible.value = true
-}
-
-const hideDropdown = () => {
-  timeout = setTimeout(() => {
-    dropdownVisible.value = false
-  }, 200)
-}
+// 媒体菜单已改为直达，无需悬停下拉
 
 const showOtherDropdown = () => {
   clearTimeout(otherTimeout)

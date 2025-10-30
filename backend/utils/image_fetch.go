@@ -46,8 +46,13 @@ func IsExternalImageURL(raw string) bool {
 	return true
 }
 
-// FetchAndStoreImage 下载并保存外链图片，返回站内可访问路径（/uploads/images/<file>）
+// FetchAndStoreImage 下载并保存外链图片到 uploads/images，返回站内可访问路径（/uploads/images/<file>）
 func FetchAndStoreImage(raw string) (string, error) {
+	return FetchAndStoreImageTo(raw, "")
+}
+
+// FetchAndStoreImageTo 下载并保存外链图片到 uploads/images/<subdir>，subdir 为空则为 uploads/images 根目录
+func FetchAndStoreImageTo(raw string, subdir string) (string, error) {
 	if !IsExternalImageURL(raw) {
 		return raw, nil
 	}
@@ -113,6 +118,9 @@ func FetchAndStoreImage(raw string) (string, error) {
 
 	// 确保目录存在
 	dir := filepath.Join("uploads", "images")
+	if subdir != "" {
+		dir = filepath.Join(dir, subdir)
+	}
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
@@ -153,27 +161,43 @@ func isPrivateIP(ip net.IP) bool {
 
 // StoreLocalImageFromPath 从本地路径读取图片并保存到 uploads/images，返回站内URL
 func StoreLocalImageFromPath(p string) (string, error) {
-    data, err := os.ReadFile(p)
-    if err != nil { return "", err }
-    // 猜测MIME
-    mimeType := http.DetectContentType(data)
-    if mt, _, err := mime.ParseMediaType(mimeType); err == nil { mimeType = mt }
-    ext, ok := allowedImageMIMEs[mimeType]
-    if !ok {
-        // 若无匹配，尝试从扩展名推断
-        if e := strings.ToLower(filepath.Ext(p)); e != "" {
-            ext = e
-        } else {
-            return "", fmt.Errorf("unsupported mime: %s", mimeType)
-        }
-    }
-    h := sha256.Sum256(data)
-    filename := hex.EncodeToString(h[:]) + ext
-    dir := filepath.Join("uploads", "images")
-    if err := os.MkdirAll(dir, 0755); err != nil { return "", err }
-    abs := filepath.Join(dir, filename)
-    if _, err := os.Stat(abs); errors.Is(err, os.ErrNotExist) {
-        if err := os.WriteFile(abs, data, 0644); err != nil { return "", err }
-    }
-    return "/" + filepath.ToSlash(abs), nil
+	return StoreLocalImageFromPathTo(p, "")
+}
+
+// StoreLocalImageFromPathTo 从本地路径读取图片并保存到 uploads/images/<subdir>，返回站内URL
+func StoreLocalImageFromPathTo(p string, subdir string) (string, error) {
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return "", err
+	}
+	// 猜测MIME
+	mimeType := http.DetectContentType(data)
+	if mt, _, err := mime.ParseMediaType(mimeType); err == nil {
+		mimeType = mt
+	}
+	ext, ok := allowedImageMIMEs[mimeType]
+	if !ok {
+		// 若无匹配，尝试从扩展名推断
+		if e := strings.ToLower(filepath.Ext(p)); e != "" {
+			ext = e
+		} else {
+			return "", fmt.Errorf("unsupported mime: %s", mimeType)
+		}
+	}
+	h := sha256.Sum256(data)
+	filename := hex.EncodeToString(h[:]) + ext
+	dir := filepath.Join("uploads", "images")
+	if subdir != "" {
+		dir = filepath.Join(dir, subdir)
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+	abs := filepath.Join(dir, filename)
+	if _, err := os.Stat(abs); errors.Is(err, os.ErrNotExist) {
+		if err := os.WriteFile(abs, data, 0644); err != nil {
+			return "", err
+		}
+	}
+	return "/" + filepath.ToSlash(abs), nil
 }

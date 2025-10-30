@@ -3,6 +3,7 @@ package controllers
 import (
 	"backend/config"
 	"backend/models"
+	"backend/utils"
 	"net/http"
 	"strconv"
 
@@ -70,6 +71,16 @@ func CreateMedia(c *gin.Context) {
 		return
 	}
 
+	// 本地化外链封面到 uploads/images/media
+	if media.Poster != "" {
+		if local, err := utils.FetchAndStoreImageTo(media.Poster, "media"); err == nil {
+			media.Poster = local
+		} else {
+			// 下载失败不阻断创建，仅记录到响应
+			c.Set("media_poster_error", err.Error())
+		}
+	}
+
 	if err := config.DB.Create(&media).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create media"})
 		return
@@ -84,6 +95,15 @@ func UpdateMedia(c *gin.Context) {
 	if err := c.ShouldBindJSON(&media); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// 本地化外链封面到 uploads/images/media
+	if media.Poster != "" {
+		if local, err := utils.FetchAndStoreImageTo(media.Poster, "media"); err == nil {
+			media.Poster = local
+		} else {
+			c.Set("media_poster_error", err.Error())
+		}
 	}
 
 	if err := config.DB.Model(&models.Media{}).Where("id = ?", mediaID).Updates(media).Error; err != nil {
@@ -102,4 +122,32 @@ func DeleteMedia(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Media deleted"})
+}
+
+// 批量本地化历史媒体封面
+func MigrateMediaImages(c *gin.Context) {
+	var items []models.Media
+	if err := config.DB.Find(&items).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch media"})
+		return
+	}
+
+	migrated := 0
+	failed := 0
+	for i := range items {
+		m := &items[i]
+		if local, err := utils.FetchAndStoreImageTo(m.Poster, "media"); err == nil && local != m.Poster {
+			if err := config.DB.Model(&models.Media{}).Where("id = ?", m.ID).Update("poster", local).Error; err == nil {
+				migrated++
+			} else {
+				failed++
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"migrated": migrated,
+		"failed":   failed,
+		"total":    len(items),
+	})
 }

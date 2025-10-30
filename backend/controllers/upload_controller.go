@@ -55,7 +55,8 @@ func UploadImage(c *gin.Context) {
 	filename := fmt.Sprintf("%s_%s%s", now.Format("20060102_150405"), randomStr, ext)
 
 	// 创建目录
-	uploadDir := filepath.Join("uploads", "images", year, month)
+	// 正文图片统一放入 uploads/images/content/<year>/<month>
+	uploadDir := filepath.Join("uploads", "images", "content", year, month)
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create directory"})
 		return
@@ -69,7 +70,7 @@ func UploadImage(c *gin.Context) {
 	}
 
 	// 返回图片 URL（使用正斜杠，适配 Web）
-	imageURL := fmt.Sprintf("/uploads/images/%s/%s/%s", year, month, filename)
+	imageURL := fmt.Sprintf("/uploads/images/content/%s/%s/%s", year, month, filename)
 
 	c.JSON(http.StatusOK, gin.H{
 		"url":      imageURL,
