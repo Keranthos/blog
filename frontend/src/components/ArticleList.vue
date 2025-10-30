@@ -8,14 +8,14 @@
 
     <!-- 标签页区域 -->
     <div class="tabs-section">
-      <div class="tabs-container">
+      <div ref="tabsContainer" class="tabs-container">
         <div class="tab-background" :style="tabBackgroundTransform"></div>
-        <div class="tab-item" :class="{ active: activeTab === 'main' }" @click="switchTab('main')">
+        <div ref="tabMain" class="tab-item" :class="{ active: activeTab === 'main' }" @click="switchTab('main')">
           <span class="tab-icon">📚</span>
           <span class="tab-text">{{ getTypeName(type) }}</span>
           <span class="tab-count">({{ getArticleCount() }})</span>
         </div>
-        <div class="tab-item" :class="{ active: activeTab === 'thoughts' }" @click="switchTab('thoughts')">
+        <div ref="tabThoughts" class="tab-item" :class="{ active: activeTab === 'thoughts' }" @click="switchTab('thoughts')">
           <span class="tab-icon">🌟</span>
           <span class="tab-text">所思所想</span>
         </div>
@@ -41,7 +41,9 @@
             :type="type" :reading-time="article.readingTime" :article-type="article.articleType"
           />
         </div>
-        <div v-else class="no-content">
+        <!-- 无限滚动哨兵（仅手机端且未到最后一页时显示） -->
+        <div v-if="isMobile && currentPage < totalPage" ref="infiniteSentinel" class="infinite-sentinel"></div>
+        <div v-if="!isMobile && currentPage === 1 && (!articles || articles.length === 0)" class="no-content">
           <p>暂无内容</p>
         </div>
       </div>
@@ -60,10 +62,10 @@
     </div>
 
     <!-- 分页区域 -->
-    <div v-if="activeTab === 'main'" class="pagination-section">
+    <div v-if="activeTab === 'main' && totalPage > 1 && !isMobile" class="pagination-section">
       <div class="pagination">
-        <button :disabled="currentPage <= 1" @click="loadPage(currentPage - 1)">
-          上一页
+        <button class="nav-btn prev" :disabled="currentPage <= 1" @click="loadPage(currentPage - 1)">
+          PREV
         </button>
         <button v-if="currentPage > 4" @click="loadPage(1)">1</button>
         <span v-if="currentPage > 4">...</span>
@@ -72,8 +74,8 @@
         </button>
         <span v-if="currentPage < totalPage - 3">...</span>
         <button v-if="currentPage < totalPage - 3" @click="loadPage(totalPage)">{{ totalPage }}</button>
-        <button :disabled="currentPage >= totalPage" @click="loadPage(currentPage + 1)">
-          下一页
+        <button class="nav-btn next" :disabled="currentPage >= totalPage" @click="loadPage(currentPage + 1)">
+          NEXT
         </button>
       </div>
     </div>
@@ -82,7 +84,7 @@
 
 <script setup>
 // 上条栏中博客、项目、科研日记的基础显示视图
-import { ref, onMounted, watch, computed, defineAsyncComponent } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick, defineAsyncComponent } from 'vue'
 // import ArticleCard from '@/components/ArticleCard.vue'
 import { getArticlesList, getArticlesNum } from '@/api/Articles/browse'
 import { batchEstimateReadingTime } from '@/utils/readingTime'
@@ -175,14 +177,50 @@ const fetchArticlesNum = async () => {
   }
 }
 
-const loadPage = async (page) => {
+// 是否为手机端（≤768px）
+const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
+const handleResize = () => { isMobile.value = window.innerWidth <= 768 }
+
+// 无限滚动哨兵
+const infiniteSentinel = ref(null)
+let io = null
+
+const setupInfiniteScroll = async () => {
+  if (!isMobile.value) { teardownInfiniteScroll(); return }
+  if (!('IntersectionObserver' in window)) return
+  // 等待 DOM 渲染出哨兵元素
+  await nextTick()
+  if (!infiniteSentinel.value) return
+  teardownInfiniteScroll()
+  io = new IntersectionObserver((entries) => {
+    const e = entries[0]
+    if (e && e.isIntersecting && !loading.value && currentPage.value < totalPage.value) {
+      // 避免在渲染周期内同步修改引发异常
+      setTimeout(() => loadPage(currentPage.value + 1, true), 0)
+    }
+  }, { rootMargin: '200px 0px' })
+  io.observe(infiniteSentinel.value)
+}
+
+const teardownInfiniteScroll = () => {
+  if (io) {
+    io.disconnect()
+    io = null
+  }
+}
+
+const loadPage = async (page, append = false) => {
   if (page < 1 || page > totalPage.value) return
   currentPage.value = page
 
   // 检查缓存中是否已有该页的数据
   const cacheKey = `${props.type}-${page}`
   if (articleCache.value[cacheKey]) {
-    articles.value = articleCache.value[cacheKey]
+    if (append) {
+      articles.value = [...articles.value, ...articleCache.value[cacheKey]]
+    } else {
+      articles.value = articleCache.value[cacheKey]
+    }
   } else {
     loading.value = true
     loadingProgress.value = 0
@@ -209,8 +247,13 @@ const loadPage = async (page) => {
         }))
 
         // 批量计算阅读时间
-        articles.value = batchEstimateReadingTime(momentArticles)
-        articleCache.value[cacheKey] = articles.value
+        const computedList = batchEstimateReadingTime(momentArticles)
+        if (append) {
+          articles.value = [...articles.value, ...computedList]
+        } else {
+          articles.value = computedList
+        }
+        articleCache.value[cacheKey] = computedList
       } else if (props.type === 'all') {
         // 获取所有类型的文章（博客、项目、科研）
         const blogResponse = await getArticlesList('blog', page, limit)
@@ -228,14 +271,24 @@ const loadPage = async (page) => {
         allArticles.sort((a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt))
 
         // 批量计算阅读时间
-        articles.value = batchEstimateReadingTime(allArticles)
-        articleCache.value[cacheKey] = articles.value
+        const computedList = batchEstimateReadingTime(allArticles)
+        if (append) {
+          articles.value = [...articles.value, ...computedList]
+        } else {
+          articles.value = computedList
+        }
+        articleCache.value[cacheKey] = computedList
       } else {
         const response = await getArticlesList(props.type, page, limit)
 
         // 批量计算阅读时间
-        articles.value = batchEstimateReadingTime(response.data)
-        articleCache.value[cacheKey] = articles.value // 缓存该页的数据
+        const computedList = batchEstimateReadingTime(response.data)
+        if (append) {
+          articles.value = [...articles.value, ...computedList]
+        } else {
+          articles.value = computedList
+        }
+        articleCache.value[cacheKey] = computedList // 缓存该页的数据
       }
 
       // 完成加载
@@ -288,56 +341,74 @@ const switchTab = (tab) => {
   activeTab.value = tab
 }
 
-// 计算背景位置和宽度 - 动态计算
-const tabBackgroundTransform = computed(() => {
-  if (activeTab.value === 'main') {
-    // 第一个标签：图标 + 文本 + 数字
-    const iconWidth = 20 // 📚 图标宽度
-    const textWidth = getTypeName(props.type).length * 16 // 根据字符数估算宽度
-    const countWidth = `(${getArticleCount()})`.length * 12 // 数字部分宽度
-    const padding = 32 // 左右padding
-    const gap = 12 // 元素间距
-    const totalWidth = iconWidth + textWidth + countWidth + padding + gap
+// 标签高亮背景：基于实际 DOM 宽度与位置，避免移动端估算误差
+const tabsContainer = ref(null)
+const tabMain = ref(null)
+const tabThoughts = ref(null)
 
-    return {
-      transform: 'translateX(0)',
-      width: `${totalWidth}px`
-    }
-  } else {
-    // 第二个标签：图标 + "所思所想"
-    const iconWidth = 20 // 🌟 图标宽度
-    const textWidth = '所思所想'.length * 16 // 4个字符
-    const padding = 32 // 左右padding
-    const gap = 6 // 元素间距
-    const totalWidth = iconWidth + textWidth + padding + gap
-
-    // 第一个标签的宽度
-    const firstIconWidth = 20
-    const firstTextWidth = getTypeName(props.type).length * 16
-    const firstCountWidth = `(${getArticleCount()})`.length * 12
-    const firstPadding = 32
-    const firstGap = 12
-    const firstTotalWidth = firstIconWidth + firstTextWidth + firstCountWidth + firstPadding + firstGap
-
-    return {
-      transform: `translateX(${firstTotalWidth}px)`,
-      width: `${totalWidth}px`
-    }
+const computeTabStyle = () => {
+  const currentEl = activeTab.value === 'main' ? tabMain.value : tabThoughts.value
+  const container = tabsContainer.value
+  if (currentEl && container) {
+    const crect = currentEl.getBoundingClientRect()
+    const contRect = container.getBoundingClientRect()
+    const left = crect.left - contRect.left
+    const width = crect.width
+    return { transform: `translateX(${left}px)`, width: `${width}px` }
   }
-})
+  // 回退：最小宽
+  return { transform: 'translateX(0)', width: '120px' }
+}
+
+const tabBackgroundTransform = ref({ transform: 'translateX(0)', width: '120px' })
+
+const updateTabBackground = async () => {
+  await nextTick()
+  tabBackgroundTransform.value = computeTabStyle()
+}
+
+watch([activeTab, () => props.type, totalArticles], updateTabBackground)
 
 onMounted(async () => {
   displayedText.value = props.typingText
   await loadThoughtsContent() // 加载所思所想内容
   const articleNum = await fetchArticlesNum()
   totalPage.value = Math.ceil(articleNum / limit)
-  loadPage(1)
+  await loadPage(1)
+  // 初次计算标签高亮位置
+  updateTabBackground()
+  // 监听窗口大小变化
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('resize', updateTabBackground)
+  }
+  // 设置无限滚动
+  setupInfiniteScroll()
 })
 
 watch(() => props.type, async () => {
   const articleNum = await fetchArticlesNum()
   totalPage.value = Math.ceil(articleNum / limit)
+  // 切换类型时重置数据与缓存定位
+  articles.value = []
+  currentPage.value = 1
   loadPage(1)
+  // 重新设置无限滚动
+  teardownInfiniteScroll()
+  setupInfiniteScroll()
+})
+
+watch(isMobile, () => {
+  teardownInfiniteScroll()
+  setupInfiniteScroll()
+})
+
+onBeforeUnmount(() => {
+  teardownInfiniteScroll()
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', handleResize)
+    window.removeEventListener('resize', updateTabBackground)
+  }
 })
 </script>
 
@@ -516,6 +587,8 @@ watch(() => props.type, async () => {
   justify-content: center;
 }
 
+.infinite-sentinel { width: 100%; height: 1px; }
+
 .pagination {
   display: flex;
   justify-content: center;
@@ -525,9 +598,9 @@ watch(() => props.type, async () => {
 }
 
 .pagination button {
-  padding: 10px 20px;
+  padding: 10px 18px;
   background: rgba(255, 255, 255, 0.9);
-  border: 2px solid rgba(106, 27, 154, 0.3);
+  border: 2px solid rgba(106, 27, 154, 0.25);
   border-radius: 10px;
   color: #6a1b9a;
   font-weight: 600;
@@ -547,6 +620,29 @@ watch(() => props.type, async () => {
   opacity: 0.5;
   cursor: not-allowed;
   background: rgba(255, 255, 255, 0.5);
+}
+
+/* 更大气的上一页/下一页按钮 */
+.pagination .nav-btn {
+  padding: 12px 28px;
+  border-radius: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.95rem;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  color: #fff;
+  border: 0;
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.25);
+}
+
+.pagination .nav-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(124, 58, 237, 0.35);
+}
+
+.pagination .nav-btn:disabled {
+  background: linear-gradient(135deg, rgba(168,85,247,.5) 0%, rgba(124,58,237,.5) 100%);
+  box-shadow: none;
 }
 
 .pagination span {

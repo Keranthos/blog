@@ -622,23 +622,7 @@ onMounted(() => {
 }
 
 /* 方案1: 简洁的圆点装饰 - 当前使用 */
-.tree-trunk::before {
-  content: '';
-  position: absolute;
-  top: -15px;
-  left: -8px;
-  width: 24px;
-  height: 24px;
-  background: radial-gradient(circle,
-    rgba(255, 255, 255, 0.9) 0%,
-    rgba(102, 126, 234, 0.8) 30%,
-    rgba(118, 75, 162, 0.6) 70%,
-    rgba(102, 126, 234, 0.4) 100%
-  );
-  border-radius: 50%;
-  box-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
-  animation: topGlow 3s ease-in-out infinite alternate;
-}
+.tree-trunk::before { content: none; }
 
 @keyframes topGlow {
   0% {
@@ -651,23 +635,7 @@ onMounted(() => {
   }
 }
 
-.tree-trunk::after {
-  content: '';
-  position: absolute;
-  bottom: -15px;
-  left: -8px;
-  width: 24px;
-  height: 24px;
-  background: radial-gradient(circle,
-    rgba(255, 255, 255, 0.9) 0%,
-    rgba(118, 75, 162, 0.8) 30%,
-    rgba(102, 126, 234, 0.6) 70%,
-    rgba(118, 75, 162, 0.4) 100%
-  );
-  border-radius: 50%;
-  box-shadow: 0 0 20px rgba(118, 75, 162, 0.4);
-  animation: bottomGlow 3s ease-in-out infinite alternate;
-}
+.tree-trunk::after { content: none; }
 
 @keyframes bottomGlow {
   0% {
@@ -744,28 +712,7 @@ onMounted(() => {
   }
 }
 
-.left-branch::after {
-  content: '';
-  position: absolute;
-  left: calc(50% - 120px);
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  background: radial-gradient(circle,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(102, 126, 234, 0.9) 30%,
-    rgba(118, 75, 162, 0.8) 70%,
-    rgba(102, 126, 234, 1) 100%
-  );
-  z-index: 2;
-  transform: translateY(-50%);
-  border-radius: 50%;
-  box-shadow:
-    0 0 15px rgba(102, 126, 234, 0.6),
-    0 0 30px rgba(118, 75, 162, 0.3),
-    inset 0 0 4px rgba(255, 255, 255, 0.8);
-  animation: connectionPulse 2s ease-in-out infinite alternate;
-}
+.left-branch::after { content: none; }
 
 @keyframes connectionPulse {
   0% {
@@ -810,26 +757,7 @@ onMounted(() => {
 }
 
 .right-branch::after {
-  content: '';
-  position: absolute;
-  right: calc(50% - 120px);
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  background: radial-gradient(circle,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(102, 126, 234, 0.9) 30%,
-    rgba(118, 75, 162, 0.8) 70%,
-    rgba(102, 126, 234, 1) 100%
-  );
-  z-index: 2;
-  transform: translateY(-50%);
-  border-radius: 50%;
-  box-shadow:
-    0 0 15px rgba(102, 126, 234, 0.6),
-    0 0 30px rgba(118, 75, 162, 0.3),
-    inset 0 0 4px rgba(255, 255, 255, 0.8);
-  animation: connectionPulse 2s ease-in-out infinite alternate;
+  content: none;
 }
 
 /* 月份标签 */

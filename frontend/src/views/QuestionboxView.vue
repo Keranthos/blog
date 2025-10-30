@@ -24,7 +24,7 @@
             <p v-else class="unanswered">
               待回答
             </p>
-            <div v-if="user.level >= 3&&!question.Answer" class="submit-question">
+            <div v-if="user.isLogged && user.level >= 3 && !question.Answer" class="submit-question">
               <div class="admin-answer-header">
                 <span class="admin-icon">👨‍💼</span>
                 <span class="admin-title">管理员回答</span>
@@ -38,7 +38,7 @@
 
       <!-- 移除翻页，改为一次性展示全部问题，可一直向下滚动到底部 -->
     </div>
-    <div v-if="user.level < 3" class="ask-question">
+    <div v-if="!user.isLogged || user.level < 3" class="ask-question">
       <textarea v-model="newQuestion" placeholder="输入你的问题..."></textarea>
       <button @click="handleSubmitQuestion">提交问题</button>
     </div>
@@ -429,14 +429,17 @@ onMounted(() => {
 @media (max-width: 768px) {
   .question-box-view {
     padding-top: 80px;
+    /* 为底部固定的提问条预留空间，避免与内容重叠 */
+    padding-bottom: 260px;
   }
 
-  .header-image {
-    height: 250px;
-  }
+  .question-box-view .header { padding: 0; margin-bottom: 30px !important; }
+  .question-box-view .header-image { height: 250px; display: block; margin-top: 40px; margin-bottom: 0; }
 
-  .content {
+  .question-box-view .content {
     width: 95%;
+    margin-top: 30px !important; /* 确保与头图间距不重叠 */
+    padding-top: 0;
   }
 
   .question-item {

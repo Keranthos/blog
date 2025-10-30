@@ -44,13 +44,13 @@
                     <font-awesome-icon icon="question" />
                     <span>提问箱</span>
                   </div>
-                  <div class="dropdown-item" :class="{ active: route.path === '/timeline' }" @click="navigateToTimeline">
-                    <font-awesome-icon icon="clock" />
-                    <span>时间树</span>
-                  </div>
                   <div class="dropdown-item" :class="{ active: route.path === '/presentation' }" @click="navigateToPresentation">
                     <font-awesome-icon icon="chalkboard" />
                     <span>讲演</span>
+                  </div>
+                  <div class="dropdown-item" @click="copyEmail">
+                    <font-awesome-icon icon="envelope" />
+                    <span>Email Me</span>
                   </div>
                 </div>
               </transition>
@@ -77,7 +77,7 @@
             </div>
           </template>
           <template v-else>
-            <!-- 紧凑模式下显示“菜单”入口按钮 -->
+            <!-- 紧凑模式下显示"菜单"入口按钮 -->
             <div class="menu-item" @click="openNavMoreModal">
               <font-awesome-icon icon="bars" class="menu-icon" />
               <span class="menu-text">菜单</span>
@@ -186,7 +186,13 @@
               <span>未登录</span>
             </div>
             <div v-else class="user-avatar">
-              <img :src="user.avatar || defaultAvatar" alt="User Avatar" />
+              <img
+                :src="user.avatar || defaultAvatar"
+                alt="User Avatar"
+                referrerpolicy="no-referrer"
+                loading="lazy"
+                @error="handleAvatarError"
+              />
             </div>
           </div>
         </div>
@@ -298,11 +304,11 @@
                 <button class="nav-more-subitem" @click="goAndClose('/questionbox')">
                   <font-awesome-icon icon="question" /> 提问箱
                 </button>
-                <button class="nav-more-subitem" @click="goAndClose('/timeline')">
-                  <font-awesome-icon icon="clock" /> 时间树
-                </button>
                 <button class="nav-more-subitem" @click="goAndClose('/presentation')">
                   <font-awesome-icon icon="chalkboard" /> 讲演
+                </button>
+                <button class="nav-more-subitem" @click="copyEmailAndClose">
+                  <font-awesome-icon icon="envelope" /> Email Me
                 </button>
               </div>
 
@@ -331,6 +337,7 @@
 
 <script setup>
 import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { showCustomMessage } from '@/utils/waifuMessage'
 import { useStore } from 'vuex'
 import { useRouter, useRoute } from 'vue-router'
 import { getAllComments } from '@/api/Comments/browse'
@@ -363,7 +370,7 @@ let otherTimeout = null
 let settingsTimeout = null
 let commentsTimeout = null
 
-// 响应式折叠：当中间菜单与右侧功能区可能互相遮挡时，使用“其他”模态
+// 响应式折叠：当中间菜单与右侧功能区可能互相遮挡时，使用"其他"模态
 const navbarContainer = ref(null)
 const navbarMenuCenter = ref(null)
 const navbarActions = ref(null)
@@ -441,6 +448,14 @@ const generateDefaultAvatar = (username) => {
 }
 
 const defaultAvatar = generateDefaultAvatar(user.value.name)
+// 头像加载失败回退到默认头像（安全、零成本）
+const handleAvatarError = (event) => {
+  if (!event || !event.target) return
+  const img = event.target
+  if (img.src !== defaultAvatar) {
+    img.src = defaultAvatar
+  }
+}
 
 // 创建内容（文章或媒体卡片）
 const createContent = (contentType, subType) => {
@@ -514,13 +529,40 @@ const navigateToQuestionbox = () => {
   router.push('/questionbox')
 }
 
-const navigateToTimeline = () => {
-  router.push('/timeline')
-}
+// 已移除时间树
 
 const navigateToPresentation = () => {
   router.push('/presentation')
 }
+
+// 复制邮箱
+const EMAIL = '1597807171@qq.com'
+const copyEmail = async () => {
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(EMAIL)
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = EMAIL
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    const isMobile = window.innerWidth <= 768
+    if (isMobile) {
+      alert('我的邮箱已经在你的剪切板中，也许你会给我发一封邮件？')
+    } else {
+      showCustomMessage('我的邮箱已经在你的剪切板中，也许你会给我发一封邮件？')
+    }
+  } catch (e) {
+    console.error('复制邮箱失败', e)
+  }
+}
+
+const copyEmailAndClose = async () => { await copyEmail(); closeNavMoreModal() }
 
 const navigateToImages = () => {
   router.push('/images')
@@ -1618,14 +1660,16 @@ onBeforeUnmount(() => {
 }
 
 .login-prompt {
-  background: rgba(168, 85, 247, 0.1);
+  background: #a855f7; /* 与边框同色，避免被遮挡时不易读 */
   border-color: #a855f7;
+  color: #fff;
 }
 
 .login-prompt span {
-  color: #a855f7;
-  font-size: 0.85rem;
+  color: #fff; /* 白字提高对比度 */
+  font-size: 0.7rem; /* 略小以避免被遮挡 */
   font-weight: 600;
+  white-space: nowrap; /* 防止“未登录”换行 */
 }
 
 .login-prompt:hover {
@@ -1633,7 +1677,7 @@ onBeforeUnmount(() => {
 }
 
 .login-prompt:hover span {
-  color: white;
+  color: #fff;
 }
 
 /* 响应式设计 */
@@ -1698,10 +1742,19 @@ onBeforeUnmount(() => {
 }
 
 /* 搜索框弹出时，看板娘不虚化：将其层级提升到遮罩之上 */
-:global(.waifu),
-:global(.waifu-tips),
-:global(#waifu) {
+::global(.waifu),
+::global(.waifu-tips),
+::global(#waifu) {
   z-index: 10001 !important;
+}
+
+/* 移动端隐藏看板娘 */
+@media (max-width: 768px) {
+  :global(.waifu),
+  :global(.waifu-tips),
+  :global(#waifu) {
+    display: none !important;
+  }
 }
 
 .search-modal-container {
@@ -2069,6 +2122,23 @@ onBeforeUnmount(() => {
 
   .action-btn span {
     display: none;
+  }
+
+  /* 评论下拉在手机端不超出屏幕 */
+  .comments-menu-wrapper {
+    right: 0 !important;
+    left: auto !important;
+    max-width: calc(100vw - 16px) !important;
+  }
+  .comments-menu {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 60vh !important;
+    overflow-y: auto !important;
+  }
+  /* 确保箭头仍指向菜单项但不影响布局 */
+  .comments-menu-arrow {
+    right: 12px !important;
   }
 
 }

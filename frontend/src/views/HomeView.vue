@@ -1455,15 +1455,20 @@ onMounted(async () => {
     margin-left: -15px;
     margin-right: -15px;
     padding-left: 15px;
-    padding-right: 15px;
+    padding-right: 0; /* 右侧不留内边距，便于标签贴边 */
   }
   /* 标签容器固定占 2/5 宽，靠右并保持与图标同一行 */
   .card-tags {
-    flex: 0 0 40%;
-    /* 容器靠右，由自身位置保证贴右，内容左起以便右侧出现 ... */
+    /* 贴右且不超过 40% 宽，但不足时不占空白 */
+    flex: 0 1 40%;
+    max-width: 40%;
     margin-left: auto;
+    margin-right: -15px; /* 抵消父级的内缩，真正贴边 */
     white-space: nowrap;
     text-overflow: ellipsis;
+    display: flex;
+    justify-content: flex-end; /* 标签在自身容器内靠右排列 */
+    overflow: hidden;
   }
   .card-tags .tag { display: inline; padding: 0 6px; }
 

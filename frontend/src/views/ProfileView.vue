@@ -746,6 +746,7 @@ onUnmounted(() => {
     flex-direction: column;
     text-align: left;
     gap: 15px;
+    align-items: flex-start; /* 移动端纵向布局时，头像与标题块左对齐 */
   }
 
   .intro-title h1 {

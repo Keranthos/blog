@@ -209,8 +209,8 @@ onMounted(() => {
   }
 
   .media-layout { width: 66.666%; margin: 0 auto; min-width: 480px; }
-  .intro { padding: 6px 0; }
-  .intro-text { font-size: 0.9rem; }
+  /* 手机端隐藏图片下方文案，仅展示卡片 */
+  .intro { display: none; }
 
   .create-media {
     width: 95%;
