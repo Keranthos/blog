@@ -1,9 +1,9 @@
 <template>
   <div>
     <nav class="navbar">
-      <div class="navbar-container">
+      <div ref="navbarContainer" class="navbar-container">
         <!-- 左侧 Logo 区域 -->
-        <div class="navbar-brand" @click="goToProfile">
+        <div ref="navbarBrand" class="navbar-brand" @click="goToProfile">
           <div class="brand-avatar">
             <img :src="require('@/assets/my_headportrait.jpg')" alt="Avatar" />
           </div>
@@ -11,91 +11,100 @@
         </div>
 
         <!-- 中间导航菜单 -->
-        <div class="navbar-menu-center">
-          <div class="menu-item" :class="{ active: route.path === '/' }" @click="navigateToHome">
-            <font-awesome-icon icon="house" class="menu-icon" />
-            <span class="menu-text">首页</span>
-          </div>
-          <div class="menu-item" :class="{ active: route.path === '/blog' }" @click="navigateToBlog">
-            <font-awesome-icon icon="blog" class="menu-icon" />
-            <span class="menu-text">博客</span>
-          </div>
-          <div class="menu-item" :class="{ active: route.path === '/moments' }" @click="navigateToMoments">
-            <font-awesome-icon icon="pen-to-square" class="menu-icon" />
-            <span class="menu-text">随笔</span>
-          </div>
+        <div ref="navbarMenuCenter" class="navbar-menu-center">
+          <template v-if="!isCompactNav">
+            <div class="menu-item" :class="{ active: route.path === '/' }" @click="navigateToHome">
+              <font-awesome-icon icon="house" class="menu-icon" />
+              <span class="menu-text">首页</span>
+            </div>
+            <div class="menu-item" :class="{ active: route.path === '/blog' }" @click="navigateToBlog">
+              <font-awesome-icon icon="blog" class="menu-icon" />
+              <span class="menu-text">博客</span>
+            </div>
+            <div class="menu-item" :class="{ active: route.path === '/moments' }" @click="navigateToMoments">
+              <font-awesome-icon icon="pen-to-square" class="menu-icon" />
+              <span class="menu-text">随笔</span>
+            </div>
 
-          <!-- 媒体下拉菜单 -->
-          <div class="menu-item dropdown" :class="{ active: isMediaActive }" @mouseenter="showDropdown" @mouseleave="hideDropdown">
-            <font-awesome-icon icon="ellipsis" class="menu-icon" />
-            <span class="menu-text">媒体</span>
-            <!-- 箭头 - 独立于过渡动画，立即显示，指向"媒体"文本 -->
-            <div v-if="dropdownVisible" class="dropdown-menu-arrow media-arrow"></div>
-            <transition name="dropdown-fade">
-              <div v-if="dropdownVisible" class="dropdown-menu">
-                <div class="dropdown-item" :class="{ active: route.path === '/fragments/books' }" @click="navigateToBooks">
-                  <font-awesome-icon icon="bars" />
-                  <span>书单</span>
+            <!-- 媒体下拉菜单 -->
+            <div class="menu-item dropdown" :class="{ active: isMediaActive }" @mouseenter="showDropdown" @mouseleave="hideDropdown">
+              <font-awesome-icon icon="ellipsis" class="menu-icon" />
+              <span class="menu-text">媒体</span>
+              <!-- 箭头 - 独立于过渡动画，立即显示，指向"媒体"文本 -->
+              <div v-if="dropdownVisible" class="dropdown-menu-arrow media-arrow"></div>
+              <transition name="dropdown-fade">
+                <div v-if="dropdownVisible" class="dropdown-menu">
+                  <div class="dropdown-item" :class="{ active: route.path === '/fragments/books' }" @click="navigateToBooks">
+                    <font-awesome-icon icon="book" />
+                    <span>书单</span>
+                  </div>
+                  <div class="dropdown-item" :class="{ active: route.path === '/fragments/novels' }" @click="navigateToNovels">
+                    <font-awesome-icon icon="bookmark" />
+                    <span>小说</span>
+                  </div>
+                  <div class="dropdown-item" :class="{ active: route.path === '/fragments/movies' }" @click="navigateToMovies">
+                    <font-awesome-icon icon="film" />
+                    <span>电影</span>
+                  </div>
                 </div>
-                <div class="dropdown-item" :class="{ active: route.path === '/fragments/novels' }" @click="navigateToNovels">
-                  <font-awesome-icon icon="bookmark" />
-                  <span>小说</span>
-                </div>
-                <div class="dropdown-item" :class="{ active: route.path === '/fragments/movies' }" @click="navigateToMovies">
-                  <font-awesome-icon icon="film" />
-                  <span>电影</span>
-                </div>
-              </div>
-            </transition>
-          </div>
+              </transition>
+            </div>
 
-          <!-- 其他下拉菜单 -->
-          <div class="menu-item dropdown" :class="{ active: isOtherActive }" @mouseenter="showOtherDropdown" @mouseleave="hideOtherDropdown">
-            <font-awesome-icon icon="bars" class="menu-icon" />
-            <span class="menu-text">其他</span>
-            <!-- 箭头 - 独立于过渡动画，立即显示，指向"其他"文本 -->
-            <div v-if="otherDropdownVisible" class="dropdown-menu-arrow other-arrow"></div>
-            <transition name="dropdown-fade">
-              <div v-if="otherDropdownVisible" class="dropdown-menu">
-                <div class="dropdown-item" :class="{ active: route.path === '/questionbox' }" @click="navigateToQuestionbox">
-                  <font-awesome-icon icon="question" />
-                  <span>提问箱</span>
+            <!-- 其他下拉菜单 -->
+            <div class="menu-item dropdown" :class="{ active: isOtherActive }" @mouseenter="showOtherDropdown" @mouseleave="hideOtherDropdown">
+              <font-awesome-icon icon="bars" class="menu-icon" />
+              <span class="menu-text">其他</span>
+              <!-- 箭头 - 独立于过渡动画，立即显示，指向"其他"文本 -->
+              <div v-if="otherDropdownVisible" class="dropdown-menu-arrow other-arrow"></div>
+              <transition name="dropdown-fade">
+                <div v-if="otherDropdownVisible" class="dropdown-menu">
+                  <div class="dropdown-item" :class="{ active: route.path === '/questionbox' }" @click="navigateToQuestionbox">
+                    <font-awesome-icon icon="question" />
+                    <span>提问箱</span>
+                  </div>
+                  <div class="dropdown-item" :class="{ active: route.path === '/timeline' }" @click="navigateToTimeline">
+                    <font-awesome-icon icon="clock" />
+                    <span>时间树</span>
+                  </div>
+                  <div class="dropdown-item" :class="{ active: route.path === '/presentation' }" @click="navigateToPresentation">
+                    <font-awesome-icon icon="chalkboard" />
+                    <span>讲演</span>
+                  </div>
                 </div>
-                <div class="dropdown-item" :class="{ active: route.path === '/timeline' }" @click="navigateToTimeline">
-                  <font-awesome-icon icon="clock" />
-                  <span>时间树</span>
-                </div>
-                <div class="dropdown-item" :class="{ active: route.path === '/presentation' }" @click="navigateToPresentation">
-                  <font-awesome-icon icon="chalkboard" />
-                  <span>讲演</span>
-                </div>
-              </div>
-            </transition>
-          </div>
+              </transition>
+            </div>
 
-          <!-- 设置菜单（仅管理员可见） -->
-          <div v-if="userLevel >= 3" class="menu-item dropdown" :class="{ active: isSettingsActive }" @mouseenter="showSettingsDropdown" @mouseleave="hideSettingsDropdown">
-            <font-awesome-icon icon="gear" class="menu-icon" />
-            <span class="menu-text">设置</span>
-            <!-- 箭头 - 独立于过渡动画，立即显示，指向"设置"文本 -->
-            <div v-if="settingsDropdownVisible" class="dropdown-menu-arrow settings-arrow"></div>
-            <transition name="dropdown-fade">
-              <div v-if="settingsDropdownVisible" class="dropdown-menu">
-                <div class="dropdown-item" :class="{ active: route.path === '/images' }" @click="navigateToImages">
-                  <font-awesome-icon icon="images" />
-                  <span>图片管理</span>
+            <!-- 设置菜单（仅管理员可见） -->
+            <div v-if="userLevel >= 3" class="menu-item dropdown" :class="{ active: isSettingsActive }" @mouseenter="showSettingsDropdown" @mouseleave="hideSettingsDropdown">
+              <font-awesome-icon icon="gear" class="menu-icon" />
+              <span class="menu-text">设置</span>
+              <!-- 箭头 - 独立于过渡动画，立即显示，指向"设置"文本 -->
+              <div v-if="settingsDropdownVisible" class="dropdown-menu-arrow settings-arrow"></div>
+              <transition name="dropdown-fade">
+                <div v-if="settingsDropdownVisible" class="dropdown-menu">
+                  <div class="dropdown-item" :class="{ active: route.path === '/images' }" @click="navigateToImages">
+                    <font-awesome-icon icon="images" />
+                    <span>图片管理</span>
+                  </div>
+                  <div class="dropdown-item" :class="{ active: route.path === '/location-update' }" @click="navigateToLocationUpdate">
+                    <font-awesome-icon icon="location-dot" />
+                    <span>更新位置</span>
+                  </div>
                 </div>
-                <div class="dropdown-item" :class="{ active: route.path === '/location-update' }" @click="navigateToLocationUpdate">
-                  <font-awesome-icon icon="location-dot" />
-                  <span>更新位置</span>
-                </div>
-              </div>
-            </transition>
-          </div>
+              </transition>
+            </div>
+          </template>
+          <template v-else>
+            <!-- 紧凑模式下显示“菜单”入口按钮 -->
+            <div class="menu-item" @click="openNavMoreModal">
+              <font-awesome-icon icon="bars" class="menu-icon" />
+              <span class="menu-text">菜单</span>
+            </div>
+          </template>
         </div>
 
         <!-- 右侧功能区 -->
-        <div class="navbar-actions">
+        <div ref="navbarActions" class="navbar-actions">
           <!-- 搜索键（按钮样式） -->
           <div class="search-box" :class="{ expanded: searchExpanded }" @click="openSearchModal">
             <font-awesome-icon icon="magnifying-glass" class="search-icon" />
@@ -298,11 +307,83 @@
         </div>
       </transition>
     </Teleport>
+
+    <!-- 折叠菜单模态框（与搜索弹框风格一致） -->
+    <Teleport to="body">
+      <transition name="search-modal-fade">
+        <div v-if="showNavMoreModal" class="search-modal-overlay" @click="closeNavMoreModal">
+          <div class="search-modal-container nav-more-container" @click.stop>
+            <div class="nav-more-header">导航</div>
+            <div class="nav-more-list">
+              <button class="nav-more-item" @click="goAndClose('/')">
+                <font-awesome-icon icon="house" /> 首页
+              </button>
+              <button class="nav-more-item" @click="goAndClose('/blog')">
+                <font-awesome-icon icon="blog" /> 博客
+              </button>
+              <button class="nav-more-item" @click="goAndClose('/moments')">
+                <font-awesome-icon icon="pen-to-square" /> 随笔
+              </button>
+
+              <!-- 多级：媒体 -->
+              <button class="nav-more-item has-children" @click="toggleExpand('media')">
+                <font-awesome-icon icon="ellipsis" /> 媒体
+                <span class="chevron" :class="{ open: expand.media }">›</span>
+              </button>
+              <div v-if="expand.media" class="nav-more-sublist">
+                <button class="nav-more-subitem" @click="goAndClose('/fragments/books')">
+                  <font-awesome-icon icon="book" /> 书单
+                </button>
+                <button class="nav-more-subitem" @click="goAndClose('/fragments/novels')">
+                  <font-awesome-icon icon="bookmark" /> 小说
+                </button>
+                <button class="nav-more-subitem" @click="goAndClose('/fragments/movies')">
+                  <font-awesome-icon icon="film" /> 电影
+                </button>
+              </div>
+
+              <!-- 多级：其他 -->
+              <button class="nav-more-item has-children" @click="toggleExpand('other')">
+                <font-awesome-icon icon="bars" /> 其他
+                <span class="chevron" :class="{ open: expand.other }">›</span>
+              </button>
+              <div v-if="expand.other" class="nav-more-sublist">
+                <button class="nav-more-subitem" @click="goAndClose('/questionbox')">
+                  <font-awesome-icon icon="question" /> 提问箱
+                </button>
+                <button class="nav-more-subitem" @click="goAndClose('/timeline')">
+                  <font-awesome-icon icon="clock" /> 时间树
+                </button>
+                <button class="nav-more-subitem" @click="goAndClose('/presentation')">
+                  <font-awesome-icon icon="chalkboard" /> 讲演
+                </button>
+              </div>
+
+              <!-- 多级：设置（管理员） -->
+              <template v-if="userLevel >= 3">
+                <button class="nav-more-item has-children" @click="toggleExpand('settings')">
+                  <font-awesome-icon icon="gear" /> 设置
+                  <span class="chevron" :class="{ open: expand.settings }">›</span>
+                </button>
+                <div v-if="expand.settings" class="nav-more-sublist">
+                  <button class="nav-more-subitem" @click="goAndClose('/images')">
+                    <font-awesome-icon icon="images" /> 图片管理
+                  </button>
+                  <button class="nav-more-subitem" @click="goAndClose('/location-update')">
+                    <font-awesome-icon icon="location-dot" /> 更新位置
+                  </button>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter, useRoute } from 'vue-router'
 import { getAllComments } from '@/api/Comments/browse'
@@ -334,6 +415,60 @@ let timeout = null
 let otherTimeout = null
 let settingsTimeout = null
 let commentsTimeout = null
+
+// 响应式折叠：当中间菜单与右侧功能区可能互相遮挡时，使用“其他”模态
+const navbarContainer = ref(null)
+const navbarMenuCenter = ref(null)
+const navbarActions = ref(null)
+const navbarBrand = ref(null)
+const isCompactNav = ref(false)
+const showNavMoreModal = ref(false)
+const expand = ref({ media: false, other: false, settings: false })
+
+// 两阶段测量：先渲染为非紧凑，再计算真实溢出
+const measureCompact = () => {
+  try {
+    // 直接按窗口宽度阈值快速裁决：小于 930px 一律进入紧凑模式
+    if (window.innerWidth < 930) {
+      isCompactNav.value = true
+      return
+    }
+    // 第一步：强制展示完整菜单进行测量
+    const forceNonCompact = () => {
+      isCompactNav.value = false
+    }
+    const doMeasure = () => {
+      const container = navbarContainer.value
+      const brand = navbarBrand.value
+      const menu = navbarMenuCenter.value
+      const actions = navbarActions.value
+      if (!container || !brand || !menu || !actions) return
+
+      const brandRect = brand.getBoundingClientRect()
+      const actionsRect = actions.getBoundingClientRect()
+      const menuRect = menu.getBoundingClientRect()
+
+      // 计算品牌右缘到右侧功能区左缘之间的可用宽度
+      const availableWidth = Math.max(0, actionsRect.left - brandRect.right)
+      const neededWidth = menuRect.width + 24 // 预留间距
+      const overflow = neededWidth > availableWidth
+      isCompactNav.value = overflow
+    }
+
+    forceNonCompact()
+    // 等待DOM更新后再测量
+    nextTick(doMeasure)
+  } catch (_) {}
+}
+
+const openNavMoreModal = () => { showNavMoreModal.value = true }
+const closeNavMoreModal = () => { showNavMoreModal.value = false }
+const goAndClose = (path) => { router.push(path); closeNavMoreModal() }
+const toggleExpand = (key) => {
+  const next = !expand.value[key]
+  expand.value = { media: false, other: false, settings: false }
+  if (next) expand.value[key] = true
+}
 
 const generateDefaultAvatar = (username) => {
   const canvas = document.createElement('canvas')
@@ -863,6 +998,17 @@ watch(() => route.path, () => {
     clearTimeout(searchTimeout.value)
     searchTimeout.value = null
   }
+  // 路由变化后也重新测量
+  nextTick(measureCompact)
+})
+
+onMounted(() => {
+  nextTick(measureCompact)
+  window.addEventListener('resize', measureCompact)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', measureCompact)
 })
 
 </script>
@@ -943,6 +1089,7 @@ watch(() => route.path, () => {
   flex: 1;
   justify-content: flex-start;
   margin-left: 40px;
+  min-width: 0; /* 允许在布局里收缩，便于溢出检测 */
 }
 
 .menu-item {
@@ -1887,6 +2034,39 @@ watch(() => route.path, () => {
 .search-modal-fade-leave-active {
   transition: opacity 0.3s ease;
 }
+
+/* 折叠菜单模态内容样式（复用搜索弹框容器风格） */
+.nav-more-container { max-width: 520px; }
+.nav-more-header {
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 12px;
+  text-align: left;
+}
+.nav-more-list { display: flex; flex-direction: column; gap: 8px; }
+.nav-more-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent; /* 与弹框背景融为一体 */
+  color: #333;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+.nav-more-item:hover { border-color: #a855f7; background: rgba(168,85,247,.08); color: #a855f7; }
+.nav-more-item.has-children { justify-content: space-between; }
+.nav-more-sublist { display: flex; flex-direction: column; gap: 6px; margin-left: 8px; }
+.nav-more-subitem {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border: 1px solid transparent; border-radius: 8px;
+  background: transparent; color: #333; cursor: pointer; transition: all .2s ease;
+}
+.nav-more-subitem:hover { border-color: #a855f7; background: rgba(168,85,247,.06); color: #a855f7; }
+.chevron { margin-left: auto; transform: rotate(0deg); transition: transform .2s ease; color: #999; }
+.chevron.open { transform: rotate(90deg); color: #a855f7; }
 
 .search-modal-fade-enter-active .search-modal-container,
 .search-modal-fade-leave-active .search-modal-container {

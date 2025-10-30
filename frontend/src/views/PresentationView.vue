@@ -1429,6 +1429,13 @@ const loadPdfJs = () => {
   }
 }
 
+/* 紧凑模式：头图与内容等宽（2/3 居中），高度不限制 */
+@media (max-width: 1330px) {
+  .presentation-view { padding-top: 40px; }
+  .hero-section { padding-left: 0; padding-right: 0; }
+  .hero-image-wrapper, .content-container, .separator-section .separator-text { width: 66.666%; margin: 0 auto; min-width: 480px; }
+}
+
 @media (max-width: 768px) {
   .cards-grid {
     grid-template-columns: 1fr;

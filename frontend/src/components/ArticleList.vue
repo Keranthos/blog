@@ -579,6 +579,22 @@ watch(() => props.type, async () => {
   }
 }
 
+/* 紧凑模式：与主页一致的侧边距策略 */
+@media (max-width: 1330px) {
+  .article-list-view { margin-top: 40px; }
+  .header-section,
+  .tabs-section,
+  .content-section,
+  .pagination-section {
+    width: 66.666%;
+    margin: 0 auto;
+    padding-left: 0;
+    padding-right: 0;
+    min-width: 480px;
+  }
+  .header-section { margin-top: 0; }
+}
+
 /* 加载包装器样式 */
 .loading-wrapper {
   position: fixed;
@@ -590,13 +606,19 @@ watch(() => props.type, async () => {
 }
 
 @media (max-width: 768px) {
+  .article-list-view { margin-top: 30px; }
+  /* 手机端也保持主体 2/3 宽度与最小宽度 480px（与主页一致） */
   .header-section,
   .tabs-section,
   .content-section,
   .pagination-section {
-    padding-left: 20px;
-    padding-right: 20px;
+    width: 66.666%;
+    margin: 0 auto;
+    padding-left: 0;
+    padding-right: 0;
+    min-width: 480px;
   }
+  .header-section { margin-top: 0; }
 
   .header-image {
     height: 250px;
@@ -608,7 +630,7 @@ watch(() => props.type, async () => {
   }
 
   .article-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr; /* 恢复博客/随笔在手机端单列展示 */
   }
 
   .tabs-container {

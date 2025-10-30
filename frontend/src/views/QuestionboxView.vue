@@ -469,6 +469,13 @@ onMounted(() => {
   }
 }
 
+/* 紧凑模式：头图与内容等宽（2/3 居中），高度不限制 */
+@media (max-width: 1330px) {
+  .question-box-view { padding-top: 40px; }
+  .header, .content { width: 66.666%; margin: 0 auto; min-width: 480px; }
+  .header { padding: 0; }
+}
+
 /* 翻页组件样式 */
 .pagination {
   display: flex;

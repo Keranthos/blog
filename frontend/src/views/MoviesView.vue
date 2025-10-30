@@ -173,6 +173,14 @@ onMounted(() => {
   }
 }
 
+/* 紧凑模式：头图与卡片区域等宽（2/3 居中），高度不限制 */
+@media (max-width: 1330px) {
+  .media-view { padding-top: 40px; }
+  .header, .media-list, .message1 { width: 66.666%; margin: 0 auto; min-width: 480px; }
+  .header { padding: 0; }
+  .media-list { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 1024px) {
   .media-list {
     grid-template-columns: repeat(2, 1fr);
@@ -194,7 +202,7 @@ onMounted(() => {
 
   .media-list {
     width: 95%;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .create-media {

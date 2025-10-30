@@ -917,6 +917,8 @@ onMounted(async () => {
   gap: 8px;
   flex-wrap: nowrap; /* 与图标同一行，不换行 */
   overflow: hidden;  /* 超出隐藏，配合单行显示 */
+  min-width: 0;      /* 允许在 flex 布局中收缩并触发省略号 */
+  margin-left: auto; /* 容器整体靠右，但内容从左开始，便于右侧出现 ... */
 }
 
 .tag-icon {
@@ -1364,6 +1366,9 @@ onMounted(async () => {
     width: 66.666%;
     margin: 0 auto;
   }
+  /* 紧凑模式下隐藏首页统计块，并避免与固定导航重叠 */
+  .hero-stats { display: none; }
+  .hero-section { margin-top: 40px; }
 }
 
 @media (max-width: 768px) {
@@ -1396,6 +1401,7 @@ onMounted(async () => {
   .main-content {
     width: 66.666%;
     margin: 0 auto;
+    min-width: 480px; /* 手机端主体区域最小宽度不小于 480px */
   }
 
   .blog-cards {
@@ -1445,7 +1451,8 @@ onMounted(async () => {
   /* 标签容器固定占 2/5 宽，靠右并保持与图标同一行 */
   .card-tags {
     flex: 0 0 40%;
-    justify-content: flex-end;
+    /* 容器靠右，由自身位置保证贴右，内容左起以便右侧出现 ... */
+    margin-left: auto;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
