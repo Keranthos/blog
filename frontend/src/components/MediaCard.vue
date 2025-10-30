@@ -1,5 +1,6 @@
 <template>
-  <div class="media-card" @mouseover="showOverlay = true" @mouseleave="showOverlay = false">
+  <div class="media-card-wrapper">
+  <div class="media-card" @click="openMediaModal">
     <div class="poster" :style="{ backgroundImage: `url(${props.media.Poster})` }"></div>
     <div class="content">
       <h2>{{ props.media.Name }}</h2>
@@ -8,50 +9,55 @@
         <span>{{ '⭐'.repeat(Math.round(props.media.Rating / 2)) }}</span>
       </div>
     </div>
-    <!-- 黑色背景遮罩层 -->
-    <div v-if="showOverlay" class="overlay">
-      <div class="overlay-content">
-        <h3>{{ props.media.Name }}</h3>
-        <div v-if="props.media.Rating" class="rating-display">
-          <span class="stars">{{ '⭐'.repeat(Math.round(props.media.Rating / 2)) }}</span>
-          <span class="rating-text">{{ props.media.Rating }}/10</span>
-        </div>
-        <!-- 使用 Markdown 渲染 -->
-        <div class="review-content markdown-body" v-html="renderedReview"></div>
-        <div v-if="userLevel >= 3" class="action-buttons">
-          <button class="edit-btn" @click="goToEdit">
-            <font-awesome-icon icon="edit" /> 编辑
-          </button>
-          <button class="delete-btn" @click="confirmDelete">
-            <font-awesome-icon icon="trash" /> 删除
-          </button>
+
+  </div>
+
+  <!-- 媒体详情模态框 - 与搜索模态风格一致 -->
+  <Teleport to="body">
+    <transition name="media-modal-fade">
+      <div v-if="showMediaModal" class="media-modal-overlay" @click="closeMediaModal">
+        <div class="media-modal-container" @click.stop>
+          <div class="media-modal-header">
+            <h3 class="media-modal-title">{{ props.media.Name }}</h3>
+            <button v-if="userLevel >= 3" class="media-modal-edit" @click="goToEdit">编辑</button>
+          </div>
+          <div class="media-modal-body">
+            <div class="media-modal-content">
+              <div v-if="props.media.Rating" class="media-modal-rating">
+                <span class="stars">{{ '⭐'.repeat(Math.round(props.media.Rating / 2)) }}</span>
+                <span class="rating-text">{{ props.media.Rating }}/10</span>
+              </div>
+              <div class="media-modal-review markdown-body" v-html="renderedReview"></div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </transition>
+  </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, defineEmits, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import { deleteMedia } from '@/api/media/edit'
 
 const props = defineProps({
   media: Object,
   type: String
 })
 
-const emit = defineEmits(['mediaDeleted'])
+// 无对外事件
 
 const store = useStore()
 const router = useRouter()
 const user = store.state.user
 const userLevel = user.level
 
-const showOverlay = ref(false)
+// 取消卡片悬停展示内容，仅保留普通悬停效果
+const showMediaModal = ref(false)
 
 // 格式化时间
 const formattedTime = computed(() => {
@@ -69,8 +75,31 @@ const renderedReview = computed(() => {
   return DOMPurify.sanitize(html)
 })
 
+const openMediaModal = () => {
+  showMediaModal.value = true
+}
+
+const closeMediaModal = () => {
+  showMediaModal.value = false
+}
+
+// ESC 关闭
+const handleKeydown = (e) => {
+  if (e.key === 'Escape') closeMediaModal()
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
+
 // 跳转到编辑页面
 const goToEdit = () => {
+  // 先关闭模态框
+  closeMediaModal()
   router.push({
     path: `/edit/${props.media.ID}`,
     query: {
@@ -80,32 +109,7 @@ const goToEdit = () => {
   })
 }
 
-const confirmDelete = async () => {
-  // 第一次确认
-  const firstConfirm = confirm(`确定要删除《${props.media.Name}》吗？\n\n⚠️ 此操作不可撤销！`)
-  if (!firstConfirm) return
-
-  // 第二次确认（防误触）
-  const secondConfirm = confirm(`再次确认：真的要删除《${props.media.Name}》吗？\n\n删除后将无法恢复！`)
-  if (!secondConfirm) return
-
-  try {
-    await deleteMedia(props.type, props.media.ID)
-    emit('mediaDeleted', props.media.ID)
-
-    // 显示看板娘消息（如果可用）
-    if (window.showMessage) {
-      window.showMessage('删除成功～', 3000, 9)
-    }
-  } catch (error) {
-    console.error('Failed to delete media:', error)
-
-    // 显示看板娘错误消息（如果可用）
-    if (window.showMessage) {
-      window.showMessage('(｡•́︿•̀｡)<br>删除失败了…请重试吧～', 5000, 10)
-    }
-  }
-}
+// 删除功能已移除（按需可恢复）
 </script>
 
 <style>
@@ -303,6 +307,82 @@ const confirmDelete = async () => {
   border-left-color: rgba(255, 255, 255, 0.5) !important;
   color: rgba(255, 255, 255, 0.9) !important;
 }
+
+/* 媒体模态框（对齐搜索模态视觉） */
+.media-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10000;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.media-modal-container {
+  width: 90%;
+  max-width: 600px; /* 与搜索模态一致 */
+  max-height: 85vh;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 14px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+}
+
+.media-modal-header {
+  position: relative;
+  min-height: 28px;
+}
+
+.media-modal-title { position: absolute; left: 50%; top: 0; transform: translateX(-50%); margin: 0; font-size: 1.1rem; font-weight: 700; color: #333; text-align: center; }
+.media-modal-edit { position: absolute; right: 0; top: -2px; border: none; background: transparent; color: #a855f7; font-size: 0.9rem; cursor: pointer; padding: 2px 6px; }
+.media-modal-edit:hover { color: #7c3aed; }
+
+.media-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+  min-height: 0;
+}
+
+.media-modal-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.media-modal-rating { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
+
+.media-modal-review { flex: 1; overflow-y: auto; min-height: 0; text-align: left; }
+.media-modal-review.markdown-body { background: transparent !important; padding: 0; }
+.media-modal-review.markdown-body h1,
+.media-modal-review.markdown-body h2,
+.media-modal-review.markdown-body h3,
+.media-modal-review.markdown-body h4,
+.media-modal-review.markdown-body h5,
+.media-modal-review.markdown-body h6 { background: transparent !important; }
+
+@media (max-width: 768px) {
+  .media-modal-container { width: 90%; max-width: 90%; }
+}
+.media-modal-review { scrollbar-width: none; -ms-overflow-style: none; }
+.media-modal-review::-webkit-scrollbar { display: none; }
+
+.media-modal-actions { display: flex; gap: 10px; margin-top: 12px; }
+
+.media-modal-fade-enter-active,
+.media-modal-fade-leave-active { transition: opacity 0.3s ease; }
+.media-modal-fade-enter-from,
+.media-modal-fade-leave-to { opacity: 0; }
 
 /* 卡片内容区 */
 .content {
