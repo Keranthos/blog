@@ -537,7 +537,7 @@ watch(() => props.type, async () => {
 }
 
 .pagination button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
   color: white;
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(106, 27, 154, 0.3);

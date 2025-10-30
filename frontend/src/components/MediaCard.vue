@@ -240,14 +240,14 @@ const confirmDelete = async () => {
 }
 
 .edit-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
   color: white;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
 }
 
 .edit-btn:hover {
   transform: translateY(-3px);
-  box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 6px 25px rgba(168, 85, 247, 0.5);
 }
 
 .delete-btn {

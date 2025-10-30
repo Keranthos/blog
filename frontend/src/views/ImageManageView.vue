@@ -82,7 +82,7 @@ import { ref, computed, onMounted } from 'vue'
 import NavBar from '@/components/NavBar.vue'
 import apiConfig from '@/config/api'
 import { showSuccessMessage, showErrorMessage } from '@/utils/waifuMessage'
-import axios from 'axios'
+import { requestFunc } from '@/api/req'
 
 const images = ref([])
 const loading = ref(true)
@@ -111,20 +111,22 @@ const goToPage = (page) => {
 const loadImages = async () => {
   try {
     loading.value = true
-    const user = JSON.parse(localStorage.getItem('vuex'))?.user
-    if (!user || !user.token) {
-      showErrorMessage('401')
+
+    const response = await requestFunc('/images', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }, true) // 需要token
+
+    if (!response) {
+      // requestFunc返回null表示JWT过期，已由拦截器处理
       return
     }
 
-    const response = await axios.get(`${apiConfig.apiURL}/images`, {
-      headers: {
-        Authorization: `Bearer ${user.token}`
-      }
-    })
-
     images.value = response.data.images || []
   } catch (error) {
+    console.error('加载图片列表失败:', error)
     showErrorMessage(error)
   } finally {
     loading.value = false
@@ -182,24 +184,25 @@ const deleteImage = async (image) => {
   if (!confirmed) return
 
   try {
-    const user = JSON.parse(localStorage.getItem('vuex'))?.user
-    if (!user || !user.token) {
-      showErrorMessage('401')
-      return
-    }
-
-    await axios.delete(`${apiConfig.apiURL}/images`, {
+    const response = await requestFunc('/images', {
+      method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${user.token}`
+        'Content-Type': 'application/json'
       },
       data: {
         path: image.path
       }
-    })
+    }, true) // 需要token
+
+    if (!response) {
+      // requestFunc返回null表示JWT过期，已由拦截器处理
+      return
+    }
 
     images.value = images.value.filter(img => img.path !== image.path)
     showSuccessMessage('delete')
   } catch (error) {
+    console.error('删除图片失败:', error)
     showErrorMessage(error)
   }
 }

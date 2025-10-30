@@ -191,7 +191,7 @@ h2 {
 }
 
 .basic-view:hover h2 {
-  color: #667eea;
+  color: #a855f7;
 }
 
 /* Tooltip样式 - 淡黄色版本 */
@@ -239,18 +239,18 @@ h2 {
 }
 
 .tag {
-  background: rgba(102, 126, 234, 0.1);
-  color: #667eea;
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
   padding: 4px 8px;
   border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 500;
-  border: 1px solid rgba(102, 126, 234, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.2);
   transition: all 0s;
 }
 
 .tag:hover {
-  background: rgba(102, 126, 234, 0.2);
+  background: rgba(168, 85, 247, 0.2);
   transform: translateY(-1px);
 }
 
@@ -280,17 +280,17 @@ h2 {
 }
 
 .reading-time {
-  color: #667eea;
+  color: #a855f7;
   font-size: 0.8em;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 4px;
   margin: 0;
-  background: rgba(102, 126, 234, 0.12);
+  background: rgba(168, 85, 247, 0.12);
   padding: 4px 8px;
   border-radius: 12px;
-  border: 1px solid rgba(102, 126, 234, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.2);
 }
 
 .reading-icon {
@@ -307,7 +307,7 @@ h2 {
 
 .tag {
   padding: 4px 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
   color: white;
   border-radius: 20px;
   font-size: 0.75em;
@@ -322,7 +322,7 @@ h2 {
 /* 类型图标样式 */
 .type-icon {
   font-size: 1.1em;
-  color: #667eea;
+  color: #a855f7;
   flex-shrink: 0;
 }
 

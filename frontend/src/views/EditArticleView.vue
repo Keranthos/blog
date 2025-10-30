@@ -490,7 +490,8 @@ import '@/assets/styles/github-markdown.css'
 import NavBar from '@/components/NavBar.vue'
 import { createArticle, updateArticle } from '@/api/Articles/edit'
 import { getJWT, requestFunc } from '@/api/req'
-// import { getArticleByID } from '@/api/Articles/browse'
+import { getArticleByID } from '@/api/Articles/browse'
+import { getMediaByID } from '@/api/media/browse'
 // import { imageConfig } from '@/config/images'
 import apiConfig from '@/config/api'
 import { showErrorMessage, showSuccessMessage, showWarningMessage, showCustomMessage } from '@/utils/waifuMessage'
@@ -1536,8 +1537,91 @@ const cleanup = () => {
   pendingCoverUploads.value.clear()
 }
 
+// 加载现有文章数据
+const loadExistingArticle = async () => {
+  if (!isEditing.value) return
+
+  try {
+    const id = route.params.id
+    const articleType = articleData.value.type
+
+    const res = await getArticleByID(articleType, id)
+    const data = res.data
+
+    // 填充文章数据
+    articleData.value.title = data.title || ''
+    articleData.value.image = data.image || ''
+    articleData.value.type = articleType
+    articleData.value.isTop = data.isTop || false
+
+    // 填充内容
+    markdownContent.value = data.content || ''
+    tagsInput.value = (data.tags || []).join(',')
+
+    // 保存原始数据用于检测更改
+    originalArticleData.value = JSON.parse(JSON.stringify(articleData.value))
+    originalMarkdownContent.value = markdownContent.value
+    originalTagsInput.value = tagsInput.value
+
+    // 更新预览
+    updatePreview()
+  } catch (error) {
+    console.error('加载文章失败:', error)
+    showErrorMessage('加载文章失败，请重试')
+  }
+}
+
+// 加载现有媒体数据
+const loadExistingMedia = async () => {
+  if (!isEditing.value) return
+
+  try {
+    const id = route.params.id
+    const mediaType = mediaData.value.type
+
+    const res = await getMediaByID(id, mediaType)
+    const data = res.data || res // 后端可能直接返回数据或包装在data中
+
+    // 填充媒体数据（后端字段名：Poster, Name, Review, Rating, Type）
+    mediaData.value.name = data.Name || ''
+    mediaData.value.image = data.Poster || ''
+    mediaData.value.rating = data.Rating || 8
+    mediaData.value.description = data.Review || ''
+    mediaData.value.type = data.Type || mediaType
+
+    // 保存原始数据用于检测更改
+    originalMediaData.value = JSON.parse(JSON.stringify(mediaData.value))
+  } catch (error) {
+    console.error('加载媒体数据失败:', error)
+    showErrorMessage('加载媒体数据失败，请重试')
+  }
+}
+
 // 组件挂载时初始化
-onMounted(() => {
+onMounted(async () => {
+  // 从路由query参数设置内容类型
+  if (route.query.contentType) {
+    contentType.value = route.query.contentType
+  }
+
+  // 从路由query参数设置类型
+  if (route.query.articleType) {
+    articleData.value.type = route.query.articleType
+  }
+
+  if (route.query.mediaType) {
+    mediaData.value.type = route.query.mediaType
+  }
+
+  // 如果是编辑模式，加载现有数据
+  if (isEditing.value) {
+    if (contentType.value === 'media') {
+      await loadExistingMedia()
+    } else {
+      await loadExistingArticle()
+    }
+  }
+
   // 初始化预览
   updatePreview()
 })

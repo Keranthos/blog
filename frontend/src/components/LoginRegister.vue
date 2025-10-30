@@ -202,7 +202,7 @@ const togglePanel = () => {
 .panel h2 {
   font-size: 2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -223,8 +223,8 @@ input {
 
 input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #a855f7;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
   background: white;
 }
 
@@ -235,7 +235,7 @@ input::placeholder {
 .auth-button {
   width: 85%;
   max-width: 400px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
   color: white;
   padding: 15px 2rem;
   border: none;
@@ -245,12 +245,12 @@ input::placeholder {
   font-size: 1.1rem;
   font-weight: 600;
   transition: all 0.3s ease;
-  box-shadow: 0 6px 25px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 25px rgba(168, 85, 247, 0.4);
 }
 
 .auth-button:hover {
   transform: translateY(-3px);
-  box-shadow: 0 10px 35px rgba(102, 126, 234, 0.6);
+  box-shadow: 0 10px 35px rgba(168, 85, 247, 0.6);
 }
 
 .switch-panel {
@@ -263,7 +263,7 @@ input::placeholder {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%);
   backdrop-filter: blur(10px);
   transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 3rem;
@@ -283,9 +283,9 @@ input::placeholder {
 
 .switch-button {
   background: white;
-  color: #667eea;
+  color: #a855f7;
   padding: 12px 40px;
-  border: 2px solid #667eea;
+  border: 2px solid #a855f7;
   border-radius: 25px;
   cursor: pointer;
   font-size: 1rem;
@@ -294,11 +294,11 @@ input::placeholder {
 }
 
 .switch-button:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
   color: white;
   border-color: transparent;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4);
 }
 
 .back-button {

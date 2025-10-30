@@ -27,11 +27,6 @@ const routes = [
     component: () => (import('@/views/MomentDetailView.vue'))
   },
   {
-    path: '/comments',
-    name: 'Comments',
-    component: () => import('@/views/CommentsView.vue')
-  },
-  {
     path: '/search',
     name: 'Search',
     component: () => (import('@/views/SearchView.vue'))

@@ -28,12 +28,12 @@
             <div class="article-type-icon">
               <font-awesome-icon :icon="getArticleTypeIcon(comment.articleType)" />
             </div>
-            <router-link
-              :to="getArticleLink(comment.articleType, comment.blogID)"
+            <div
               class="article-title"
+              @click="navigateToArticle(comment.articleType, comment.blogID)"
             >
               {{ comment.articleTitle || '未知文章' }}
-            </router-link>
+            </div>
           </div>
 
           <!-- 评论元信息 -->
@@ -52,9 +52,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import NavBar from '@/components/NavBar.vue'
 import { getAllComments } from '@/api/Comments/browse'
 import { marked } from 'marked'
+
+const router = useRouter()
 
 const comments = ref([])
 const loading = ref(true)
@@ -109,20 +112,21 @@ const getArticleTypeIcon = (type) => {
   return iconMap[type] || 'file'
 }
 
-// 获取文章链接
-const getArticleLink = (type, blogID) => {
+// 导航到文章
+const navigateToArticle = (type, blogID) => {
   if (type === 'moment') {
-    return `/moments/${blogID}`
+    router.push(`/moments/${blogID}`)
   } else if (type === 'blog') {
-    return `/blog/${blogID}`
+    router.push(`/blog/${blogID}`)
   } else if (type === 'research') {
     // 如果research有独立路由，使用独立路由；否则使用通用路由
-    return `/research/${blogID}`
+    router.push(`/research/${blogID}`)
   } else if (type === 'project') {
     // 如果project有独立路由，使用独立路由；否则使用通用路由
-    return `/project/${blogID}`
+    router.push(`/project/${blogID}`)
+  } else {
+    router.push('/')
   }
-  return '/'
 }
 
 // 渲染评论内容（支持Markdown）
@@ -272,6 +276,7 @@ onMounted(() => {
   font-weight: 500;
   transition: color 0.2s ease;
   flex: 1;
+  cursor: pointer;
 }
 
 .article-title:hover {

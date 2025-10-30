@@ -251,7 +251,14 @@
           <div class="sidebar-section">
             <h4 class="section-title">常用链接</h4>
             <div class="useful-links">
-              <!-- 暂时留空，后续填写 -->
+              <div class="nav-link-item" @click="openExternal('https://github.com/Keranthos')">
+                <div class="nav-link-icon" style="background: rgba(0,0,0,0.08);">
+                  <font-awesome-icon :icon="['fab','github']" />
+                </div>
+                <div class="nav-link-content">
+                  <h5>Keranthos 的 GitHub</h5>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -271,6 +278,9 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
 const typingText = '欢迎来到山角函兽的小窝'
 const displayedText = ref('')
+const openExternal = (url) => {
+  window.open(url, '_blank')
+}
 const latestBlogs = ref([])
 const latestMoments = ref([])
 const latestProjects = ref([])
@@ -726,7 +736,7 @@ onMounted(async () => {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: linear-gradient(180deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.3) 100%);
   z-index: 1;
 }
 
@@ -757,7 +767,7 @@ onMounted(async () => {
   align-items: center;
   margin-bottom: 25px;
   padding-bottom: 15px;
-  border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+  border-bottom: 2px solid rgba(168, 85, 247, 0.1);
 }
 
 .section-title {
@@ -775,15 +785,15 @@ onMounted(async () => {
 }
 
 .section-text {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .section-count {
-  background: rgba(102, 126, 234, 0.1);
-  color: #667eea;
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
   padding: 6px 12px;
   border-radius: 20px;
   font-size: 0.85rem;
@@ -847,7 +857,7 @@ onMounted(async () => {
 .card-icon {
   font-size: 1rem;
   margin-right: 8px;
-  color: #667eea;
+  color: #a855f7;
   vertical-align: middle;
 }
 
@@ -879,7 +889,7 @@ onMounted(async () => {
   align-items: center;
   margin-top: auto;
   padding-top: 15px;
-  border-top: 1px solid rgba(102, 126, 234, 0.1);
+  border-top: 1px solid rgba(168, 85, 247, 0.1);
 }
 
 .card-date {
@@ -908,18 +918,18 @@ onMounted(async () => {
 }
 
 .tag {
-  background: rgba(102, 126, 234, 0.1);
-  color: #667eea;
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
   padding: 4px 8px;
   border-radius: 12px;
   font-size: 0.8rem;
   font-weight: 500;
-  border: 1px solid rgba(102, 126, 234, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.2);
   transition: all 0.3s ease;
 }
 
 .tag:hover {
-  background: rgba(102, 126, 234, 0.2);
+  background: rgba(168, 85, 247, 0.2);
   transform: translateY(-1px);
 }
 
@@ -960,11 +970,11 @@ onMounted(async () => {
 }
 
 .weather-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
   border-radius: 20px;
   padding: 24px;
   color: white;
-  box-shadow: 0 12px 40px rgba(102, 126, 234, 0.25);
+  box-shadow: 0 12px 40px rgba(168, 85, 247, 0.25);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   position: relative;
@@ -1145,7 +1155,7 @@ onMounted(async () => {
   color: #333;
   margin-bottom: 15px;
   padding-bottom: 8px;
-  border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+  border-bottom: 2px solid rgba(168, 85, 247, 0.1);
 }
 
 /* 导航链接样式 */
@@ -1160,7 +1170,7 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.5);
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -1223,21 +1233,21 @@ onMounted(async () => {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.1), transparent);
   transition: left 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .top-blog-item:hover {
   transform: translateY(-2px) scale(1.02);
   box-shadow:
-    0 8px 25px rgba(102, 126, 234, 0.15),
+    0 8px 25px rgba(168, 85, 247, 0.15),
     0 4px 12px rgba(0, 0, 0, 0.1);
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgba(124, 58, 237, 0.08) 100%);
   border-radius: 8px;
   padding: 12px 16px;
   margin: 0 -16px 4px -16px;
-  border: 1px solid rgba(102, 126, 234, 0.2);
-  border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-bottom: 1px solid rgba(168, 85, 247, 0.2);
 }
 
 .top-blog-item:hover::before {
@@ -1260,7 +1270,7 @@ onMounted(async () => {
 }
 
 .blog-title:hover {
-  color: #667eea;
+  color: #a855f7;
   transform: translateX(4px);
 }
 
@@ -1274,7 +1284,7 @@ onMounted(async () => {
 }
 
 .top-blog-item:hover .blog-date {
-  color: #667eea;
+  color: #a855f7;
   transform: translateX(4px);
 }
 
@@ -1282,7 +1292,7 @@ onMounted(async () => {
   font-size: 0.9rem;
   opacity: 0.7;
   flex-shrink: 0;
-  color: #667eea;
+  color: #a855f7;
   margin-right: 4px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -1311,7 +1321,7 @@ onMounted(async () => {
 }
 
 .link-item:hover {
-  color: #667eea;
+  color: #a855f7;
 }
 
 .link-icon {

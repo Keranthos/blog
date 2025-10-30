@@ -9,7 +9,7 @@
     </div>
     <div class="content">
       <div class="question-list">
-        <div v-for="question in paginatedQuestions" :key="question.ID" class="question-item">
+        <div v-for="question in questions" :key="question.ID" class="question-item">
           <div class="question">
             <p class="author">
               {{ question.Author || '匿名用户' }}
@@ -36,26 +36,7 @@
         </div>
       </div>
 
-      <!-- 翻页组件 -->
-      <div v-if="questions.length > 0" class="pagination">
-        <button
-          class="page-btn"
-          :disabled="currentPage === 1"
-          @click="goToPage(currentPage - 1)"
-        >
-          上一页
-        </button>
-        <span class="page-info">
-          第 {{ currentPage }} 页 / 共 {{ totalPages }} 页
-        </span>
-        <button
-          class="page-btn"
-          :disabled="currentPage === totalPages"
-          @click="goToPage(currentPage + 1)"
-        >
-          下一页
-        </button>
-      </div>
+      <!-- 移除翻页，改为一次性展示全部问题，可一直向下滚动到底部 -->
     </div>
     <div v-if="user.level < 3" class="ask-question">
       <textarea v-model="newQuestion" placeholder="输入你的问题..."></textarea>
@@ -68,7 +49,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { getQuestions } from '@/api/questionBox/browse'
 import { submitQuestion, submitAnswer } from '@/api/questionBox/edit'
@@ -84,26 +65,7 @@ const questionBoxBackground = questionBoxBackgroundImg
 const questions = ref([])
 const newQuestion = ref('')
 const answers = ref({})
-const currentPage = ref(1)
 const isLoading = ref(false)
-
-// 翻页相关
-const pageSize = ref(10) // 每页显示10个问题
-
-// 翻页计算属性
-const totalPages = computed(() => Math.ceil(questions.value.length / pageSize.value))
-const paginatedQuestions = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return questions.value.slice(start, end)
-})
-
-// 翻页方法
-const goToPage = (page) => {
-  if (page >= 1 && page <= totalPages.value) {
-    currentPage.value = page
-  }
-}
 
 const loadQuestions = async () => {
   if (isLoading.value) return
@@ -125,7 +87,6 @@ const handleSubmitQuestion = async () => {
   try {
     await submitQuestion(user, newQuestion.value)
     newQuestion.value = ''
-    currentPage.value = 1
     questions.value = []
     loadQuestions()
   } catch (error) {
@@ -138,7 +99,6 @@ const handleSubmitAnswer = async (questionId) => {
     console.log('jwt:', store.state.token)
     await submitAnswer(user, questionId, answers.value[questionId])
     answers.value[questionId] = ''
-    currentPage.value = 1
     questions.value = []
     loadQuestions()
   } catch (error) {

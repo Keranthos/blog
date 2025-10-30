@@ -1,236 +1,313 @@
 <template>
-  <nav class="navbar">
-    <div class="navbar-container">
-      <!-- 左侧 Logo 区域 -->
-      <div class="navbar-brand" @click="goToProfile">
-        <div class="brand-avatar">
-          <img :src="require('@/assets/my_headportrait.jpg')" alt="Avatar" />
-        </div>
-        <span class="brand-name">山角函兽</span>
-      </div>
-
-      <!-- 中间导航菜单 -->
-      <div class="navbar-menu-center">
-        <router-link to="/" class="menu-item" active-class="active">
-          <font-awesome-icon icon="house" class="menu-icon" />
-          <span class="menu-text">首页</span>
-        </router-link>
-        <router-link to="/blog" class="menu-item" active-class="active">
-          <font-awesome-icon icon="blog" class="menu-icon" />
-          <span class="menu-text">博客</span>
-        </router-link>
-        <router-link to="/moments" class="menu-item" active-class="active">
-          <font-awesome-icon icon="pen-to-square" class="menu-icon" />
-          <span class="menu-text">随笔</span>
-        </router-link>
-
-        <!-- 媒体下拉菜单 -->
-        <div class="menu-item dropdown" :class="{ active: isMediaActive }" @mouseenter="showDropdown" @mouseleave="hideDropdown">
-          <font-awesome-icon icon="ellipsis" class="menu-icon" />
-          <span class="menu-text">媒体</span>
-          <!-- 箭头 - 独立于过渡动画，立即显示，指向"媒体"文本 -->
-          <div v-if="dropdownVisible" class="dropdown-menu-arrow media-arrow"></div>
-          <transition name="dropdown-fade">
-            <div v-if="dropdownVisible" class="dropdown-menu">
-              <router-link to="/fragments/books" class="dropdown-item" active-class="active">
-                <font-awesome-icon icon="bars" />
-                <span>书单</span>
-              </router-link>
-              <router-link to="/fragments/novels" class="dropdown-item" active-class="active">
-                <font-awesome-icon icon="bookmark" />
-                <span>小说</span>
-              </router-link>
-              <router-link to="/fragments/movies" class="dropdown-item" active-class="active">
-                <font-awesome-icon icon="film" />
-                <span>电影</span>
-              </router-link>
-            </div>
-          </transition>
+  <div>
+    <nav class="navbar">
+      <div class="navbar-container">
+        <!-- 左侧 Logo 区域 -->
+        <div class="navbar-brand" @click="goToProfile">
+          <div class="brand-avatar">
+            <img :src="require('@/assets/my_headportrait.jpg')" alt="Avatar" />
+          </div>
+          <span class="brand-name">山角函兽</span>
         </div>
 
-        <!-- 其他下拉菜单 -->
-        <div class="menu-item dropdown" :class="{ active: isOtherActive }" @mouseenter="showOtherDropdown" @mouseleave="hideOtherDropdown">
-          <font-awesome-icon icon="bars" class="menu-icon" />
-          <span class="menu-text">其他</span>
-          <!-- 箭头 - 独立于过渡动画，立即显示，指向"其他"文本 -->
-          <div v-if="otherDropdownVisible" class="dropdown-menu-arrow other-arrow"></div>
-          <transition name="dropdown-fade">
-            <div v-if="otherDropdownVisible" class="dropdown-menu">
-              <router-link to="/questionbox" class="dropdown-item" active-class="active">
-                <font-awesome-icon icon="question" />
-                <span>提问箱</span>
-              </router-link>
-              <router-link to="/timeline" class="dropdown-item" active-class="active">
-                <font-awesome-icon icon="clock" />
-                <span>时间树</span>
-              </router-link>
-              <router-link to="/presentation" class="dropdown-item" active-class="active">
-                <font-awesome-icon icon="chalkboard" />
-                <span>讲演</span>
-              </router-link>
-            </div>
-          </transition>
-        </div>
+        <!-- 中间导航菜单 -->
+        <div class="navbar-menu-center">
+          <div class="menu-item" :class="{ active: route.path === '/' }" @click="navigateToHome">
+            <font-awesome-icon icon="house" class="menu-icon" />
+            <span class="menu-text">首页</span>
+          </div>
+          <div class="menu-item" :class="{ active: route.path === '/blog' }" @click="navigateToBlog">
+            <font-awesome-icon icon="blog" class="menu-icon" />
+            <span class="menu-text">博客</span>
+          </div>
+          <div class="menu-item" :class="{ active: route.path === '/moments' }" @click="navigateToMoments">
+            <font-awesome-icon icon="pen-to-square" class="menu-icon" />
+            <span class="menu-text">随笔</span>
+          </div>
 
-        <!-- 设置菜单（仅管理员可见） -->
-        <div v-if="userLevel >= 3" class="menu-item dropdown" :class="{ active: isSettingsActive }" @mouseenter="showSettingsDropdown" @mouseleave="hideSettingsDropdown">
-          <font-awesome-icon icon="gear" class="menu-icon" />
-          <span class="menu-text">设置</span>
-          <!-- 箭头 - 独立于过渡动画，立即显示，指向"设置"文本 -->
-          <div v-if="settingsDropdownVisible" class="dropdown-menu-arrow settings-arrow"></div>
-          <transition name="dropdown-fade">
-            <div v-if="settingsDropdownVisible" class="dropdown-menu">
-              <router-link to="/images" class="dropdown-item" active-class="active">
-                <font-awesome-icon icon="images" />
-                <span>图片管理</span>
-              </router-link>
-              <router-link to="/location-update" class="dropdown-item" active-class="active" @click="settingsDropdownVisible = false">
-                <font-awesome-icon icon="location-dot" />
-                <span>更新位置</span>
-              </router-link>
-            </div>
-          </transition>
-        </div>
-      </div>
-
-      <!-- 右侧功能区 -->
-      <div class="navbar-actions">
-        <!-- 搜索框 -->
-        <div class="search-box" :class="{ expanded: searchExpanded }">
-          <font-awesome-icon icon="magnifying-glass" class="search-icon" @mousedown.prevent="handleSearch" />
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="想找点什么？"
-            class="search-input"
-            @focus="searchExpanded = true"
-            @blur="searchExpanded = false"
-            @keydown="onSearchKeydown"
-          />
-        </div>
-
-        <!-- 创建内容下拉菜单 -->
-        <div v-if="userLevel >= 3" class="create-dropdown menu-item dropdown" @mouseenter="showCreateMenuHandler" @mouseleave="hideCreateMenu">
-          <svg class="menu-icon write-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-          </svg>
-          <span class="menu-text">写点什么</span>
-          <!-- 箭头 - 独立于过渡动画，立即显示，指向"写点什么"文本 -->
-          <div v-if="showCreateMenu" class="create-menu-arrow"></div>
-          <transition name="dropdown-fade">
-            <div v-if="showCreateMenu" class="create-menu">
-              <div class="menu-section">
-                <div class="menu-section-title">📝 文章</div>
-                <button class="create-item" @click="createContent('article', 'blog')">
-                  <font-awesome-icon icon="blog" />
-                  <span>博客</span>
-                </button>
-                <button class="create-item" @click="createContent('article', 'moment')">
-                  <font-awesome-icon icon="comment-dots" />
-                  <span>随笔</span>
-                </button>
-              </div>
-              <div class="menu-divider"></div>
-              <div class="menu-section">
-                <div class="menu-section-title">🎬 媒体卡片</div>
-                <button class="create-item" @click="createContent('media', 'books')">
+          <!-- 媒体下拉菜单 -->
+          <div class="menu-item dropdown" :class="{ active: isMediaActive }" @mouseenter="showDropdown" @mouseleave="hideDropdown">
+            <font-awesome-icon icon="ellipsis" class="menu-icon" />
+            <span class="menu-text">媒体</span>
+            <!-- 箭头 - 独立于过渡动画，立即显示，指向"媒体"文本 -->
+            <div v-if="dropdownVisible" class="dropdown-menu-arrow media-arrow"></div>
+            <transition name="dropdown-fade">
+              <div v-if="dropdownVisible" class="dropdown-menu">
+                <div class="dropdown-item" :class="{ active: route.path === '/fragments/books' }" @click="navigateToBooks">
                   <font-awesome-icon icon="bars" />
                   <span>书单</span>
-                </button>
-                <button class="create-item" @click="createContent('media', 'novels')">
+                </div>
+                <div class="dropdown-item" :class="{ active: route.path === '/fragments/novels' }" @click="navigateToNovels">
                   <font-awesome-icon icon="bookmark" />
                   <span>小说</span>
-                </button>
-                <button class="create-item" @click="createContent('media', 'movies')">
+                </div>
+                <div class="dropdown-item" :class="{ active: route.path === '/fragments/movies' }" @click="navigateToMovies">
                   <font-awesome-icon icon="film" />
                   <span>电影</span>
-                </button>
+                </div>
               </div>
-              <div class="menu-divider"></div>
-              <div class="menu-section">
-                <div class="menu-section-title">📊 其他</div>
-                <button class="create-item" @click="createContent('presentation', 'ppt')">
+            </transition>
+          </div>
+
+          <!-- 其他下拉菜单 -->
+          <div class="menu-item dropdown" :class="{ active: isOtherActive }" @mouseenter="showOtherDropdown" @mouseleave="hideOtherDropdown">
+            <font-awesome-icon icon="bars" class="menu-icon" />
+            <span class="menu-text">其他</span>
+            <!-- 箭头 - 独立于过渡动画，立即显示，指向"其他"文本 -->
+            <div v-if="otherDropdownVisible" class="dropdown-menu-arrow other-arrow"></div>
+            <transition name="dropdown-fade">
+              <div v-if="otherDropdownVisible" class="dropdown-menu">
+                <div class="dropdown-item" :class="{ active: route.path === '/questionbox' }" @click="navigateToQuestionbox">
+                  <font-awesome-icon icon="question" />
+                  <span>提问箱</span>
+                </div>
+                <div class="dropdown-item" :class="{ active: route.path === '/timeline' }" @click="navigateToTimeline">
+                  <font-awesome-icon icon="clock" />
+                  <span>时间树</span>
+                </div>
+                <div class="dropdown-item" :class="{ active: route.path === '/presentation' }" @click="navigateToPresentation">
                   <font-awesome-icon icon="chalkboard" />
                   <span>讲演</span>
-                </button>
+                </div>
               </div>
-            </div>
-          </transition>
+            </transition>
+          </div>
+
+          <!-- 设置菜单（仅管理员可见） -->
+          <div v-if="userLevel >= 3" class="menu-item dropdown" :class="{ active: isSettingsActive }" @mouseenter="showSettingsDropdown" @mouseleave="hideSettingsDropdown">
+            <font-awesome-icon icon="gear" class="menu-icon" />
+            <span class="menu-text">设置</span>
+            <!-- 箭头 - 独立于过渡动画，立即显示，指向"设置"文本 -->
+            <div v-if="settingsDropdownVisible" class="dropdown-menu-arrow settings-arrow"></div>
+            <transition name="dropdown-fade">
+              <div v-if="settingsDropdownVisible" class="dropdown-menu">
+                <div class="dropdown-item" :class="{ active: route.path === '/images' }" @click="navigateToImages">
+                  <font-awesome-icon icon="images" />
+                  <span>图片管理</span>
+                </div>
+                <div class="dropdown-item" :class="{ active: route.path === '/location-update' }" @click="navigateToLocationUpdate">
+                  <font-awesome-icon icon="location-dot" />
+                  <span>更新位置</span>
+                </div>
+              </div>
+            </transition>
+          </div>
         </div>
 
-        <!-- 评论下拉菜单 -->
-        <div class="comments-dropdown menu-item dropdown" @mouseenter="showCommentsMenu" @mouseleave="hideCommentsMenu">
-          <svg class="menu-icon comment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            <line x1="8" y1="10" x2="8" y2="10.01" />
-            <line x1="12" y1="10" x2="12" y2="10.01" />
-            <line x1="16" y1="10" x2="16" y2="10.01" />
-          </svg>
-          <span class="menu-text">评论</span>
-          <!-- 箭头 - 独立于过渡动画，立即显示 -->
-          <div v-if="showCommentsDropdown" class="comments-menu-arrow"></div>
-          <transition name="dropdown-fade">
-            <div v-if="showCommentsDropdown" class="comments-menu-wrapper" @mouseenter="showCommentsMenu" @mouseleave="hideCommentsMenu">
-              <div class="comments-menu">
-                <div v-if="commentsLoading" class="comments-loading">
-                  <div class="spinner"></div>
-                  <span>加载中...</span>
+        <!-- 右侧功能区 -->
+        <div class="navbar-actions">
+          <!-- 搜索键（按钮样式） -->
+          <div class="search-box" :class="{ expanded: searchExpanded }" @click="openSearchModal">
+            <font-awesome-icon icon="magnifying-glass" class="search-icon" />
+            <span class="search-placeholder">找点什么？</span>
+            <input
+              v-model="searchQuery"
+              type="text"
+              class="search-input search-input-hidden"
+              tabindex="-1"
+              aria-hidden="true"
+            />
+          </div>
+
+          <!-- 创建内容下拉菜单 -->
+          <div v-if="userLevel >= 3" class="create-dropdown menu-item dropdown" @mouseenter="showCreateMenuHandler" @mouseleave="hideCreateMenu">
+            <svg class="menu-icon write-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+            </svg>
+            <span class="menu-text">写点什么</span>
+            <!-- 箭头 - 独立于过渡动画，立即显示，指向"写点什么"文本 -->
+            <div v-if="showCreateMenu" class="create-menu-arrow"></div>
+            <transition name="dropdown-fade">
+              <div v-if="showCreateMenu" class="create-menu">
+                <div class="menu-section">
+                  <div class="menu-section-title">📝 文章</div>
+                  <button class="create-item" @click="createContent('article', 'blog')">
+                    <font-awesome-icon icon="blog" />
+                    <span>博客</span>
+                  </button>
+                  <button class="create-item" @click="createContent('article', 'moment')">
+                    <font-awesome-icon icon="comment-dots" />
+                    <span>随笔</span>
+                  </button>
                 </div>
-                <div v-else-if="recentComments.length === 0" class="comments-empty">
-                  <span>暂无评论</span>
+                <div class="menu-divider"></div>
+                <div class="menu-section">
+                  <div class="menu-section-title">🎬 媒体卡片</div>
+                  <button class="create-item" @click="createContent('media', 'books')">
+                    <font-awesome-icon icon="bars" />
+                    <span>书单</span>
+                  </button>
+                  <button class="create-item" @click="createContent('media', 'novels')">
+                    <font-awesome-icon icon="bookmark" />
+                    <span>小说</span>
+                  </button>
+                  <button class="create-item" @click="createContent('media', 'movies')">
+                    <font-awesome-icon icon="film" />
+                    <span>电影</span>
+                  </button>
                 </div>
-                <div v-else class="comments-list">
-                  <div
-                    v-for="comment in recentComments"
-                    :key="comment.ID"
-                    class="comment-item"
-                    @click="goToCommentArticle(comment)"
-                  >
-                    <div class="comment-bubble">
-                      <div class="comment-avatar-col">
-                        <div class="avatar-square">{{ (comment.username || 'U').charAt(0).toUpperCase() }}</div>
-                      </div>
-                      <div class="comment-content-col">
-                        <div class="comment-meta-row">
-                          <span class="comment-author">{{ comment.username || '匿名用户' }}</span>
-                          <span class="comment-time">{{ formatCommentTime(comment.CreatedAt) }}</span>
+                <div class="menu-divider"></div>
+                <div class="menu-section">
+                  <div class="menu-section-title">📊 其他</div>
+                  <button class="create-item" @click="createContent('presentation', 'ppt')">
+                    <font-awesome-icon icon="chalkboard" />
+                    <span>讲演</span>
+                  </button>
+                </div>
+              </div>
+            </transition>
+          </div>
+
+          <!-- 评论下拉菜单 -->
+          <div class="comments-dropdown menu-item dropdown" @mouseenter="showCommentsMenu" @mouseleave="hideCommentsMenu">
+            <svg class="menu-icon comment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              <line x1="8" y1="10" x2="8" y2="10.01" />
+              <line x1="12" y1="10" x2="12" y2="10.01" />
+              <line x1="16" y1="10" x2="16" y2="10.01" />
+            </svg>
+            <span class="menu-text">评论</span>
+            <!-- 箭头 - 独立于过渡动画，立即显示 -->
+            <div v-if="showCommentsDropdown" class="comments-menu-arrow"></div>
+            <transition name="dropdown-fade">
+              <div v-if="showCommentsDropdown" class="comments-menu-wrapper" @mouseenter="showCommentsMenu" @mouseleave="hideCommentsMenu">
+                <div class="comments-menu">
+                  <div v-if="commentsLoading" class="comments-loading">
+                    <div class="spinner"></div>
+                    <span>加载中...</span>
+                  </div>
+                  <div v-else-if="recentComments.length === 0" class="comments-empty">
+                    <span>暂无评论</span>
+                  </div>
+                  <div v-else class="comments-list">
+                    <div
+                      v-for="comment in recentComments"
+                      :key="comment.ID"
+                      class="comment-item"
+                      @click="goToCommentArticle(comment)"
+                    >
+                      <div class="comment-bubble">
+                        <div class="comment-avatar-col">
+                          <div class="avatar-square">{{ (comment.username || 'U').charAt(0).toUpperCase() }}</div>
                         </div>
-                        <div class="comment-article-row">
-                          <font-awesome-icon :icon="getArticleTypeIcon(comment.articleType)" class="article-type-icon" />
-                          <span class="article-title-text">
-                            {{ comment.articleTitle || '未知文章' }}
-                          </span>
+                        <div class="comment-content-col">
+                          <div class="comment-meta-row">
+                            <span class="comment-author">{{ comment.username || '匿名用户' }}</span>
+                            <span class="comment-time">{{ formatCommentTime(comment.CreatedAt) }}</span>
+                          </div>
+                          <div class="comment-article-row">
+                            <font-awesome-icon :icon="getArticleTypeIcon(comment.articleType)" class="article-type-icon" />
+                            <span class="article-title-text">
+                              {{ comment.articleTitle || '未知文章' }}
+                            </span>
+                          </div>
+                          <div class="comment-text">{{ stripMarkdown(comment.content || '') }}</div>
                         </div>
-                        <div class="comment-text">{{ stripMarkdown(comment.content || '') }}</div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </transition>
-        </div>
-
-        <!-- 用户头像 -->
-        <div class="user-menu" @click="goToAuthUser">
-          <div v-if="!user.isLogged" class="user-avatar login-prompt">
-            <span>未登录</span>
+            </transition>
           </div>
-          <div v-else class="user-avatar">
-            <img :src="user.avatar || defaultAvatar" alt="User Avatar" />
+
+          <!-- 用户头像 -->
+          <div class="user-menu" @click="goToAuthUser">
+            <div v-if="!user.isLogged" class="user-avatar login-prompt">
+              <span>未登录</span>
+            </div>
+            <div v-else class="user-avatar">
+              <img :src="user.avatar || defaultAvatar" alt="User Avatar" />
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </nav>
+    </nav>
+
+    <!-- 搜索模态框 - 使用 Teleport 渲染到 body -->
+    <Teleport to="body">
+      <transition name="search-modal-fade">
+        <div v-if="showSearchModal" class="search-modal-overlay" @click="closeSearchModal">
+          <div class="search-modal-container" @click.stop>
+            <div class="search-modal-input-wrapper">
+              <input
+                ref="searchModalInput"
+                v-model="searchModalQuery"
+                type="text"
+                placeholder="请输入关键词进行搜索,空格隔开多个关键词"
+                class="search-modal-input"
+                @keydown.esc="closeSearchModal"
+              />
+            </div>
+
+            <!-- 搜索结果区域 -->
+            <div v-if="searchModalLoading || hasSearched || searchModalResults.length > 0" class="search-modal-results">
+              <!-- 加载中 -->
+              <div v-if="searchModalLoading" class="search-loading">
+                <div class="loading-spinner"></div>
+                <p>搜索中...</p>
+              </div>
+
+              <!-- 搜索结果列表 -->
+              <div v-else-if="searchModalResults.length > 0" class="search-results-list">
+                <div
+                  v-for="result in searchModalResults"
+                  :key="`${result.type}-${result.id}`"
+                  class="search-result-item"
+                  @click="goToSearchResult(result)"
+                >
+                  <div class="result-image">
+                    <img :src="result.image || 'https://picsum.photos/id/1/400/300'" alt="封面" />
+                  </div>
+                  <div class="result-content">
+                    <h3 class="result-title">
+                      <font-awesome-icon :icon="getResultTypeIcon(result.type)" class="result-type-icon" />
+                      {{ result.title }}
+                    </h3>
+                    <div class="result-tags-wrapper">
+                      <div v-if="filteredTags(result.tags).length" class="result-tags">
+                        <span v-for="tag in filteredTags(result.tags)" :key="tag" class="tag">{{ tag }}</span>
+                      </div>
+                    </div>
+                    <div class="result-meta">
+                      <span class="meta-item">
+                        <font-awesome-icon icon="calendar" />
+                        {{ formatResultDate(result.time) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 无结果 -->
+              <div v-else-if="hasSearched && !searchModalLoading && searchModalResults.length === 0" class="search-empty">
+                <font-awesome-icon icon="magnifying-glass" class="empty-icon" />
+                <p>没有找到相关内容</p>
+              </div>
+            </div>
+
+            <!-- 初始提示（无搜索结果时显示） -->
+            <div v-else class="search-modal-hint">
+              <div class="search-modal-icon">
+                <font-awesome-icon icon="magnifying-glass" />
+              </div>
+              <p>输入关键词以搜索</p>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
+  </div>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter, useRoute } from 'vue-router'
 import { getAllComments } from '@/api/Comments/browse'
+import { getArticlesList } from '@/api/Articles/browse'
+import { getMomentsList } from '@/api/Moments/browse'
 
 const store = useStore()
 const router = useRouter()
@@ -244,6 +321,13 @@ const showCreateMenu = ref(false)
 const showCommentsDropdown = ref(false)
 const searchExpanded = ref(false)
 const searchQuery = ref('')
+const showSearchModal = ref(false)
+const searchModalQuery = ref('')
+const searchModalInput = ref(null)
+const searchModalResults = ref([])
+const searchModalLoading = ref(false)
+const searchTimeout = ref(null)
+const hasSearched = ref(false)
 const recentComments = ref([])
 const commentsLoading = ref(false)
 let timeout = null
@@ -325,6 +409,52 @@ const goToAuthUser = () => {
 
 const goToProfile = () => {
   router.push('/profile')
+}
+
+// 导航函数
+const navigateToHome = () => {
+  router.push('/')
+}
+
+const navigateToBlog = () => {
+  router.push('/blog')
+}
+
+const navigateToMoments = () => {
+  router.push('/moments')
+}
+
+const navigateToBooks = () => {
+  router.push('/fragments/books')
+}
+
+const navigateToNovels = () => {
+  router.push('/fragments/novels')
+}
+
+const navigateToMovies = () => {
+  router.push('/fragments/movies')
+}
+
+const navigateToQuestionbox = () => {
+  router.push('/questionbox')
+}
+
+const navigateToTimeline = () => {
+  router.push('/timeline')
+}
+
+const navigateToPresentation = () => {
+  router.push('/presentation')
+}
+
+const navigateToImages = () => {
+  router.push('/images')
+}
+
+const navigateToLocationUpdate = () => {
+  router.push('/location-update')
+  settingsDropdownVisible.value = false
 }
 
 const userLevel = computed(() => {
@@ -524,29 +654,181 @@ const goToCommentArticle = (comment) => {
   showCommentsDropdown.value = false
 }
 
-// 搜索功能
-const handleSearch = () => {
-  if (!searchQuery.value.trim()) {
-    // 如果搜索框为空，展开搜索框并聚焦
-    searchExpanded.value = true
+// 点击按钮直接打开模态搜索
+
+// 已改为点击按钮打开模态搜索，不再监听输入框回车
+
+// 打开搜索模态框
+const openSearchModal = () => {
+  showSearchModal.value = true
+  searchModalQuery.value = ''
+  nextTick(() => {
+    if (searchModalInput.value) {
+      searchModalInput.value.focus()
+    }
+  })
+}
+
+// 关闭搜索模态框
+const closeSearchModal = () => {
+  showSearchModal.value = false
+  searchModalQuery.value = ''
+  searchModalResults.value = []
+  hasSearched.value = false
+  // 清除搜索定时器
+  if (searchTimeout.value) {
+    clearTimeout(searchTimeout.value)
+    searchTimeout.value = null
+  }
+}
+
+// 获取结果类型图标
+const getResultTypeIcon = (type) => {
+  const iconMap = {
+    blog: 'blog',
+    moment: 'pen-to-square',
+    research: 'flask',
+    project: 'code'
+  }
+  return iconMap[type] || 'file'
+}
+
+// 过滤搜索结果中的标签，移除类型性标签（如 博客/随笔/研究/项目 以及英文类型）
+const filteredTags = (tags = []) => {
+  if (!Array.isArray(tags)) return []
+  const typeNames = new Set(['博客', '随笔', '研究', '项目', 'blog', 'moment', 'research', 'project'])
+  return tags.filter(t => {
+    const s = String(t).trim()
+    return s && !typeNames.has(s.toLowerCase ? s.toLowerCase() : s)
+  })
+}
+
+// 格式化日期
+const formatResultDate = (timestamp) => {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// 跳转到搜索结果文章
+const goToSearchResult = (result) => {
+  if (result.type === 'moment') {
+    router.push(`/moments/${result.id}`)
+  } else if (result.type === 'blog') {
+    router.push(`/blog/${result.id}`)
+  } else if (result.type === 'research') {
+    router.push(`/research/${result.id}`)
+  } else if (result.type === 'project') {
+    router.push(`/project/${result.id}`)
+  }
+  closeSearchModal()
+}
+
+// 检查文章是否匹配关键词（支持空格分隔的多个关键词）
+const matchesKeywords = (item, keywords) => {
+  const title = (item.title || '').toLowerCase()
+  const tags = (item.tags || []).join(' ').toLowerCase()
+
+  // 只要任意一个关键词匹配标题或标签即可
+  return keywords.some(keyword =>
+    title.includes(keyword.toLowerCase()) ||
+    tags.includes(keyword.toLowerCase())
+  )
+}
+
+// 模态框搜索
+const handleModalSearch = async () => {
+  const query = searchModalQuery.value.trim()
+  if (!query) {
+    searchModalResults.value = []
+    hasSearched.value = false
     return
   }
 
-  // 跳转到搜索结果页面
-  router.push({
-    path: '/search',
-    query: { search: searchQuery.value }
-  })
-  searchQuery.value = ''
-  searchExpanded.value = false
-}
+  // 分割关键词（支持空格分隔）
+  const keywords = query.split(/\s+/).filter(k => k.length > 0)
+  if (keywords.length === 0) {
+    searchModalResults.value = []
+    hasSearched.value = false
+    return
+  }
 
-// 监听搜索框回车
-const onSearchKeydown = (e) => {
-  if (e.key === 'Enter') {
-    handleSearch()
+  searchModalLoading.value = true
+  searchModalResults.value = []
+  hasSearched.value = true
+
+  try {
+    const allResults = []
+    const types = ['blog', 'moment', 'research', 'project']
+
+    for (const type of types) {
+      try {
+        if (type === 'moment') {
+          const response = await getMomentsList(1, 100)
+          const articles = (response.data || []).filter(item =>
+            matchesKeywords(item, keywords)
+          ).map(item => ({
+            id: item.ID,
+            type: 'moment',
+            title: item.title,
+            image: item.image,
+            tags: item.tags || [],
+            time: item.CreatedAt
+          }))
+          allResults.push(...articles)
+        } else {
+          const response = await getArticlesList(type, 1, 100)
+          const articles = (response.data || []).filter(item =>
+            matchesKeywords(item, keywords)
+          ).map(item => ({
+            id: item.ID,
+            type,
+            title: item.title,
+            image: item.image,
+            tags: item.tags || [],
+            time: item.CreatedAt
+          }))
+          allResults.push(...articles)
+        }
+      } catch (error) {
+        console.error(`搜索 ${type} 失败:`, error)
+      }
+    }
+
+    searchModalResults.value = allResults
+  } catch (error) {
+    console.error('搜索失败:', error)
+  } finally {
+    searchModalLoading.value = false
   }
 }
+
+// 监听搜索输入，1秒后自动搜索
+watch(searchModalQuery, (newQuery) => {
+  // 清除之前的定时器
+  if (searchTimeout.value) {
+    clearTimeout(searchTimeout.value)
+    searchTimeout.value = null
+  }
+
+  // 如果输入为空，清空结果和搜索状态
+  if (!newQuery.trim()) {
+    searchModalResults.value = []
+    hasSearched.value = false
+    return
+  }
+
+  // 设置1秒延迟搜索
+  searchTimeout.value = setTimeout(() => {
+    handleModalSearch()
+  }, 1000)
+})
 
 // 监听路由变化，清理所有下拉框状态
 watch(() => route.path, () => {
@@ -556,6 +838,9 @@ watch(() => route.path, () => {
   showCreateMenu.value = false
   showCommentsDropdown.value = false
   searchExpanded.value = false
+  showSearchModal.value = false
+  searchModalResults.value = []
+  hasSearched.value = false
 
   // 清理所有timeout
   if (timeout) {
@@ -573,6 +858,10 @@ watch(() => route.path, () => {
   if (commentsTimeout) {
     clearTimeout(commentsTimeout)
     commentsTimeout = null
+  }
+  if (searchTimeout.value) {
+    clearTimeout(searchTimeout.value)
+    searchTimeout.value = null
   }
 })
 
@@ -621,13 +910,13 @@ watch(() => route.path, () => {
   height: 45px;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid #667eea;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  border: 2px solid #a855f7;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
   transition: all 0.3s ease;
 }
 
 .brand-avatar:hover {
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.5);
 }
 
 .brand-avatar img {
@@ -639,7 +928,7 @@ watch(() => route.path, () => {
 .brand-name {
   font-size: 1.2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -693,10 +982,10 @@ watch(() => route.path, () => {
 
 /* Hover 效果 */
 .menu-item:hover {
-  background: rgba(102, 126, 234, 0.08);
-  color: #667eea;
+  background: rgba(168, 85, 247, 0.08);
+  color: #a855f7;
   animation: bounce 0.6s ease;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.2);
 }
 
 /* 跳一跳动画 */
@@ -714,16 +1003,16 @@ watch(() => route.path, () => {
 
 /* 激活状态 */
 .menu-item.active {
-  background: #667eea;
-  color: white;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.2);
   transform: translateY(-1px);
 }
 
 .menu-item.active:hover {
-  background: #5a67d8;
+  background: rgba(168, 85, 247, 0.15);
   animation: bounce 0.6s ease;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
 }
 
 /* 下拉菜单 */
@@ -737,12 +1026,12 @@ watch(() => route.path, () => {
   left: 0;
   min-width: 160px;
   max-width: 200px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 1);
   border-radius: 6px;
   padding: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  z-index: 2000;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: none;
+  z-index: 2003;
 }
 
 /* 下拉菜单箭头 - 独立于过渡动画，立即显示，指向菜单项文本 */
@@ -751,15 +1040,14 @@ watch(() => route.path, () => {
   top: calc(100% + 10px);
   width: 12px;
   height: 12px;
-  background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-bottom: none;
   border-right: none;
   transform: rotate(45deg);
   transform-origin: center center;
   z-index: 2001;
   pointer-events: none;
-  box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* 媒体箭头 - 指向"媒体"文本中心 */
@@ -794,15 +1082,15 @@ watch(() => route.path, () => {
 }
 
 .dropdown-item:hover {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-  color: #667eea;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%);
+  color: #a855f7;
 }
 
 .dropdown-item.active {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
-  color: #667eea;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(124, 58, 237, 0.15) 100%);
+  color: #a855f7;
   font-weight: 600;
-  border-left: 3px solid #667eea;
+  border-left: 3px solid #a855f7;
 }
 
 .dropdown-item svg {
@@ -883,13 +1171,12 @@ watch(() => route.path, () => {
   top: calc(100% + 16px);
   right: -20px; /* 右侧菜单项，下拉框向右移动20px */
   min-width: 200px;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 1);
   border-radius: 8px;
   padding: 12px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  z-index: 2000;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: none;
+  z-index: 2003;
 }
 
 /* 箭头 - 独立于过渡动画，立即显示，指向"写点什么"文本 */
@@ -899,15 +1186,14 @@ watch(() => route.path, () => {
   right: calc(65% - 15px); /* 菜单项文本中心大约在35%位置，从右边计算是65%，再向右移动20px */
   width: 12px;
   height: 12px;
-  background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-bottom: none;
   border-right: none;
   transform: rotate(45deg);
   transform-origin: center center;
   z-index: 2001;
   pointer-events: none;
-  box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.1);
   /* 箭头相对于"写点什么"菜单项定位，在下拉框顶部上方6px */
 }
 
@@ -948,8 +1234,8 @@ watch(() => route.path, () => {
 }
 
 .create-item:hover {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-  color: #667eea;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(124, 58, 237, 0.1) 100%);
+  color: #a855f7;
 }
 
 .create-item svg {
@@ -972,28 +1258,29 @@ watch(() => route.path, () => {
   position: relative;
   display: flex;
   align-items: center;
-  background: rgba(102, 126, 234, 0.08);
-  border-radius: 12px;
-  padding: 10px 16px;
+  gap: 10px;
+  background: rgba(168, 85, 247, 0.04);
+  border-radius: 14px;
+  padding: 8px 14px;
   transition: all 0.2s ease;
-  border: 1px solid transparent;
-}
-
-.search-box.expanded {
-  background: white;
-  border-color: #667eea;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
-}
-
-.search-icon {
-  color: #667eea;
-  font-size: 1rem;
-  transition: all 0.3s ease;
+  border: 2px solid #a855f7;
+  color: #a855f7;
   cursor: pointer;
 }
 
-.search-icon:hover {
-  color: #764ba2;
+.search-box:hover {
+  background: rgba(168, 85, 247, 0.08);
+}
+
+.search-icon {
+  color: #a855f7;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.search-placeholder {
+  color: #a855f7;
+  font-size: 0.95rem;
 }
 
 .search-input {
@@ -1007,10 +1294,7 @@ watch(() => route.path, () => {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.search-box.expanded .search-input {
-  width: 200px;
-  margin-left: 10px;
-}
+.search-input-hidden { display: none; }
 
 .search-input::placeholder {
   color: #999;
@@ -1028,15 +1312,14 @@ watch(() => route.path, () => {
   right: calc(65% - 15px); /* 菜单项文本中心大约在35%位置，从右边计算是65%，再向右移动20px */
   width: 12px;
   height: 12px;
-  background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-bottom: none;
   border-right: none;
   transform: rotate(45deg);
   transform-origin: center center;
   z-index: 2001;
   pointer-events: none;
-  box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.1);
   /* 箭头相对于评论菜单项定位，在下拉框顶部上方6px */
 }
 
@@ -1045,18 +1328,18 @@ watch(() => route.path, () => {
   position: absolute;
   top: calc(100% + 16px);
   right: -20px; /* 评论下拉框向右移动20px */
-  z-index: 2000;
+  z-index: 2003;
   transform-origin: top center;
 }
 
 .comments-menu {
   width: 500px;
   max-height: 500px;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 1);
   border-radius: 8px;
   padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: none;
   overflow-y: auto !important; /* 强制启用滚动 */
   scrollbar-width: thin !important; /* Firefox */
 }
@@ -1074,8 +1357,8 @@ watch(() => route.path, () => {
 .spinner {
   width: 20px;
   height: 20px;
-  border: 3px solid rgba(102, 126, 234, 0.1);
-  border-top-color: #667eea;
+  border: 3px solid rgba(168, 85, 247, 0.1);
+  border-top-color: #a855f7;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -1130,7 +1413,7 @@ watch(() => route.path, () => {
   width: 48px; /* 增大头像尺寸 */
   height: 48px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
   color: white;
   display: flex;
   align-items: center;
@@ -1174,14 +1457,14 @@ watch(() => route.path, () => {
 
 .article-type-icon {
   font-size: 1rem; /* 增大图标 */
-  color: #667eea;
+  color: #a855f7;
   flex-shrink: 0;
 }
 
 .article-title-text {
   font-size: 1rem; /* 增大字体 */
   font-weight: 500;
-  color: #667eea;
+  color: #a855f7;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1218,13 +1501,13 @@ watch(() => route.path, () => {
 }
 
 .comments-menu::-webkit-scrollbar-thumb {
-  background: rgba(102, 126, 234, 0.3) !important;
+  background: rgba(168, 85, 247, 0.3) !important;
   border-radius: 3px !important;
   display: block !important;
 }
 
 .comments-menu::-webkit-scrollbar-thumb:hover {
-  background: rgba(102, 126, 234, 0.5) !important;
+  background: rgba(168, 85, 247, 0.5) !important;
 }
 
 /* 确保滚动条可见 - 覆盖所有可能的全局样式 */
@@ -1244,16 +1527,16 @@ watch(() => route.path, () => {
   height: 40px;
   border-radius: 12px;
   overflow: hidden;
-  border: 2px solid #667eea;
+  border: 2px solid #a855f7;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
 }
 
 .user-avatar:hover {
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.5);
 }
 
 .user-avatar img {
@@ -1263,18 +1546,18 @@ watch(() => route.path, () => {
 }
 
 .login-prompt {
-  background: rgba(102, 126, 234, 0.1);
-  border-color: #667eea;
+  background: rgba(168, 85, 247, 0.1);
+  border-color: #a855f7;
 }
 
 .login-prompt span {
-  color: #667eea;
+  color: #a855f7;
   font-size: 0.85rem;
   font-weight: 600;
 }
 
 .login-prompt:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
 }
 
 .login-prompt:hover span {
@@ -1323,6 +1606,310 @@ watch(() => route.path, () => {
   .navbar-actions {
     gap: 8px;
   }
+}
+
+/* 搜索模态框 */
+.search-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10000;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* 搜索框弹出时，看板娘不虚化：将其层级提升到遮罩之上 */
+:global(.waifu),
+:global(.waifu-tips),
+:global(#waifu) {
+  z-index: 10001 !important;
+}
+
+.search-modal-container {
+  width: 90%;
+  max-width: 600px;
+  max-height: 85vh;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 14px;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+  margin: 7.5vh auto;
+}
+
+.search-modal-input-wrapper {
+  width: 100%;
+  margin-bottom: 1.5rem;
+  flex-shrink: 0;
+}
+
+.search-modal-input {
+  width: 100%;
+  padding: 1rem 1.5rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 1rem;
+  outline: none;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.search-modal-input:focus {
+  border-color: #a855f7;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+}
+
+.search-modal-icon {
+  font-size: 3rem;
+  color: #a855f7;
+  margin: 1rem 0;
+}
+
+.search-modal-hint {
+  text-align: center;
+  color: #666;
+  line-height: 1.8;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.search-modal-hint p {
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.search-modal-hint p:first-child {
+  font-size: 1rem;
+  color: #333;
+  font-weight: 500;
+}
+
+/* 搜索结果区域 */
+.search-modal-results {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  max-height: calc(85vh - 150px);
+  margin-top: 1rem;
+}
+
+/* 隐藏滚动条但保持滚动功能 */
+.search-modal-results {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+
+.search-modal-results::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* 加载中状态 */
+.search-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 0;
+  color: #666;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(168, 85, 247, 0.1);
+  border-top-color: #a855f7;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.search-loading p {
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+/* 搜索结果列表 */
+.search-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.search-result-item {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.search-result-item:hover {
+  background: rgba(168, 85, 247, 0.08);
+  border-color: #a855f7;
+}
+
+.result-image {
+  width: 120px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.result-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.result-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.result-type {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.result-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.result-type-icon {
+  color: #a855f7;
+  margin-right: 8px;
+}
+
+.result-tags-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.result-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.result-tags .tag {
+  padding: 0.25rem 0.6rem;
+  background: rgba(168, 85, 247, 0.08);
+  color: #a855f7;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.result-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #999;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* 无结果状态 */
+.search-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 0;
+  color: #999;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.search-empty p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* 搜索模态框过渡动画 */
+.search-modal-fade-enter-active,
+.search-modal-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.search-modal-fade-enter-active .search-modal-container,
+.search-modal-fade-leave-active .search-modal-container {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-modal-fade-enter-from {
+  opacity: 0;
+}
+
+.search-modal-fade-enter-from .search-modal-container {
+  transform: scale(0.9) translateY(-20px);
+  opacity: 0;
+}
+
+.search-modal-fade-leave-to {
+  opacity: 0;
+}
+
+.search-modal-fade-leave-to .search-modal-container {
+  transform: scale(0.9) translateY(-20px);
+  opacity: 0;
 }
 
 @media (max-width: 768px) {

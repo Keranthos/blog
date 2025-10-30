@@ -613,7 +613,7 @@ defineExpose({
 
 .submit-reply-btn {
   padding: 0.6rem 1.2rem;
-  background: #667eea;
+  background: #a855f7;
   color: white;
   border: none;
   border-radius: 6px;
