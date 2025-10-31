@@ -49,7 +49,7 @@
 
     <!-- 文章头图 -->
     <div class="article-image-section">
-      <img :src="image" alt="Detail Image" class="article-image" loading="lazy" />
+      <img :src="image" alt="Detail Image" class="article-image" loading="lazy" decoding="async" @error="onImgError($event)" />
     </div>
 
     <!-- 文章内容卡片 -->
@@ -143,7 +143,7 @@
         <div class="section-header">
           <h2>
             <svg class="comment-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
             评论
             <span v-if="comments.length" class="comment-count">({{ comments.length }})</span>
@@ -194,7 +194,7 @@
                     <span v-if="replyingTo" class="reply-tag">@{{ getReplyTargetName() }}</span>
                     <span class="comment-time">刚刚</span>
                   </div>
-                  <div class="comment-bubble" v-if="newComment.trim()">
+                  <div v-if="newComment.trim()" class="comment-bubble">
                     <div class="comment-content" v-html="renderedPreview"></div>
                   </div>
                 </div>
@@ -764,6 +764,15 @@ const showShareMenu = ref(false) // 显示分享菜单
 const readingTime = ref(null) // 阅读时间估算
 const tocVisible = ref(true) // 目录是否可见
 const contentContainer = ref(null) // 内容容器引用
+const fallbackImg = '/images/sunset-mountains.jpg'
+
+// 图片错误回退
+const onImgError = (e) => {
+  const img = e?.target
+  if (img && img.src !== fallbackImg) {
+    img.src = fallbackImg
+  }
+}
 
 // 文章数据对象（用于相关文章推荐）
 const articleData = computed(() => {

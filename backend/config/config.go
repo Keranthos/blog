@@ -1,6 +1,7 @@
 package config
 
 import (
+	"backend/middlewares"
 	"backend/models"
 	"fmt"
 	"log"
@@ -99,6 +100,15 @@ func InitDB() error { // 初始化全局连接池DB
 	); err != nil {
 		return fmt.Errorf("error migrating database: %v", err)
 	}
+
+	// 创建必要的索引以优化查询性能
+	if err := CreateIndexes(); err != nil {
+		log.Printf("警告: 创建索引时出现错误: %v", err)
+		// 索引创建失败不影响程序运行，仅记录警告
+	}
+
+	// 启用慢查询监控
+	middlewares.SlowQueryMonitor(DB)
 
 	return nil
 }

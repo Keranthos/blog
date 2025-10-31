@@ -5,7 +5,7 @@
       <!-- 左侧：顶部图片 + 外部文案 -->
       <div class="left-col">
         <div class="header">
-          <img :src="novelsBackground" alt="Background Image" class="header-image" loading="lazy" />
+          <img :src="novelsBackground" alt="Background Image" class="header-image" loading="lazy" decoding="async" @error="onImgError($event)" />
         </div>
         <div class="intro">
           <pre class="intro-text">{{ introText }}</pre>
@@ -43,6 +43,15 @@ const currentPage = ref(1)
 const isLoading = ref(false)
 const mediaCache = ref({})
 const introText = ref('')
+const fallbackImg = '/images/sunset-mountains.jpg'
+
+// 图片错误回退
+const onImgError = (e) => {
+  const img = e?.target
+  if (img && img.src !== fallbackImg) {
+    img.src = fallbackImg
+  }
+}
 
 const loadMedia = async () => {
   if (isLoading.value) return

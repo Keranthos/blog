@@ -20,6 +20,8 @@
             :src="article.image || getDefaultImage(article.type)"
             :alt="article.title"
             loading="lazy"
+            decoding="async"
+            @error="onImgError($event)"
           />
         </div>
 
@@ -77,6 +79,7 @@ const props = defineProps({
 const router = useRouter()
 const relatedArticles = ref([])
 const loading = ref(false)
+const fallbackImg = '/images/sunset-mountains.jpg'
 
 // 获取类型图标
 const getTypeIcon = (type) => {
@@ -277,6 +280,14 @@ const goToArticle = (article) => {
 onMounted(() => {
   getRelatedArticles()
 })
+
+// 图片错误回退
+const onImgError = (e) => {
+  const img = e?.target
+  if (img && img.src !== fallbackImg) {
+    img.src = fallbackImg
+  }
+}
 </script>
 
 <style scoped>

@@ -10,7 +10,7 @@
     <div class="hero-section">
       <div class="hero-content">
         <div class="avatar-container">
-          <img src="@/assets/my_headportrait.jpg" alt="Avatar" class="hero-avatar" />
+          <img src="@/assets/my_headportrait.jpg" alt="Avatar" class="hero-avatar" loading="lazy" decoding="async" @error="onImgError($event)" />
           <div class="avatar-ring"></div>
         </div>
         <h1 class="hero-title">{{ displayedText }}<span class="cursor">|</span></h1>
@@ -67,7 +67,7 @@
                     <p class="card-excerpt">{{ getPlainText(blog.content) || '记录成长路上的点点滴滴...' }}</p>
                   </div>
                   <div class="card-thumbnail">
-                    <img :src="blog.image" :alt="blog.title" />
+                    <img :src="blog.image" :alt="blog.title" loading="lazy" decoding="async" @error="onImgError($event)" />
                   </div>
                   <div class="card-meta">
                     <div class="card-date">
@@ -114,7 +114,7 @@
                     <p class="card-excerpt">{{ getPlainText(moment.content) || '记录生活的点点滴滴...' }}</p>
                   </div>
                   <div class="card-thumbnail">
-                    <img :src="moment.image" :alt="moment.title" />
+                    <img :src="moment.image" :alt="moment.title" loading="lazy" decoding="async" @error="onImgError($event)" />
                   </div>
                   <div class="card-meta">
                     <div class="card-date">
@@ -161,7 +161,7 @@
                     <p class="card-excerpt">{{ getPlainText(project.content) || '展示我的项目作品...' }}</p>
                   </div>
                   <div class="card-thumbnail">
-                    <img :src="project.image" :alt="project.title" />
+                    <img :src="project.image" :alt="project.title" loading="lazy" decoding="async" @error="onImgError($event)" />
                   </div>
                   <div class="card-meta">
                     <div class="card-date">
@@ -299,6 +299,15 @@ const weatherInfo = ref({
 // 确保组件正确初始化
 const isComponentReady = ref(false)
 const loadingProgress = ref(0)
+const fallbackImg = '/images/sunset-mountains.jpg'
+
+// 图片错误回退
+const onImgError = (e) => {
+  const img = e?.target
+  if (img && img.src !== fallbackImg) {
+    img.src = fallbackImg
+  }
+}
 
 const typeText = async () => {
   for (let i = 0; i < typingText.length; i++) {

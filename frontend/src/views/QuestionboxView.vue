@@ -5,6 +5,9 @@
       <img
         :src="questionBoxBackground"
         alt="Background Image" class="header-image"
+        loading="lazy"
+        decoding="async"
+        @error="onImgError($event)"
       />
     </div>
     <div class="content">
@@ -61,6 +64,15 @@ const store = useStore()
 const user = store.state.user
 
 const questionBoxBackground = questionBoxBackgroundImg
+const fallbackImg = '/images/sunset-mountains.jpg'
+
+// 图片错误回退
+const onImgError = (e) => {
+  const img = e?.target
+  if (img && img.src !== fallbackImg) {
+    img.src = fallbackImg
+  }
+}
 
 const questions = ref([])
 const newQuestion = ref('')
@@ -96,7 +108,6 @@ const handleSubmitQuestion = async () => {
 
 const handleSubmitAnswer = async (questionId) => {
   try {
-    console.log('jwt:', store.state.token)
     await submitAnswer(user, questionId, answers.value[questionId])
     answers.value[questionId] = ''
     questions.value = []

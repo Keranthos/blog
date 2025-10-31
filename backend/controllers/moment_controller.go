@@ -22,6 +22,11 @@ func GetMoments(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit parameter"})
 		return
 	}
+	// 分页上限校验：防止 limit 过大导致性能问题
+	const maxLimit = 100
+	if limit > maxLimit {
+		limit = maxLimit
+	}
 
 	var moments []models.Moment
 	offset := (page - 1) * limit

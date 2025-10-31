@@ -53,14 +53,8 @@ apiClient.interceptors.request.use(
     // 检查JWT过期时间并显示信息
     const token = config.headers?.Authorization?.replace('Bearer ', '') || getJWT()
     if (token) {
-      const expInfo = getJWTExpirationInfo(token)
-      if (expInfo) {
-        console.log('JWT过期时间信息:', {
-          过期时间: expInfo.expDate.toLocaleString(),
-          剩余时间: `${expInfo.hoursLeft}小时${expInfo.minutesLeft}分钟`,
-          是否已过期: expInfo.isExpired
-        })
-      }
+      // JWT 过期时间检查（生产环境可移除）
+      // const expInfo = getJWTExpirationInfo(token)
     }
 
     // 不再显示"正在请求数据"消息

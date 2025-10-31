@@ -22,6 +22,11 @@ func GetMedia(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit parameter"})
 		return
 	}
+	// 分页上限校验：防止 limit 过大导致性能问题
+	const maxLimit = 100
+	if limit > maxLimit {
+		limit = maxLimit
+	}
 	mediaType := c.Query("type")
 	if mediaType != "novels" && mediaType != "books" && mediaType != "movies" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": mediaType + " is not a valid media type"})

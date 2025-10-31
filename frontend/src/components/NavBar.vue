@@ -5,7 +5,7 @@
         <!-- 左侧 Logo 区域 -->
         <div ref="navbarBrand" class="navbar-brand" @click="goToProfile">
           <div class="brand-avatar">
-            <img :src="require('@/assets/my_headportrait.jpg')" alt="Avatar" />
+            <img :src="require('@/assets/my_headportrait.jpg')" alt="Avatar" loading="lazy" decoding="async" @error="onImgError($event)" />
           </div>
           <span class="brand-name">山角函兽</span>
         </div>
@@ -191,6 +191,7 @@
                 alt="User Avatar"
                 referrerpolicy="no-referrer"
                 loading="lazy"
+                decoding="async"
                 @error="handleAvatarError"
               />
             </div>
@@ -216,11 +217,34 @@
             </div>
 
             <!-- 搜索结果区域 -->
-            <div v-if="searchModalLoading || hasSearched || searchModalResults.length > 0" class="search-modal-results">
-              <!-- 加载中 -->
-              <div v-if="searchModalLoading" class="search-loading">
-                <div class="loading-spinner"></div>
-                <p>搜索中...</p>
+            <div v-if="searchModalLoading || hasSearched || searchModalResults.length > 0 || searchError" class="search-modal-results">
+              <!-- 加载中 - 使用 Skeleton -->
+              <div v-if="searchModalLoading" class="search-loading-skeleton">
+                <div
+                  v-for="n in 3"
+                  :key="n"
+                  class="skeleton-result-item"
+                >
+                  <div class="skeleton-result-image"></div>
+                  <div class="skeleton-result-content">
+                    <div class="skeleton-result-title"></div>
+                    <div class="skeleton-result-tags">
+                      <div class="skeleton-result-tag"></div>
+                      <div class="skeleton-result-tag"></div>
+                    </div>
+                    <div class="skeleton-result-meta"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 错误重试提示 -->
+              <div v-else-if="searchError && !searchModalLoading" class="search-error">
+                <font-awesome-icon icon="triangle-exclamation" class="error-icon" />
+                <p class="error-message">{{ searchError }}</p>
+                <button class="retry-button" @click="retrySearch">
+                  <font-awesome-icon icon="arrow-rotate-right" />
+                  <span>重试</span>
+                </button>
               </div>
 
               <!-- 搜索结果列表 -->
@@ -232,7 +256,7 @@
                   @click="goToSearchResult(result)"
                 >
                   <div class="result-image">
-                    <img :src="result.image || 'https://picsum.photos/id/1/400/300'" alt="封面" />
+                    <img :src="result.image || 'https://picsum.photos/id/1/400/300'" alt="封面" loading="lazy" decoding="async" @error="onImgError($event)" />
                   </div>
                   <div class="result-content">
                     <h3 class="result-title">
@@ -363,6 +387,9 @@ const searchModalResults = ref([])
 const searchModalLoading = ref(false)
 const searchTimeout = ref(null)
 const hasSearched = ref(false)
+const searchError = ref(null) // 搜索错误信息
+const searchRetryCount = ref(0) // 重试次数
+const maxSearchRetries = 3 // 最大重试次数
 const recentComments = ref([])
 const commentsLoading = ref(false)
 let timeout = null
@@ -448,12 +475,20 @@ const generateDefaultAvatar = (username) => {
 }
 
 const defaultAvatar = generateDefaultAvatar(user.value.name)
+const fallbackImg = '/images/sunset-mountains.jpg'
 // 头像加载失败回退到默认头像（安全、零成本）
 const handleAvatarError = (event) => {
   if (!event || !event.target) return
   const img = event.target
   if (img.src !== defaultAvatar) {
     img.src = defaultAvatar
+  }
+}
+// 通用图片错误回退
+const onImgError = (e) => {
+  const img = e?.target
+  if (img && img.src !== fallbackImg) {
+    img.src = fallbackImg
   }
 }
 
@@ -652,13 +687,10 @@ const loadRecentComments = async () => {
   try {
     commentsLoading.value = true
     const res = await getAllComments()
-    console.log('获取到的评论响应:', res)
     // 后端返回格式为 {data: [...]}，getAllComments 已经返回了 res.data，所以需要再取 .data
     const data = res?.data || []
-    console.log('获取到的评论数据:', data)
     // 只取最近的评论，最多显示10条
     recentComments.value = (Array.isArray(data) ? data : []).slice(0, 10)
-    console.log('处理后的评论数据:', recentComments.value)
   } catch (error) {
     console.error('加载评论失败:', error)
     recentComments.value = []
@@ -844,12 +876,13 @@ const matchesKeywords = (item, keywords) => {
   )
 }
 
-// 模态框搜索
-const handleModalSearch = async () => {
+// 模态框搜索（带重试机制）
+const handleModalSearch = async (retry = 0) => {
   const query = searchModalQuery.value.trim()
   if (!query) {
     searchModalResults.value = []
     hasSearched.value = false
+    searchError.value = null
     return
   }
 
@@ -858,16 +891,20 @@ const handleModalSearch = async () => {
   if (keywords.length === 0) {
     searchModalResults.value = []
     hasSearched.value = false
+    searchError.value = null
     return
   }
 
   searchModalLoading.value = true
   searchModalResults.value = []
   hasSearched.value = true
+  searchError.value = null
+  searchRetryCount.value = retry
 
   try {
     const allResults = []
     const types = ['blog', 'moment', 'research', 'project']
+    let hasError = false
 
     for (const type of types) {
       try {
@@ -900,15 +937,43 @@ const handleModalSearch = async () => {
         }
       } catch (error) {
         console.error(`搜索 ${type} 失败:`, error)
+        hasError = true
       }
     }
 
+    // 如果没有任何结果且发生了错误，抛出错误以便重试
+    if (allResults.length === 0 && hasError && retry < maxSearchRetries) {
+      throw new Error('搜索请求失败，请重试')
+    }
+
     searchModalResults.value = allResults
+    searchError.value = null
+    searchRetryCount.value = 0 // 成功后重置重试计数
   } catch (error) {
     console.error('搜索失败:', error)
+    // 如果还有重试机会，延迟后重试
+    if (retry < maxSearchRetries) {
+      searchError.value = `搜索失败，正在重试 (${retry + 1}/${maxSearchRetries})...`
+      const retryDelay = (retry + 1) * 1000 // 递增延迟：1s, 2s, 3s
+      setTimeout(() => {
+        handleModalSearch(retry + 1)
+      }, retryDelay)
+    } else {
+      // 重试次数用尽
+      searchError.value = '搜索失败，请检查网络连接后重试'
+      searchRetryCount.value = 0
+    }
   } finally {
-    searchModalLoading.value = false
+    if (searchRetryCount.value === 0 || searchRetryCount.value >= maxSearchRetries) {
+      searchModalLoading.value = false
+    }
   }
+}
+
+// 重试搜索
+const retrySearch = () => {
+  searchRetryCount.value = 0
+  handleModalSearch(0)
 }
 
 // 监听搜索输入，1秒后自动搜索
@@ -928,7 +993,7 @@ watch(searchModalQuery, (newQuery) => {
 
   // 设置1秒延迟搜索
   searchTimeout.value = setTimeout(() => {
-    handleModalSearch()
+    handleModalSearch(0) // 重置重试计数
   }, 1000)
 })
 
@@ -1596,6 +1661,7 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   text-align: left;
 }
@@ -1669,7 +1735,7 @@ onBeforeUnmount(() => {
   color: #fff; /* 白字提高对比度 */
   font-size: 0.7rem; /* 略小以避免被遮挡 */
   font-weight: 600;
-  white-space: nowrap; /* 防止“未登录”换行 */
+  white-space: nowrap; /* 防止"未登录"换行 */
 }
 
 .login-prompt:hover {
@@ -1742,9 +1808,9 @@ onBeforeUnmount(() => {
 }
 
 /* 搜索框弹出时，看板娘不虚化：将其层级提升到遮罩之上 */
-::global(.waifu),
-::global(.waifu-tips),
-::global(#waifu) {
+:global(.waifu),
+:global(.waifu-tips),
+:global(#waifu) {
   z-index: 10001 !important;
 }
 
@@ -1844,33 +1910,135 @@ onBeforeUnmount(() => {
   display: none; /* Chrome, Safari, Opera */
 }
 
-/* 加载中状态 */
-.search-loading {
+/* 加载中状态 - Skeleton */
+.search-loading-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.skeleton-result-item {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-result-image {
+  width: 80px;
+  height: 60px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.skeleton-result-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.skeleton-result-title {
+  height: 20px;
+  width: 70%;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 4px;
+}
+
+.skeleton-result-tags {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.skeleton-result-tag {
+  width: 60px;
+  height: 20px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 10px;
+}
+
+.skeleton-result-meta {
+  height: 16px;
+  width: 120px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  border-radius: 4px;
+}
+
+@keyframes loading {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 错误重试提示 */
+.search-error {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 3rem 0;
-  color: #666;
+  padding: 2rem;
+  text-align: center;
 }
 
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(168, 85, 247, 0.1);
-  border-top-color: #a855f7;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+.error-icon {
+  font-size: 3rem;
+  color: #ff6b6b;
   margin-bottom: 1rem;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.error-message {
+  font-size: 1rem;
+  color: #666;
+  margin: 0 0 1.5rem 0;
 }
 
-.search-loading p {
+.retry-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
   font-size: 0.95rem;
-  margin: 0;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+
+.retry-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4);
+}
+
+.retry-button:active {
+  transform: translateY(0);
 }
 
 /* 搜索结果列表 */
@@ -1940,6 +2108,7 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 
@@ -2149,5 +2318,13 @@ onBeforeUnmount(() => {
     padding: 8px 20px;
     background: rgba(255, 255, 255, 0.98);
   }
+}
+
+/* 搜索/任意模态弹出时，看板娘不虚化：提升层级并固定定位 */
+:global(.waifu),
+:global(.waifu-tips),
+:global(#waifu) {
+  position: fixed !important;
+  z-index: 10002 !important; /* 高于 10000 的模态遮罩 */
 }
 </style>

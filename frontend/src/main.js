@@ -14,6 +14,7 @@ import store from './store'
 import './assets/styles/github-markdown.css'
 import './assets/styles/github-highlight.css'
 import headImage from './assets/my_headportrait.jpg'
+import { initErrorReporter, handleVueError } from './utils/errorReporter'
 import {
   faHouse,
   faBlog,
@@ -238,10 +239,17 @@ library.add(
 )
 
 const app = createApp(App)
+
+// 配置 Vue 全局错误处理
+app.config.errorHandler = handleVueError
+
 app.use(router)
 app.use(store)
 app.component('FontAwesomeIcon', FontAwesomeIcon)
 app.mount('#app')
+
+// 初始化前端错误监控
+initErrorReporter()
 
 // 设置浏览器标签栏标题与图标
 try {

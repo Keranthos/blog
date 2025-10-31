@@ -3,7 +3,7 @@
     <NavBar />
     <!-- 头部图片区域 -->
     <div class="header-section">
-      <img :src="headerImage" alt="Header Image" class="header-image" />
+      <img :src="headerImage" alt="Header Image" class="header-image" loading="lazy" decoding="async" @error="onImgError($event)" />
     </div>
 
     <!-- 标签页区域 -->
@@ -109,6 +109,15 @@ const loading = ref(false)
 const loadingProgress = ref(0)
 const activeTab = ref('main') // 当前激活的标签页
 const totalArticles = ref(0) // 实际文章总数
+const fallbackImg = '/images/sunset-mountains.jpg'
+
+// 图片错误回退
+const onImgError = (e) => {
+  const img = e?.target
+  if (img && img.src !== fallbackImg) {
+    img.src = fallbackImg
+  }
+}
 
 // 所思所想内容
 const thoughtsContent = ref({
@@ -184,6 +193,48 @@ const handleResize = () => { isMobile.value = window.innerWidth <= 768 }
 // 无限滚动哨兵
 const infiniteSentinel = ref(null)
 let io = null
+let loadDebounceTimer = null // 去抖定时器
+const isLoadingPage = ref(false) // 加载锁，防止并发加载
+const retryCount = ref(0) // 重试计数器
+const maxRetries = 3 // 最大重试次数
+const debounceDelay = 300 // 去抖延迟（毫秒）
+
+// 去抖函数
+const debouncedLoadPage = (page, append = false) => {
+  clearTimeout(loadDebounceTimer)
+  loadDebounceTimer = setTimeout(() => {
+    loadPageWithRetry(page, append)
+  }, debounceDelay)
+}
+
+// 带重试的加载函数
+const loadPageWithRetry = async (page, append = false, retry = 0) => {
+  if (isLoadingPage.value || loading.value) return // 如果正在加载，直接返回
+  if (page < 1 || page > totalPage.value) return
+
+  isLoadingPage.value = true
+  retryCount.value = retry
+
+  try {
+    await loadPage(page, append)
+    retryCount.value = 0 // 成功后重置重试计数
+  } catch (error) {
+    console.error('加载页面失败:', error)
+    // 如果还有重试机会，延迟后重试
+    if (retry < maxRetries) {
+      const retryDelay = (retry + 1) * 1000 // 递增延迟：1s, 2s, 3s
+      setTimeout(() => {
+        loadPageWithRetry(page, append, retry + 1)
+      }, retryDelay)
+    } else {
+      // 重试次数用尽，显示错误提示
+      console.error('加载失败，已达到最大重试次数')
+      retryCount.value = 0
+    }
+  } finally {
+    isLoadingPage.value = false
+  }
+}
 
 const setupInfiniteScroll = async () => {
   if (!isMobile.value) { teardownInfiniteScroll(); return }
@@ -194,11 +245,11 @@ const setupInfiniteScroll = async () => {
   teardownInfiniteScroll()
   io = new IntersectionObserver((entries) => {
     const e = entries[0]
-    if (e && e.isIntersecting && !loading.value && currentPage.value < totalPage.value) {
-      // 避免在渲染周期内同步修改引发异常
-      setTimeout(() => loadPage(currentPage.value + 1, true), 0)
+    if (e && e.isIntersecting && !loading.value && !isLoadingPage.value && currentPage.value < totalPage.value) {
+      // 使用去抖函数，避免快速滚动时触发多次加载
+      debouncedLoadPage(currentPage.value + 1, true)
     }
-  }, { rootMargin: '200px 0px' })
+  }, { rootMargin: '200px 0px', threshold: 0.1 })
   io.observe(infiniteSentinel.value)
 }
 
@@ -207,10 +258,17 @@ const teardownInfiniteScroll = () => {
     io.disconnect()
     io = null
   }
+  // 清理去抖定时器
+  if (loadDebounceTimer) {
+    clearTimeout(loadDebounceTimer)
+    loadDebounceTimer = null
+  }
 }
 
 const loadPage = async (page, append = false) => {
-  if (page < 1 || page > totalPage.value) return
+  if (page < 1 || page > totalPage.value) {
+    return Promise.resolve() // 确保总是返回 Promise
+  }
   currentPage.value = page
 
   // 检查缓存中是否已有该页的数据
@@ -221,6 +279,7 @@ const loadPage = async (page, append = false) => {
     } else {
       articles.value = articleCache.value[cacheKey]
     }
+    return Promise.resolve() // 从缓存读取成功，返回 resolved Promise
   } else {
     loading.value = true
     loadingProgress.value = 0
@@ -303,6 +362,7 @@ const loadPage = async (page, append = false) => {
       console.error('加载页面失败:', error)
       clearInterval(progressInterval)
       loading.value = false
+      throw error // 抛出错误，让 loadPageWithRetry 捕获并重试
     }
   }
 }

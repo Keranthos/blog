@@ -56,7 +56,7 @@
           <div class="media-modal-container" @click.stop>
             <div class="media-modal-header">
               <div v-if="props.media.Poster" class="modal-thumb">
-                <img :src="props.media.Poster" :alt="props.media.Name" />
+                <img :src="props.media.Poster" :alt="props.media.Name" loading="lazy" decoding="async" @error="onImgError($event)" />
               </div>
               <div class="media-modal-headinfo">
                 <h3 class="media-modal-title">{{ props.media.Name }}</h3>
@@ -94,6 +94,8 @@ import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { showCustomMessage } from '@/utils/waifuMessage'
+const fallbackImg = '/images/sunset-mountains.jpg'
 
 const props = defineProps({
   media: Object,
@@ -150,6 +152,44 @@ const renderedReview = computed(() => {
 
 const openMediaModal = () => {
   showMediaModal.value = true
+  // 以 1/4 概率在弹框打开时根据类型说一句话
+  try {
+    if (Math.random() < 0.25) {
+      const t = (props.type || '').toLowerCase()
+      let texts = []
+      if (t === 'novels') {
+        texts = [
+          '📖 小说里的世界总有点不一样，你觉得呢？',
+          '📖 让我们在故事里再多待一会儿吧',
+          '📖 虚构里藏着真实，慢慢看不着急'
+        ]
+      } else if (t === 'books') {
+        texts = [
+          '📚 读书不觉已春深，一寸光阴一寸金',
+          '📚 好书像灯，愿它照亮你的路',
+          '📚 也许你能给我推荐一本？'
+        ]
+      } else if (t === 'movies') {
+        texts = [
+          '🎬 灯光、镜头、开始～',
+          '🎬 有些片尾曲适合静静听完',
+          '🎬 电影是另一个时间的容器'
+        ]
+      }
+      if (texts.length) {
+        const text = texts[Math.floor(Math.random() * texts.length)]
+        showCustomMessage(text, 4000)
+      }
+    }
+  } catch (e) { /* 忽略提示失败 */ }
+}
+
+// 图片错误回退
+const onImgError = (e) => {
+  const img = e?.target
+  if (img && img.src !== fallbackImg) {
+    img.src = fallbackImg
+  }
 }
 
 const closeMediaModal = () => {

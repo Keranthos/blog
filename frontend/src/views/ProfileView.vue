@@ -9,7 +9,7 @@
         <div class="left-section">
           <div class="self-intro">
             <div class="intro-header">
-              <img src="@/assets/my_headportrait.jpg" alt="Avatar" class="intro-avatar" />
+              <img src="@/assets/my_headportrait.jpg" alt="Avatar" class="intro-avatar" loading="lazy" decoding="async" @error="onImgError($event)" />
               <div class="intro-title">
                 <h1>山角函兽</h1>
                 <p>此情可待成追忆 --Keranthos的来源</p>
@@ -19,7 +19,7 @@
               <div class="intro-text" v-html="formattedIntro"></div>
               <!-- 底部装饰图片 -->
               <div class="intro-bottom-image">
-                <img src="/images/sunset-mountains.jpg" alt="Sunset Mountains" />
+                <img src="/images/sunset-mountains.jpg" alt="Sunset Mountains" loading="lazy" decoding="async" @error="onImgError($event)" />
               </div>
             </div>
           </div>
@@ -74,7 +74,7 @@
         class="project-image-preview"
         :style="imagePreviewStyle"
       >
-        <img :src="hoveredProject.image" :alt="hoveredProject.title" />
+        <img :src="hoveredProject.image" :alt="hoveredProject.title" loading="lazy" decoding="async" @error="onImgError($event)" />
       </div>
     </div>
   </div>
@@ -97,6 +97,15 @@ const stats = ref({
 const introContent = ref('')
 const hoveredProject = ref(null)
 const mousePosition = ref({ x: 0, y: 0 })
+const fallbackImg = '/images/sunset-mountains.jpg'
+
+// 图片错误回退
+const onImgError = (e) => {
+  const img = e?.target
+  if (img && img.src !== fallbackImg) {
+    img.src = fallbackImg
+  }
+}
 
 // 项目数据
 const projects = ref([

@@ -12,6 +12,9 @@ import (
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
+	// 请求日志中间件（记录所有请求和慢请求）
+	r.Use(middlewares.RequestLogger())
+
 	// 创建控制器实例
 	weatherController := controllers.NewWeatherController(config.DB)
 	presentationController := controllers.NewPresentationController(config.DB)

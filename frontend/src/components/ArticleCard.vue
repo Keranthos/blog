@@ -1,6 +1,6 @@
 <template>
   <div class="basic-view" @click="goToDetail">
-    <img v-if="props.image" :src="props.image" alt="Article Image" class="image" loading="lazy" />
+    <img v-if="props.image" :src="props.image" alt="Article Image" class="image" loading="lazy" decoding="async" @error="onImgError($event)" />
     <div class="content" :class="{ 'no-image': !props.image }">
       <div v-if="showTooltipFlag" class="tooltip">{{ props.title }}</div>
       <div v-if="showTooltipFlag" class="tooltip-arrow"></div>
@@ -26,6 +26,7 @@
 import { computed, ref } from 'vue'
 // 用于展示一篇博客（科研日记、项目笔记）的基础介绍卡片
 import { useRouter } from 'vue-router'
+const fallbackImg = '/images/sunset-mountains.jpg'
 
 const props = defineProps({
   id: Number,
@@ -72,6 +73,14 @@ const goToDetail = () => {
       routeName = 'BlogDetail'
   }
   router.push({ name: routeName, params: { id: props.id } })
+}
+
+// 图片错误回退
+const onImgError = (e) => {
+  const img = e?.target
+  if (img && img.src !== fallbackImg) {
+    img.src = fallbackImg
+  }
 }
 
 // 获取类型图标

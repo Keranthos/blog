@@ -302,12 +302,7 @@ function loadWidget(config) {
 				"每一个问题都是成长的契机，欢迎交流"
 			];
 			text = questionMessages[Math.floor(Math.random() * questionMessages.length)];
-		} else if (location.pathname.includes("/timeline")) {
-			const timelineMessages = [
-				"朋友，你觉得时间轴应该是一支箭，还是一棵树？",
-				"现在的我依然是菜菜的，但是三十年河东三十年河西，莫欺少年穷、莫欺中年穷、莫欺老年穷、似者为大，朋友"
-			];
-			text = timelineMessages[Math.floor(Math.random() * timelineMessages.length)];
+		// 时间树界面已移除，不再展示对应文案
 		} else if (location.pathname.includes("/presentation")) {
 			const presentationMessages = [
 				"作为一个很讨厌麻烦的i人，我必须承认讲演时常困扰我",
@@ -419,12 +414,7 @@ function loadWidget(config) {
 					"每一个问题都是成长的契机，欢迎交流"
 				];
 				text = questionMessages[Math.floor(Math.random() * questionMessages.length)];
-			} else if (location.pathname.includes("/timeline")) {
-				const timelineMessages = [
-					"朋友，你觉得时间轴应该是一支箭，还是一棵树？",
-					"现在的我依然是菜菜的，但是三十年河东三十年河西，莫欺少年穷、莫欺中年穷、莫欺老年穷、似者为大，朋友"
-				];
-				text = timelineMessages[Math.floor(Math.random() * timelineMessages.length)];
+			// 时间树界面已移除，不再展示对应文案
 			} else if (location.pathname.includes("/presentation")) {
 				const presentationMessages = [
 					"作为一个很讨厌麻烦的i人，我必须承认讲演时常困扰我",

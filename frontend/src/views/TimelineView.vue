@@ -100,7 +100,7 @@
                     </div>
                   </div>
                   <div v-if="article.image" class="card-thumbnail">
-                    <img :src="article.image" :alt="getArticleTitle(article)" />
+                    <img :src="article.image" :alt="getArticleTitle(article)" loading="lazy" decoding="async" @error="onImgError($event)" />
                   </div>
                 </div>
               </article>
@@ -126,6 +126,15 @@ const loading = ref(true)
 const timelineData = ref({})
 const selectedYear = ref('')
 const selectedMonth = ref('')
+const fallbackImg = '/images/sunset-mountains.jpg'
+
+// 图片错误回退
+const onImgError = (e) => {
+  const img = e?.target
+  if (img && img.src !== fallbackImg) {
+    img.src = fallbackImg
+  }
+}
 
 // 计算属性
 const availableYears = computed(() => {
