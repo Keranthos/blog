@@ -164,7 +164,6 @@ export function generateListSEO (pageType, page = 1) {
     research: { name: '科研', desc: '科研记录' },
     moment: { name: '碎碎念', desc: '生活感悟' },
     tags: { name: '标签云', desc: '文章标签分类' },
-    timeline: { name: '时间树', desc: '按时间浏览文章' },
     archive: { name: '文章归档', desc: '按年份月份浏览文章' },
     search: { name: '搜索', desc: '搜索文章内容' }
   }

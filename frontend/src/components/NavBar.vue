@@ -623,7 +623,7 @@ const isMediaActive = computed(() => {
 })
 
 const isOtherActive = computed(() => {
-  const otherPaths = ['/questionbox', '/timeline', '/presentation']
+  const otherPaths = ['/questionbox', '/presentation']
   return otherPaths.includes(route.path)
 })
 

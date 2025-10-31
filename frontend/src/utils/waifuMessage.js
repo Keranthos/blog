@@ -65,7 +65,6 @@ const errorMessages = {
   presentation_error: '(｡•́︿•̀｡)<br>讲演加载失败了呢…再试试看？',
   media_error: '(｡•́︿•̀｡)<br>媒体内容加载失败…检查一下网络？',
   comment_error: '(｡•́︿•̀｡)<br>评论提交失败…再试一次吧～',
-  timeline_error: '(｡•́︿•̀｡)<br>时间线加载失败了呢…',
   search_error: '(｡•́︿•̀｡)<br>搜索功能出问题了…'
 }
 
@@ -86,7 +85,6 @@ const successMessages = {
   presentation: '讲演内容加载成功！',
   media: '媒体内容加载成功！',
   search: '搜索完成！找到相关内容啦～',
-  timeline: '时间线加载成功！',
   profile: '个人资料加载成功！'
 }
 
