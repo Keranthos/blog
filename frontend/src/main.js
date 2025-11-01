@@ -113,6 +113,10 @@ import {
 } from '@fortawesome/free-solid-svg-icons'
 
 import {
+  faStar as faStarRegular
+} from '@fortawesome/free-regular-svg-icons'
+
+import {
   faGithub,
   faGitlab,
   faBitbucket,
@@ -204,6 +208,7 @@ library.add(
   faPhone,
   faMapMarkerAlt,
   faStar,
+  faStarRegular,
   faCog,
   faUser,
   faInfoCircle,

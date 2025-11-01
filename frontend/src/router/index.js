@@ -52,16 +52,13 @@ const routes = [
     component: () => import('@/views/BlogDetailView.vue'), // ：id怎么处理？
     props: true
   },
-  { path: '/fragments/books', name: 'Books', component: () => import('@/views/BooksView.vue') },
   { path: '/fragments/novels', name: 'Novels', component: () => import('@/views/NovelsView.vue') },
-  { path: '/fragments/movies', name: 'Movies', component: () => import('@/views/MoviesView.vue') },
   { path: '/login-register', name: 'LoginRegister', component: () => import('@/views/LoginRegisterView.vue') },
   { path: '/user-info', name: 'UserInfo', component: () => import('@/views/LoginRegisterView.vue') },
   { path: '/profile', name: 'Profile', component: () => import('@/views/ProfileView.vue') },
   { path: '/images', name: 'ImageManage', component: () => import('@/views/ImageManageView.vue') },
   { path: '/presentation', name: 'Presentation', component: () => import('@/views/PresentationView.vue') },
   { path: '/editpresentation', name: 'EditPresentation', component: () => import('@/views/EditPresentationView.vue') },
-  { path: '/loading-test', name: 'LoadingTest', component: () => import('@/views/LoadingTestView.vue') },
   { path: '/error', name: 'Error', component: () => import('@/views/ErrorView.vue') },
   { path: '/:catchAll(.*)', name: 'NotFound', component: () => import('@/views/NotFoundView.vue') }
 ]

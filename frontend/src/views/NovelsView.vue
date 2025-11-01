@@ -8,7 +8,8 @@
           <img :src="novelsBackground" alt="Background Image" class="header-image" loading="lazy" decoding="async" @error="onImgError($event)" />
         </div>
         <div class="intro">
-          <pre class="intro-text">{{ introText }}</pre>
+          <div v-if="introTitle" class="intro-title">{{ introTitle }}</div>
+          <pre v-if="introBody" class="intro-text">{{ introBody }}</pre>
         </div>
       </div>
 
@@ -18,6 +19,7 @@
           <MediaCard
             v-for="media in mediaList"
             :key="media.ID + '_' + (media.__type || '')"
+            :ref="el => { if (el) mediaCardRefs[media.ID] = el }"
             :media="media"
             :type="media.__type || 'novels'"
             variant="row"
@@ -30,12 +32,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, defineAsyncComponent } from 'vue'
+import { ref, onMounted, watch, nextTick, defineAsyncComponent } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { getMediaList } from '@/api/media/browse'
 import MediaCard from '@/components/MediaCard.vue'
 import novelsBackgroundImg from '@/assets/novels_background.jpg'
 
 const NavBar = defineAsyncComponent(() => import('@/components/NavBar.vue'))
+const route = useRoute()
+const router = useRouter()
 
 const novelsBackground = novelsBackgroundImg
 const mediaList = ref([])
@@ -43,7 +48,39 @@ const currentPage = ref(1)
 const isLoading = ref(false)
 const mediaCache = ref({})
 const introText = ref('')
+const introTitle = ref('')
+const introBody = ref('')
 const fallbackImg = '/images/sunset-mountains.jpg'
+const mediaCardRefs = ref({}) // 存储MediaCard组件的引用
+
+// 解析介绍文本，提取第一句话作为标题
+const parseIntroText = (text) => {
+  if (!text) {
+    introTitle.value = ''
+    introBody.value = ''
+    return
+  }
+
+  // 找到第一个句号、问号或感叹号
+  const firstSentenceEnd = text.match(/[。！？]/)
+  if (firstSentenceEnd) {
+    const endIndex = firstSentenceEnd.index + 1
+    introTitle.value = text.substring(0, endIndex).trim()
+    // 正文从标题结束位置开始，保留所有后续内容（包括换行和空格）
+    introBody.value = text.substring(endIndex)
+  } else {
+    // 如果没有找到标点，则将第一行作为标题（遇到第一个换行符为止）
+    const firstLineEnd = text.indexOf('\n')
+    if (firstLineEnd > 0) {
+      introTitle.value = text.substring(0, firstLineEnd).trim()
+      // 正文从第一行结束后开始，保留所有后续内容（包括换行和空格）
+      introBody.value = text.substring(firstLineEnd + 1) // +1 跳过换行符，但保留后续格式
+    } else {
+      introTitle.value = text.trim()
+      introBody.value = ''
+    }
+  }
+}
 
 // 图片错误回退
 const onImgError = (e) => {
@@ -102,13 +139,62 @@ const removeMedia = (mediaId) => {
   }
 }
 
+// 打开指定媒体的详情框
+const openMediaById = async (mediaId) => {
+  // 确保媒体列表已加载
+  if (mediaList.value.length === 0) {
+    await loadMedia()
+  }
+
+  // 查找对应的媒体卡片
+  const targetMedia = mediaList.value.find(m => m.ID === parseInt(mediaId))
+  if (targetMedia && mediaCardRefs.value[targetMedia.ID]) {
+    // 调用MediaCard的打开方法（如果MediaCard暴露了openMediaModal方法）
+    const cardComponent = mediaCardRefs.value[targetMedia.ID]
+    if (cardComponent && typeof cardComponent.openMediaModal === 'function') {
+      cardComponent.openMediaModal()
+    }
+  }
+}
+
+// 监听路由query变化，打开指定的媒体详情框
+watch(() => route.query.mediaId, async (mediaId) => {
+  if (mediaId) {
+    // 等待DOM更新
+    await nextTick()
+    // 延迟一点确保MediaCard组件已完全渲染
+    setTimeout(() => {
+      openMediaById(mediaId)
+      // 清除query参数，避免刷新时重复打开
+      router.replace({ query: {} })
+    }, 300)
+  }
+}, { immediate: true })
+
 onMounted(() => {
   loadMedia()
   // 加载左侧文案（来自 public/data/media-intro.txt）
   fetch('/data/media-intro.txt')
     .then(res => res.ok ? res.text() : '')
-    .then(text => { introText.value = text || '' })
-    .catch(() => { introText.value = '' })
+    .then(text => {
+      introText.value = text || ''
+      parseIntroText(text || '')
+    })
+    .catch(() => {
+      introText.value = ''
+      parseIntroText('')
+    })
+
+  // 如果有mediaId参数，打开对应的详情框
+  if (route.query.mediaId) {
+    nextTick(() => {
+      setTimeout(() => {
+        openMediaById(route.query.mediaId)
+        // 清除query参数
+        router.replace({ query: {} })
+      }, 500)
+    })
+  }
 })
 </script>
 
@@ -135,6 +221,19 @@ onMounted(() => {
 }
 
 .intro { background: transparent; border: none; border-radius: 0; padding: 8px 0; }
+
+.intro-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #a855f7;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid rgba(168, 85, 247, 0.2);
+  line-height: 1.6;
+  letter-spacing: 0.3px;
+  text-align: left;
+}
+
 .intro-text { white-space: pre-wrap; text-align: left; margin: 0; color: #333; font-size: 0.95rem; line-height: 1.7; }
 
 .media-rows { display: flex; flex-direction: column; gap: 12px; padding: 4px; }

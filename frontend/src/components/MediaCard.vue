@@ -13,11 +13,11 @@
               <span class="stars">
                 <span v-for="(s, idx) in starArray" :key="'s-'+idx" class="star-wrap">
                   <span v-if="s.cls === 'half-star'" class="star-half-wrap">
-                    <font-awesome-icon :icon="['far','star']" class="star-icon empty-star" :style="{ color: '#e0e0e0' }" />
-                    <font-awesome-icon :icon="'star'" class="star-icon full-star star-half-overlay" :style="{ color: '#ffd700' }" />
+                    <font-awesome-icon :icon="['far','star']" class="star-icon empty-star" />
+                    <font-awesome-icon :icon="'star'" class="star-icon full-star star-half-overlay" />
                   </span>
-                  <font-awesome-icon v-else-if="s.cls === 'full-star'" :icon="s.icon" class="star-icon full-star" :style="{ color: '#ffd700' }" />
-                  <font-awesome-icon v-else :icon="s.icon" class="star-icon empty-star" :style="{ color: '#e0e0e0' }" />
+                  <font-awesome-icon v-else-if="s.cls === 'full-star'" :icon="s.icon" class="star-icon full-star" />
+                  <font-awesome-icon v-else :icon="s.icon" class="star-icon empty-star" />
                 </span>
               </span>
               <span class="rating-text">{{ props.media.Rating }}/10</span>
@@ -37,11 +37,11 @@
             <span class="stars">
               <span v-for="(s, idx) in starArray" :key="'m-'+idx" class="star-wrap">
                 <span v-if="s.cls === 'half-star'" class="star-half-wrap">
-                  <font-awesome-icon :icon="['far','star']" class="star-icon empty-star" :style="{ color: '#e0e0e0' }" />
-                  <font-awesome-icon :icon="'star'" class="star-icon full-star star-half-overlay" :style="{ color: '#ffd700' }" />
+                  <font-awesome-icon :icon="['far','star']" class="star-icon empty-star" />
+                  <font-awesome-icon :icon="'star'" class="star-icon full-star star-half-overlay" />
                 </span>
-                <font-awesome-icon v-else-if="s.cls === 'full-star'" :icon="s.icon" class="star-icon full-star" :style="{ color: '#ffd700' }" />
-                <font-awesome-icon v-else :icon="s.icon" class="star-icon empty-star" :style="{ color: '#e0e0e0' }" />
+                <font-awesome-icon v-else-if="s.cls === 'full-star'" :icon="s.icon" class="star-icon full-star" />
+                <font-awesome-icon v-else :icon="s.icon" class="star-icon empty-star" />
               </span>
             </span>
           </div>
@@ -89,13 +89,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { showCustomMessage } from '@/utils/waifuMessage'
-const fallbackImg = '/images/sunset-mountains.jpg'
 
 const props = defineProps({
   media: Object,
@@ -146,34 +145,75 @@ const starArray = computed(() => {
 // 渲染 Markdown
 const renderedReview = computed(() => {
   if (!props.media.Review) return ''
-  const html = marked(props.media.Review)
-  return DOMPurify.sanitize(html)
+  let html = marked(props.media.Review)
+
+  // 为图片添加内联样式，确保在渲染时就有宽度和高度限制，避免闪烁
+  html = html.replace(
+    /<img([^>]*)(style="[^"]*")?([^>]*)>/gi,
+    (match, before, existingStyle, after) => {
+      // 如果已经有style属性，则合并样式
+      if (existingStyle) {
+        const newStyle = existingStyle.replace(/"/g, '') + '; max-width: 80% !important; max-height: 400px !important; width: auto !important; height: auto !important; display: block !important; margin: 20px auto !important; box-sizing: border-box !important;'
+        return `<img${before} style="${newStyle}"${after}>`
+      } else {
+        // 如果没有style属性，则添加新的style属性
+        return `<img${before} style="max-width: 80% !important; max-height: 400px !important; width: auto !important; height: auto !important; display: block !important; margin: 20px auto !important; box-sizing: border-box !important;"${after}>`
+      }
+    }
+  )
+
+  // 配置DOMPurify允许style属性，确保内联样式不被过滤
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img'],
+    ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'title', 'width', 'height'],
+    ALLOW_DATA_ATTR: true
+  })
 })
 
 const openMediaModal = () => {
   showMediaModal.value = true
+  // 在弹框打开后，延迟为图片添加样式（确保 DOM 完全渲染）
+  nextTick(() => {
+    setTimeout(() => {
+      const modalReview = document.querySelector('.media-modal-review')
+      if (modalReview) {
+        const images = modalReview.querySelectorAll('img')
+        images.forEach(img => {
+          // 确保图片样式正确应用（内联样式优先级最高）
+          img.style.setProperty('max-width', '80%', 'important')
+          img.style.setProperty('max-height', '400px', 'important')
+          img.style.setProperty('width', 'auto', 'important')
+          img.style.setProperty('height', 'auto', 'important')
+          img.style.setProperty('display', 'block', 'important')
+          img.style.setProperty('margin', '20px auto', 'important')
+          img.style.setProperty('box-sizing', 'border-box', 'important')
+        })
+      }
+    }, 300) // 增加延迟时间，确保 v-html 渲染完成
+  })
   // 以 1/4 概率在弹框打开时根据类型说一句话
   try {
     if (Math.random() < 0.25) {
       const t = (props.type || '').toLowerCase()
       let texts = []
-      if (t === 'novels') {
+      if (t === 'books') {
         texts = [
-          '📖 小说里的世界总有点不一样，你觉得呢？',
-          '📖 让我们在故事里再多待一会儿吧',
-          '📖 虚构里藏着真实，慢慢看不着急'
+          '您有多久没有完整读过一本书？那里面有与我们共鸣的灵魂',
+          '我记不清上一次打开非专业的纸质书是什么时候了，但它们一定组成了我的一部分',
+          '也许您有好书要推荐给我，朋友？',
+          '我会永远怀念小时候和亲人朋友在书店里面打发的时光，哪怕那时候的书店朴实的只有书'
         ]
-      } else if (t === 'books') {
+      } else if (t === 'novels') {
         texts = [
-          '📚 读书不觉已春深，一寸光阴一寸金',
-          '📚 好书像灯，愿它照亮你的路',
-          '📚 也许你能给我推荐一本？'
+          '仔细回想，小说已经贯穿了我到现在为止超过一半的人生',
+          '虚构的故事里藏着最真实的情感，欢迎来到想象的世界',
+          '我们在小说中寻找想象里的自己，但不要忘了自己不是找到的，而是创造的'
         ]
       } else if (t === 'movies') {
         texts = [
-          '🎬 灯光、镜头、开始～',
-          '🎬 有些片尾曲适合静静听完',
-          '🎬 电影是另一个时间的容器'
+          '无关乎题材与风格，我总是痴迷于所有的好电影',
+          '我喜欢有年代感的电影，它里面有时代的影子',
+          '好的电影不厌百回看，也许现在是时候翻出你最爱的电影了'
         ]
       }
       if (texts.length) {
@@ -182,13 +222,73 @@ const openMediaModal = () => {
       }
     }
   } catch (e) { /* 忽略提示失败 */ }
+
+  // 弹框打开后，为正文中的图片添加错误处理
+  // 使用 setTimeout 确保 DOM 完全渲染
+  setTimeout(() => {
+    const modalReview = document.querySelector('.media-modal-review')
+    if (modalReview) {
+      const images = modalReview.querySelectorAll('img')
+      images.forEach(img => {
+        // 避免重复添加
+        if (!img.dataset.errorHandlerAdded) {
+          img.dataset.errorHandlerAdded = 'true'
+          img.addEventListener('error', () => {
+            img.style.display = 'none'
+          })
+        }
+      })
+    }
+  }, 100)
 }
 
-// 图片错误回退
+// 监听弹框打开，为正文中的图片添加错误处理和样式
+watch(showMediaModal, (isOpen) => {
+  if (isOpen) {
+    // 使用 nextTick 和延迟执行，确保 v-html 渲染完成后再处理图片
+    nextTick(() => {
+      setTimeout(() => {
+        const modalReview = document.querySelector('.media-modal-review')
+        if (modalReview) {
+          const images = modalReview.querySelectorAll('img')
+          images.forEach(img => {
+            // 避免重复添加
+            if (!img.dataset.errorHandlerAdded) {
+              img.dataset.errorHandlerAdded = 'true'
+              img.addEventListener('error', () => {
+                img.style.display = 'none'
+              })
+              // 确保图片样式正确应用（内联样式优先级最高）
+              img.style.setProperty('max-width', '80%', 'important')
+              img.style.setProperty('max-height', '400px', 'important')
+              img.style.setProperty('width', 'auto', 'important')
+              img.style.setProperty('height', 'auto', 'important')
+              img.style.setProperty('display', 'block', 'important')
+              img.style.setProperty('margin', '20px auto', 'important')
+              img.style.setProperty('box-sizing', 'border-box', 'important')
+            } else {
+              // 即使已经添加过错误处理，也要确保样式应用
+              img.style.setProperty('max-width', '80%', 'important')
+              img.style.setProperty('max-height', '400px', 'important')
+              img.style.setProperty('width', 'auto', 'important')
+              img.style.setProperty('height', 'auto', 'important')
+              img.style.setProperty('display', 'block', 'important')
+              img.style.setProperty('margin', '20px auto', 'important')
+              img.style.setProperty('box-sizing', 'border-box', 'important')
+            }
+          })
+        }
+      }, 300) // 增加延迟时间，确保 v-html 和图片加载完成
+    })
+  }
+})
+
+// 图片错误处理：隐藏图片而不是显示默认图片
 const onImgError = (e) => {
   const img = e?.target
-  if (img && img.src !== fallbackImg) {
-    img.src = fallbackImg
+  if (img) {
+    // 隐藏图片元素
+    img.style.display = 'none'
   }
 }
 
@@ -223,6 +323,11 @@ const goToEdit = () => {
 }
 
 // 删除功能已移除（按需可恢复）
+
+// 暴露方法供父组件调用
+defineExpose({
+  openMediaModal
+})
 </script>
 
 <style>
@@ -374,10 +479,34 @@ const goToEdit = () => {
 .stars { font-size: 1.1rem; line-height: 1; display: inline-flex; align-items: center; }
 .star-wrap { position: relative; display: inline-block; width: 1em; height: 1em; margin-right: 2px; }
 .star-wrap svg { width: 100%; height: 100%; display: block; }
-.stars .empty-star svg { color: #e0e0e0; }
-.modal-stars .empty-star { color: #ffd700; } /* 弹框内的空星显示黄色描边 */
-.modal-stars .full-star, .modal-stars .star-half-overlay { color: #ffd700; }
-.stars .full-star svg { color: #ffd700; }
+/* 满星：实心黄色 - Font Awesome 实心星星 */
+.stars .full-star,
+.stars .full-star svg,
+.stars .full-star svg path {
+  color: #ffd700 !important;
+}
+/* 空星：黄色边框（空心）- Font Awesome 空心星星（far star 自动是空心的） */
+.stars .empty-star,
+.stars .empty-star svg,
+.stars .empty-star svg path {
+  color: #ffd700 !important;
+}
+/* 弹框中的星星样式 */
+.modal-stars .full-star,
+.modal-stars .full-star svg,
+.modal-stars .full-star svg path {
+  color: #ffd700 !important;
+}
+.modal-stars .empty-star,
+.modal-stars .empty-star svg,
+.modal-stars .empty-star svg path {
+  color: #ffd700 !important;
+}
+.modal-stars .star-half-overlay,
+.modal-stars .star-half-overlay svg,
+.modal-stars .star-half-overlay svg path {
+  color: #ffd700 !important;
+}
 .star-half-wrap { position: relative; display: block; width: 100%; height: 100%; }
 .star-half-wrap .empty-star, .star-half-wrap .full-star { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
 .star-half-overlay { position: absolute; left: 0; top: 0; width: 100%; height: 100%; clip-path: inset(0 50% 0 0); }
@@ -509,10 +638,10 @@ const goToEdit = () => {
   cursor: default;
 }
 
-.media-modal-header { position: relative; min-height: 28px; display: grid; grid-template-columns: 60px 1fr auto; align-items: stretch; gap: 10px; }
+.media-modal-header { position: relative; min-height: 28px; display: grid; grid-template-columns: auto 1fr auto; align-items: stretch; gap: 10px; }
 
-.modal-thumb { width: 60px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,0.08); background: #fff; display: flex; align-items: center; justify-content: center; }
-.modal-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.modal-thumb { width: auto; max-width: none; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,0.08); background: #fff; display: flex; align-items: center; justify-content: center; }
+.modal-thumb img { width: auto; max-width: none; height: 60px; max-height: 60px; object-fit: contain; display: block; }
 
 .media-modal-headinfo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
 .media-modal-title { margin: 0; font-size: 1.1rem; font-weight: 700; color: #333; text-align: center; }
@@ -539,6 +668,22 @@ const goToEdit = () => {
 .media-modal-review.markdown-body h4,
 .media-modal-review.markdown-body h5,
 .media-modal-review.markdown-body h6 { background: transparent !important; }
+/* 媒体弹框中正文图片样式 - 宽度不超过容器80%，高度不超过400px，居中显示 */
+.media-modal-container .media-modal-review.markdown-body img,
+.media-modal-content .media-modal-review.markdown-body img,
+.media-modal-review.markdown-body img,
+.media-modal-review img {
+  max-width: 80% !important;
+  max-height: 400px !important;
+  width: auto !important;
+  height: auto !important;
+  display: block !important;
+  margin: 20px auto !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  object-fit: contain !important;
+  box-sizing: border-box !important;
+}
 
 @media (max-width: 768px) {
   .media-modal-container { width: 90%; max-width: 90%; }

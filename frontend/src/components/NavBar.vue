@@ -616,10 +616,9 @@ const userLevel = computed(() => {
   }
 })
 
-// 检查当前路由是否匹配下拉框中的路径
+// 检查当前路由是否匹配书影集路径
 const isMediaActive = computed(() => {
-  const mediaPaths = ['/fragments/books', '/fragments/novels', '/fragments/movies']
-  return mediaPaths.includes(route.path)
+  return route.path === '/fragments/novels'
 })
 
 const isOtherActive = computed(() => {

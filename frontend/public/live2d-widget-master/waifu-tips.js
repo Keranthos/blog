@@ -274,28 +274,6 @@ function loadWidget(config) {
 				"文章只是一张地图，找到回忆还需要翻山越岭"
 			];
 			text = momentsMessages[Math.floor(Math.random() * momentsMessages.length)];
-		} else if (location.pathname === "/fragments/books") {
-			const booksMessages = [
-				"您有多久没有完整读过一本书？那里面有与我们共鸣的灵魂",
-				"我记不清上一次打开非专业的纸质书是什么时候了，但它们一定组成了我的一部分",
-				"也许您有好书要推荐给我，朋友？",
-				"我会永远怀念小时候和亲人朋友在书店里面打发的时光，哪怕那时候的书店朴实的只有书"
-			];
-			text = booksMessages[Math.floor(Math.random() * booksMessages.length)];
-		} else if (location.pathname === "/fragments/novels") {
-			const novelsMessages = [
-				"仔细回想，小说已经贯穿了我到现在为止超过一半的人生",
-				"虚构的故事里藏着最真实的情感，欢迎来到想象的世界",
-				"我们在小说中寻找想象里的自己，但不要忘了自己不是找到的，而是创造的"
-			];
-			text = novelsMessages[Math.floor(Math.random() * novelsMessages.length)];
-		} else if (location.pathname === "/fragments/movies") {
-			const moviesMessages = [
-				"无关乎题材与风格，我总是痴迷于所有的好电影",
-				"我喜欢有年代感的电影，它里面有时代的影子",
-				"好的电影不厌百回看，也许现在是时候翻出你最爱的电影了，朋友"
-			];
-			text = moviesMessages[Math.floor(Math.random() * moviesMessages.length)];
 		} else if (location.pathname.includes("/questionbox")) {
 			const questionMessages = [
 				"知无不言，言无不尽",
@@ -368,10 +346,8 @@ function loadWidget(config) {
 		function showPageWelcomeMessage() {
 			let text;
 		if (location.pathname === "/") {
-			const homeMessages = [
-				"回到首页啦～欢迎回来，朋友"
-			];
-			text = homeMessages[Math.floor(Math.random() * homeMessages.length)];
+			// 回到首页时不显示消息
+			return;
 			} else if (location.pathname.includes("/blog")) {
 				const blogMessages = [
 					"我努力想探寻世界上所有好玩的东西，这里留着一点足迹",
@@ -386,28 +362,6 @@ function loadWidget(config) {
 					"文章只是一张地图，找到回忆还需要翻山越岭"
 				];
 				text = momentsMessages[Math.floor(Math.random() * momentsMessages.length)];
-			} else if (location.pathname === "/fragments/books") {
-				const booksMessages = [
-					"您有多久没有完整读过一本书？那里面有与我们共鸣的灵魂",
-					"我记不清上一次打开非专业的纸质书是什么时候了，但它们一定组成了我的一部分",
-					"也许您有好书要推荐给我，朋友？",
-					"我会永远怀念小时候和亲人朋友在书店里面打发的时光，哪怕那时候的书店朴实的只有书"
-				];
-				text = booksMessages[Math.floor(Math.random() * booksMessages.length)];
-			} else if (location.pathname === "/fragments/novels") {
-				const novelsMessages = [
-					"仔细回想，小说已经贯穿了我到现在为止超过一半的人生",
-					"虚构的故事里藏着最真实的情感，欢迎来到想象的世界",
-					"我们在小说中寻找想象里的自己，但不要忘了自己不是找到的，而是创造的"
-				];
-				text = novelsMessages[Math.floor(Math.random() * novelsMessages.length)];
-			} else if (location.pathname === "/fragments/movies") {
-				const moviesMessages = [
-					"无关乎题材与风格，我总是痴迷于所有的好电影",
-					"我喜欢有年代感的电影，它里面有时代的影子",
-					"好的电影不厌百回看，也许现在是时候翻出你最爱的电影了，朋友"
-				];
-				text = moviesMessages[Math.floor(Math.random() * moviesMessages.length)];
 			} else if (location.pathname.includes("/questionbox")) {
 				const questionMessages = [
 					"知无不言，言无不尽",
@@ -633,7 +587,7 @@ function initWidget(config, apiPath) {
 		// 延迟加载模型，等待loadWidget完成
 		setTimeout(() => {
 			if (window.loadModel) {
-				window.loadModel(9, 0, "ヾ(◍°∇°◍)ﾉﾞ<br>欢迎来到我的小窝～");
+				window.loadModel(9, 0, null);
 			}
 		}, 1500);
 	}

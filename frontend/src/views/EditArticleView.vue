@@ -400,6 +400,16 @@
       />
     </div>
 
+    <!-- 媒体编辑器隐藏的文件输入 -->
+    <input
+      v-if="contentType === 'media'"
+      ref="mediaImageInput"
+      type="file"
+      accept="image/*"
+      style="display: none"
+      @change="handleMediaImageUpload"
+    />
+
     <!-- 媒体卡片编辑 - 使用与文章编辑器相同的分屏样式 -->
     <div v-if="contentType === 'media'" class="typora-editor">
       <div class="editor-content">
@@ -420,20 +430,53 @@
                 <button title="斜体" class="toolbar-btn" @click="insertMediaMarkdown('*', '*')">
                   <font-awesome-icon icon="italic" />
                 </button>
-                <button title="标题" class="toolbar-btn" @click="insertMediaMarkdown('### ', '')">
-                  <font-awesome-icon icon="heading" />
+                <button title="删除线" class="toolbar-btn" @click="insertMediaMarkdown('~~', '~~')">
+                  <font-awesome-icon icon="strikethrough" />
                 </button>
-                <button title="链接" class="toolbar-btn" @click="insertMediaMarkdown('[', '](url)')">
+              </div>
+              <div class="toolbar-divider"></div>
+              <div class="toolbar-group">
+                <button title="标题 1" class="toolbar-btn" @click="insertMediaMarkdown('# ', '')">
+                  H1
+                </button>
+                <button title="标题 2" class="toolbar-btn" @click="insertMediaMarkdown('## ', '')">
+                  H2
+                </button>
+                <button title="标题 3" class="toolbar-btn" @click="insertMediaMarkdown('### ', '')">
+                  H3
+                </button>
+              </div>
+              <div class="toolbar-divider"></div>
+              <div class="toolbar-group">
+                <button title="链接" class="toolbar-btn" @click="insertMediaLink()">
                   <font-awesome-icon icon="link" />
+                </button>
+                <button title="图片" class="toolbar-btn" @click="insertMediaImage()">
+                  <font-awesome-icon icon="image" />
                 </button>
                 <button title="代码" class="toolbar-btn" @click="insertMediaMarkdown('`', '`')">
                   <font-awesome-icon icon="code" />
                 </button>
+              </div>
+              <div class="toolbar-divider"></div>
+              <div class="toolbar-group">
                 <button title="引用" class="toolbar-btn" @click="insertMediaMarkdown('> ', '')">
                   <font-awesome-icon icon="quote-left" />
                 </button>
-                <button title="列表" class="toolbar-btn" @click="insertMediaMarkdown('- ', '')">
-                  <font-awesome-icon icon="list" />
+                <button title="无序列表" class="toolbar-btn" @click="insertMediaMarkdown('- ', '')">
+                  <font-awesome-icon icon="list-ul" />
+                </button>
+                <button title="有序列表" class="toolbar-btn" @click="insertMediaMarkdown('1. ', '')">
+                  <font-awesome-icon icon="list-ol" />
+                </button>
+              </div>
+              <div class="toolbar-divider"></div>
+              <div class="toolbar-group">
+                <button title="分割线" class="toolbar-btn" @click="insertMediaMarkdown('---\n', '')">
+                  <font-awesome-icon icon="minus" />
+                </button>
+                <button title="表格" class="toolbar-btn" @click="insertMediaTable()">
+                  <font-awesome-icon icon="table" />
                 </button>
               </div>
             </div>
@@ -442,15 +485,22 @@
             <textarea
               ref="mediaTextarea"
               v-model="mediaData.description"
-              placeholder="# 写下你的评价...&#10;&#10;支持 Markdown 语法&#10;- **粗体** *斜体*&#10;- ### 标题&#10;- [链接](url)&#10;- `代码`&#10;- > 引用&#10;- - 列表&#10;&#10;💡 分享你的观影/阅读感受"
+              placeholder="# 写下你的评价...&#10;&#10;支持 Markdown 语法：&#10;- **粗体** *斜体* ~~删除线~~&#10;- # 标题 1-3&#10;- [链接](url)&#10;- ![图片](url)&#10;- `代码`&#10;- > 引用&#10;- - 无序列表 1. 有序列表&#10;- --- 分割线&#10;- 表格&#10;&#10;💡 提示：可以直接Ctrl+V 粘贴图片"
               class="source-editor"
               @keydown.tab.prevent="handleMediaTab"
+              @paste="handleMediaPaste"
+              @input="updateMediaPreview"
+              @keyup="updateMediaCursorPosition"
+              @click="updateMediaCursorPosition"
+              @scroll="syncMediaScroll"
             ></textarea>
 
             <!-- 左侧底部统计 -->
             <div class="panel-footer">
               <div class="editor-stats">
-                <span>字数: {{ mediaData.description.length }}</span>
+                <span class="word-count">{{ mediaWordCount }} 字</span>
+                <span class="line-count">{{ mediaLineCount }} 行</span>
+                <span class="cursor-position">{{ mediaCursorLine }} {{ mediaCursorColumn }}</span>
               </div>
             </div>
           </div>
@@ -513,6 +563,9 @@ const editorTextarea = ref(null)
 const imageInput = ref(null)
 const wysiwygContent = ref(null)
 const mediaTextarea = ref(null)
+const mediaCursorLine = ref(1) // 媒体编辑器光标行号
+const mediaCursorColumn = ref(1) // 媒体编辑器光标列号
+const mediaImageInput = ref(null) // 媒体编辑器图片上传input
 
 // 图片加载状态管理
 const imageLoadingStates = ref(new Map())
@@ -602,9 +655,21 @@ const lineCount = computed(() => {
   return markdownContent.value.split('\n').length
 })
 
-// 媒体内容预览（Markdown 渲染）
+// 媒体编辑器字数统计
+const mediaWordCount = computed(() => {
+  return mediaData.value.description.replace(/\s/g, '').length
+})
+
+// 媒体编辑器行数统计
+const mediaLineCount = computed(() => {
+  return mediaData.value.description.split('\n').length
+})
+
+// 媒体内容预览（Markdown 渲染）- 与文章编辑器保持一致的功能
 const sanitizedMediaContent = computed(() => {
   if (!mediaData.value.description) return ''
+
+  // 使用 marked 渲染 Markdown，确保代码块结构正确
   const rendered = marked(mediaData.value.description, {
     breaks: true, // 将换行符转换为 <br>
     gfm: true, // 启用 GitHub Flavored Markdown
@@ -612,10 +677,45 @@ const sanitizedMediaContent = computed(() => {
     mangle: false,
     sanitize: false // 不禁用HTML标签，让br标签通过
   })
-  return DOMPurify.sanitize(rendered, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img'],
-    ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'title', 'width', 'height']
+
+  // 处理blob URL，尝试显示实际图片
+  let processedContent = rendered
+  const blobImageRegex = /<img[^>]*src="(blob:[^"]*)"[^>]*>/g
+  processedContent = processedContent.replace(blobImageRegex, (match, blobUrl) => {
+    const altMatch = match.match(/alt="([^"]*)"/)
+    const altText = altMatch ? altMatch[1] : '粘贴的图片'
+    return `<div class="blob-image-container">
+      <img src="${blobUrl}" alt="${altText}" class="blob-image"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+      <div class="image-placeholder-preview" style="display: none;">
+        <div class="placeholder-icon">📷</div>
+        <div class="placeholder-text">${altText}</div>
+        <div class="placeholder-hint">将在保存时上传</div>
+      </div>
+    </div>`
   })
+
+  // 使用与文章编辑器相同的 DOMPurify 配置
+  const sanitized = DOMPurify.sanitize(processedContent, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img'],
+    ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'title', 'width', 'height'],
+    ALLOW_DATA_ATTR: true,
+    ALLOW_UNKNOWN_PROTOCOLS: true
+  })
+
+  // 确保DOM更新后高亮代码块
+  nextTick(() => {
+    setTimeout(() => {
+      const finalCodeBlocks = document.querySelectorAll('.preview-content.markdown-body pre code')
+      finalCodeBlocks.forEach((block) => {
+        if (block.textContent && block.textContent.trim()) {
+          hljs.highlightElement(block)
+        }
+      })
+    }, 100)
+  })
+
+  return sanitized
 })
 
 // 图片加载状态计算属性
@@ -777,7 +877,180 @@ const handleMediaTab = (event) => {
   // 移动光标
   nextTick(() => {
     textarea.selectionStart = textarea.selectionEnd = start + 2
+    updateMediaCursorPosition()
   })
+}
+
+// 媒体编辑器更新预览
+const updateMediaPreview = () => {
+  // sanitizedMediaContent 是 computed，会自动更新
+  // 但需要确保代码高亮
+  nextTick(() => {
+    setTimeout(() => {
+      const finalCodeBlocks = document.querySelectorAll('.preview-content.markdown-body pre code')
+      finalCodeBlocks.forEach((block) => {
+        if (block.textContent && block.textContent.trim()) {
+          hljs.highlightElement(block)
+        }
+      })
+    }, 100)
+  })
+}
+
+// 媒体编辑器光标位置更新
+const updateMediaCursorPosition = () => {
+  if (!mediaTextarea.value) return
+
+  const textarea = mediaTextarea.value
+  const text = textarea.value
+  const cursorPos = textarea.selectionStart
+
+  // 计算行号和列号
+  const textBeforeCursor = text.substring(0, cursorPos)
+  const lines = textBeforeCursor.split('\n')
+  mediaCursorLine.value = lines.length
+  mediaCursorColumn.value = lines[lines.length - 1].length + 1
+}
+
+// 媒体编辑器滚动同步
+const syncMediaScroll = () => {
+  if (!mediaTextarea.value) return
+
+  const textarea = mediaTextarea.value
+  const previewContent = document.querySelector('.preview-content.markdown-body')
+
+  if (!previewContent) return
+
+  // 计算滚动比例
+  const scrollTop = textarea.scrollTop
+  const scrollHeight = textarea.scrollHeight
+  const clientHeight = textarea.clientHeight
+  const maxScroll = scrollHeight - clientHeight
+
+  if (maxScroll > 0) {
+    const scrollRatio = scrollTop / maxScroll
+    const previewMaxScroll = previewContent.scrollHeight - previewContent.clientHeight
+    const targetScrollTop = scrollRatio * previewMaxScroll
+
+    previewContent.scrollTop = targetScrollTop
+  }
+}
+
+// 媒体编辑器粘贴处理（Ctrl+V 粘贴图片）
+const handleMediaPaste = async (event) => {
+  const items = event.clipboardData.items
+  if (!items) return
+
+  // 查找图片
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (item.type.indexOf('image') !== -1) {
+      // 阻止默认粘贴行为
+      event.preventDefault()
+
+      // 获取图片文件
+      const file = item.getAsFile()
+      if (!file) continue
+
+      const textarea = mediaTextarea.value
+      const start = textarea.selectionStart
+
+      try {
+        // 创建本地预览URL
+        const localUrl = URL.createObjectURL(file)
+
+        // 生成文件名
+        const timestamp = new Date().getTime()
+        const filename = `paste_${timestamp}.png`
+
+        // 插入本地预览的Markdown
+        const imageMarkdown = `\n\n![${filename}](${localUrl})\n\n`
+        const beforeText = mediaData.value.description.substring(0, start)
+        const afterText = mediaData.value.description.substring(start)
+        mediaData.value.description = beforeText + imageMarkdown + afterText
+
+        // 添加到待上传队列
+        pendingUploads.value.set(localUrl, {
+          file,
+          localUrl,
+          serverUrl: null
+        })
+
+        // 更新预览
+        updateMediaPreview()
+
+        showCustomMessage('图片已粘贴，将在保存时上传', 3000)
+      } catch (error) {
+        showErrorMessage('paste_failed')
+      }
+
+      break
+    }
+  }
+}
+
+// 媒体编辑器插入链接
+const insertMediaLink = () => {
+  const url = prompt('请输入链接地址:')
+  if (url) {
+    insertMediaMarkdown('[', `](${url})`)
+  }
+}
+
+// 媒体编辑器插入图片
+const insertMediaImage = () => {
+  if (mediaImageInput.value) {
+    mediaImageInput.value.click()
+  }
+}
+
+// 媒体编辑器插入表格
+const insertMediaTable = () => {
+  const tableMarkdown = '\n| 列1 | 列2 | 列3 |\n|-----|-----|-----|\n| 内容1 | 内容2 | 内容3 |\n| 内容4 | 内容5 | 内容6 |\n\n'
+  insertMediaMarkdown(tableMarkdown, '')
+}
+
+// 媒体编辑器图片上传处理
+const handleMediaImageUpload = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  const textarea = mediaTextarea.value
+  const start = textarea.selectionStart
+
+  try {
+    // 显示上传中提示
+    const uploadingText = '\n\n![上传中...]()\n\n'
+    const beforeText = mediaData.value.description.substring(0, start)
+    const afterText = mediaData.value.description.substring(start)
+    mediaData.value.description = beforeText + uploadingText + afterText
+
+    // 上传图片
+    const imageUrl = await uploadImageFile(file)
+    if (!imageUrl) {
+      // 上传失败，移除上传中文本
+      mediaData.value.description = mediaData.value.description.replace(uploadingText, '')
+      return
+    }
+
+    // 替换上传中文本为实际图片
+    mediaData.value.description = mediaData.value.description.replace(
+      uploadingText,
+      `\n\n![${file.name}](${imageUrl})\n\n`
+    )
+
+    // 更新预览
+    updateMediaPreview()
+
+    showSuccessMessage('upload')
+  } catch (error) {
+    // 移除上传中文件
+    mediaData.value.description = mediaData.value.description.replace('\n\n![上传中...]()\n\n', '')
+    showErrorMessage('upload_failed')
+  }
+
+  // 清空 input
+  event.target.value = ''
 }
 
 // 保存文章
@@ -901,7 +1174,10 @@ const saveArticle = async () => {
 
 // 保存媒体卡片
 const saveMedia = async () => {
-  if (!canSave.value) return
+  if (!canSave.value) {
+    showErrorMessage('empty_input')
+    return
+  }
 
   try {
     const user = store.state.user
@@ -911,19 +1187,64 @@ const saveMedia = async () => {
       return
     }
 
+    // 批量上传待上传的图片（正文中的图片）
+    if (pendingUploads.value.size > 0) {
+      for (const [localUrl, uploadInfo] of pendingUploads.value) {
+        try {
+          const serverUrl = await uploadImageFile(uploadInfo.file)
+          if (serverUrl) {
+            // 替换Markdown中的本地URL为服务器URL
+            mediaData.value.description = mediaData.value.description.replace(localUrl, serverUrl)
+            uploadInfo.serverUrl = serverUrl
+          }
+        } catch (error) {
+          // 忽略单个图片上传失败，但记录警告
+          console.warn('正文图片上传失败:', error)
+        }
+      }
+
+      // 清理本地URL
+      for (const [localUrl] of pendingUploads.value) {
+        URL.revokeObjectURL(localUrl)
+      }
+      pendingUploads.value.clear()
+    }
+
+    // 批量上传封面图片
+    if (pendingCoverUploads.value.size > 0) {
+      for (const [, uploadInfo] of pendingCoverUploads.value) {
+        try {
+          const serverUrl = await uploadImageFile(uploadInfo.file)
+          if (serverUrl) {
+            // 替换封面图片的本地URL为服务器URL
+            mediaData.value.image = serverUrl
+            uploadInfo.serverUrl = serverUrl
+          }
+        } catch (error) {
+          // 封面图片上传失败，记录错误
+          console.error('封面图片上传失败:', error)
+          showErrorMessage('upload_failed')
+        }
+      }
+
+      // 清理本地URL
+      for (const [localUrl] of pendingCoverUploads.value) {
+        URL.revokeObjectURL(localUrl)
+      }
+      pendingCoverUploads.value.clear()
+    }
+
     const { createMedia, updateMedia } = await import('@/api/media/edit')
 
     // 后端字段名：Poster, Name, Review, Rating, Type
     const mediaPayload = {
-      Poster: mediaData.value.image, // 前端 image 后端 Poster
+      Poster: mediaData.value.image || '', // 前端 image 后端 Poster，允许为空
       Name: mediaData.value.name,
-      Review: mediaData.value.description, // 前端 description 后端 Review
+      Review: mediaData.value.description || '', // 前端 description 后端 Review，允许为空
       Rating: mediaData.value.rating,
       Type: mediaData.value.type,
       Date: new Date().toISOString().split('T')[0] // 添加日期
     }
-
-    // console.log('保存的媒体数据', mediaPayload)
 
     if (isEditing.value) {
       await updateMedia(mediaData.value.type, route.params.id, mediaPayload)
@@ -933,9 +1254,10 @@ const saveMedia = async () => {
       showSuccessMessage('submit')
     }
 
-    // 跳转到对应媒体页面（统一媒体入口在 /fragments/...）
-    router.push(`/fragments/${mediaData.value.type}`)
+    // 跳转到统一媒体页面（所有媒体类型都使用 /fragments/novels）
+    router.push('/fragments/novels')
   } catch (error) {
+    console.error('保存媒体卡片失败:', error)
     showErrorMessage(error)
   }
 }
@@ -1543,28 +1865,54 @@ const loadExistingArticle = async () => {
 
   try {
     const id = route.params.id
-    const articleType = articleData.value.type
+    const articleType = articleData.value.type || route.query.articleType || 'blog'
 
-    const res = await getArticleByID(articleType, id)
-    const data = res.data
+    // 碎碎念使用不同的 API
+    if (articleType === 'moment') {
+      const { getMoment } = await import('@/api/Moments/browse')
+      const res = await getMoment(id)
+      const data = res.data
 
-    // 填充文章数据
-    articleData.value.title = data.title || ''
-    articleData.value.image = data.image || ''
-    articleData.value.type = articleType
-    articleData.value.isTop = data.isTop || false
+      // 填充文章数据
+      articleData.value.title = data.Title || ''
+      articleData.value.image = data.Image || ''
+      articleData.value.type = 'moment'
+      articleData.value.isTop = false
 
-    // 填充内容
-    markdownContent.value = data.content || ''
-    tagsInput.value = (data.tags || []).join(',')
+      // 填充内容
+      markdownContent.value = data.Content || ''
+      tagsInput.value = ''
 
-    // 保存原始数据用于检测更改
-    originalArticleData.value = JSON.parse(JSON.stringify(articleData.value))
-    originalMarkdownContent.value = markdownContent.value
-    originalTagsInput.value = tagsInput.value
+      // 保存原始数据用于检测更改
+      originalArticleData.value = JSON.parse(JSON.stringify(articleData.value))
+      originalMarkdownContent.value = markdownContent.value
+      originalTagsInput.value = tagsInput.value
 
-    // 更新预览
-    updatePreview()
+      // 更新预览
+      updatePreview()
+    } else {
+      // 其他类型使用标准 API
+      const res = await getArticleByID(articleType, id)
+      const data = res.data
+
+      // 填充文章数据
+      articleData.value.title = data.title || ''
+      articleData.value.image = data.image || ''
+      articleData.value.type = articleType
+      articleData.value.isTop = data.isTop || false
+
+      // 填充内容
+      markdownContent.value = data.content || ''
+      tagsInput.value = (data.tags || []).join(',')
+
+      // 保存原始数据用于检测更改
+      originalArticleData.value = JSON.parse(JSON.stringify(articleData.value))
+      originalMarkdownContent.value = markdownContent.value
+      originalTagsInput.value = tagsInput.value
+
+      // 更新预览
+      updatePreview()
+    }
   } catch (error) {
     console.error('加载文章失败:', error)
     showErrorMessage('加载文章失败，请重试')
@@ -1617,13 +1965,21 @@ onMounted(async () => {
   if (isEditing.value) {
     if (contentType.value === 'media') {
       await loadExistingMedia()
+      // 初始化媒体预览
+      updateMediaPreview()
     } else {
       await loadExistingArticle()
+      // 初始化预览
+      updatePreview()
+    }
+  } else {
+    // 非编辑模式也要初始化预览
+    if (contentType.value === 'media') {
+      updateMediaPreview()
+    } else {
+      updatePreview()
     }
   }
-
-  // 初始化预览
-  updatePreview()
 })
 
 // 组件卸载时清理
@@ -2634,16 +2990,16 @@ defineExpose({
     line-height: 1.4 !important;
   }
 
-  /* 预览区域图片样式 */
+  /* 预览区域图片样式 - 宽度不超过80%，居中显示 */
   .right-panel .preview-content.markdown-body img {
-    max-width: 50% !important;
-    max-height: 50vh !important;
+    max-width: 80% !important;
     width: auto !important;
     height: auto !important;
     border-radius: 8px !important;
-    margin: 10px auto !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    margin: 20px auto !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
     display: block !important;
+    object-fit: contain !important;
   }
 
   /* 图片占位符样式 */
@@ -2695,6 +3051,23 @@ defineExpose({
   /* 隐藏Webkit浏览器滚动条 */
   .right-panel .preview-content::-webkit-scrollbar {
     display: none;
+  }
+
+  /* 媒体预览区域文本左对齐 */
+  .right-panel .preview-content.markdown-body {
+    text-align: left !important;
+  }
+  .right-panel .preview-content.markdown-body * {
+    text-align: left !important;
+  }
+  .right-panel .preview-content.markdown-body p,
+  .right-panel .preview-content.markdown-body div,
+  .right-panel .preview-content.markdown-body span {
+    text-align: left !important;
+  }
+  /* 确保图片居中但其他内容左对齐 */
+  .right-panel .preview-content.markdown-body img {
+    text-align: center !important;
   }
 
   /* 确保列表缩进正确 */

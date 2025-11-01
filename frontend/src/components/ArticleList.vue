@@ -128,7 +128,9 @@ const thoughtsContent = ref({
 // 加载所思所想内容
 const loadThoughtsContent = async () => {
   try {
-    const response = await fetch('/thoughts.txt')
+    // 根据类型加载不同的文件：blog 使用 blog-thoughts.txt，moment 使用 moment-thoughts.txt
+    const fileName = props.type === 'moment' ? 'moment-thoughts.txt' : 'blog-thoughts.txt'
+    const response = await fetch(`/data/${fileName}`)
     const text = await response.text()
 
     // 解析文本内容
@@ -139,14 +141,25 @@ const loadThoughtsContent = async () => {
     }
   } catch (error) {
     console.error('加载所思所想内容失败:', error)
-    // 设置默认内容
-    thoughtsContent.value = {
-      title: '时间为何只是单向地流淌?',
-      paragraphs: [
-        '我一直在思考，为什么要写博客。最开始的时候，我在知乎上写一些系统性的文章，在CSDN上写一些技术笔记。后来，我觉得应该有一个属于自己的地方，可以记录自己的思考，可以分享自己的经验，可以与他人交流。',
-        '于是，我开始在知乎上创建专栏，开始写技术博客，开始分享自己的学习心得。我希望通过写作，能够帮助更多的人，也能够让自己在技术道路上不断成长。同时，我也希望能够在互联网的世界里，留下一些有价值的内容，让知识得以传承。',
-        '时间为何只是单向地流淌？我想，也许是因为我们总是想要抓住些什么，留住些什么。而写作，就是我在时间的长河中，留下的一些痕迹。这些痕迹，或许能够帮助到一些人，或许能够启发一些思考，或许只是我对自己存在的一种证明。'
-      ]
+    // 设置默认内容（根据类型）
+    if (props.type === 'moment') {
+      thoughtsContent.value = {
+        title: '关于碎碎念',
+        paragraphs: [
+          '生活中有很多转瞬即逝的想法，它们可能不够系统，也不够深刻，但它们真实地记录了我某个时刻的感受。',
+          '有些想法像流星一样划过脑海，如果不及时记录下来，很快就会消失在记忆的海洋中。所以我把它们写在这里，不是为了给别人看，而是为了给未来的自己看。',
+          '这些碎碎的念头，是我与世界的对话，也是我与自己的和解。'
+        ]
+      }
+    } else {
+      thoughtsContent.value = {
+        title: '时间为何只是单向地流淌?',
+        paragraphs: [
+          '我一直在思考，为什么要写博客。最开始的时候，我在知乎上写一些系统性的文章，在CSDN上写一些技术笔记。后来，我觉得应该有一个属于自己的地方，可以记录自己的思考，可以分享自己的经验，可以与他人交流。',
+          '于是，我开始在知乎上创建专栏，开始写技术博客，开始分享自己的学习心得。我希望通过写作，能够帮助更多的人，也能够让自己在技术道路上不断成长。同时，我也希望能够在互联网的世界里，留下一些有价值的内容，让知识得以传承。',
+          '时间为何只是单向地流淌？我想，也许是因为我们总是想要抓住些什么，留住些什么。而写作，就是我在时间的长河中，留下的一些痕迹。这些痕迹，或许能够帮助到一些人，或许能够启发一些思考，或许只是我对自己存在的一种证明。'
+        ]
+      }
     }
   }
 }
@@ -412,31 +425,69 @@ const computeTabStyle = () => {
   if (currentEl && container) {
     const crect = currentEl.getBoundingClientRect()
     const contRect = container.getBoundingClientRect()
-    const left = crect.left - contRect.left
-    const width = crect.width
-    return { transform: `translateX(${left}px)`, width: `${width}px` }
+    // 确保元素已完全渲染（宽度不为0）
+    if (crect.width > 0) {
+      const left = crect.left - contRect.left
+      const width = crect.width
+      return { transform: `translateX(${left}px)`, width: `${width}px` }
+    }
   }
-  // 回退：最小宽
-  return { transform: 'translateX(0)', width: '120px' }
+  // 回退：根据类型设置合理的初始宽度（避免闪烁）
+  const estimatedWidth = props.type === 'moment' ? '140px' : (activeTab.value === 'main' ? '160px' : '120px')
+  return { transform: 'translateX(0)', width: estimatedWidth }
 }
 
-const tabBackgroundTransform = ref({ transform: 'translateX(0)', width: '120px' })
+// 根据类型和标签估算合理的初始宽度
+const getEstimatedWidth = () => {
+  if (props.type === 'moment') return '140px' // "碎碎念" 约140px
+  if (activeTab.value === 'main') {
+    // "我的博客" / "我的项目" / "我的科研" 约160-180px
+    const typeMap = { blog: '160px', project: '160px', research: '180px', all: '160px' }
+    return typeMap[props.type] || '160px'
+  }
+  return '120px' // "所思所想" 约120px
+}
+
+const tabBackgroundTransform = ref({ transform: 'translateX(0)', width: getEstimatedWidth() })
 
 const updateTabBackground = async () => {
+  // 先设置一个合理的估算值，避免初始显示时太小
+  const estimatedWidth = getEstimatedWidth()
+  tabBackgroundTransform.value = { transform: 'translateX(0)', width: estimatedWidth }
+
+  // 等待DOM完全渲染后再精确计算
   await nextTick()
-  tabBackgroundTransform.value = computeTabStyle()
+  // 使用 requestAnimationFrame 确保在浏览器下一次重绘前计算
+  await new Promise(resolve => requestAnimationFrame(resolve))
+  await nextTick()
+
+  // 精确计算位置和宽度
+  const computedStyle = computeTabStyle()
+  // 只有当计算结果有效时才更新（避免宽度为0的情况）
+  if (computedStyle.width !== '0px' && computedStyle.width !== estimatedWidth) {
+    tabBackgroundTransform.value = computedStyle
+  }
 }
 
 watch([activeTab, () => props.type, totalArticles], updateTabBackground)
 
 onMounted(async () => {
   displayedText.value = props.typingText
+  // 先设置初始估算值，避免显示时太小
+  tabBackgroundTransform.value = { transform: 'translateX(0)', width: getEstimatedWidth() }
+
   await loadThoughtsContent() // 加载所思所想内容
   const articleNum = await fetchArticlesNum()
   totalPage.value = Math.ceil(articleNum / limit)
   await loadPage(1)
-  // 初次计算标签高亮位置
+
+  // 等待所有内容渲染完成后再精确计算标签高亮位置
+  // 使用多层 nextTick 和 requestAnimationFrame 确保DOM完全准备好
+  await nextTick()
+  await new Promise(resolve => requestAnimationFrame(resolve))
+  await nextTick()
   updateTabBackground()
+
   // 监听窗口大小变化
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', handleResize)
@@ -529,6 +580,8 @@ onBeforeUnmount(() => {
   border-bottom: none;
   transition: transform 0.3s ease, width 0.3s ease;
   z-index: 1;
+  /* 设置最小宽度，确保初始显示时能包裹文字 */
+  min-width: 120px;
 }
 
 .tab-item {

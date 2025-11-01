@@ -21,25 +21,29 @@
         <!-- 分割线 -->
         <div class="divider"></div>
 
-        <!-- 四个互动按钮 -->
+        <!-- 四个互动按钮和编辑按钮 -->
         <div class="engagement-buttons">
           <div class="left-buttons">
-            <button class="like-btn">
-              <font-awesome-icon icon="heart" />
-              <span>0</span>
+            <button class="like-btn" :class="{ liked: isLiked }" @click="handleLike">
+              <font-awesome-icon :icon="isLiked ? 'heart' : ['far', 'heart']" />
+              <span>{{ likeCount }}</span>
             </button>
-            <button class="subscribe-btn">
+            <button class="subscribe-btn" @click="handleSubscribe">
               <font-awesome-icon icon="bookmark" />
               <span>订阅</span>
             </button>
           </div>
 
           <div class="right-buttons">
-            <button class="comment-btn">
+            <button v-if="user.level >= 3" class="edit-btn" @click="goToEdit">
+              <font-awesome-icon icon="pen-to-square" />
+              <span>编辑</span>
+            </button>
+            <button class="comment-btn" @click="scrollToComments">
               <font-awesome-icon icon="comment" />
               <span>{{ comments.length }}</span>
             </button>
-            <button class="share-btn" @click="toggleShareMenu">
+            <button class="share-btn" @click="handleShare">
               <font-awesome-icon icon="share" />
             </button>
           </div>
@@ -100,36 +104,6 @@
           </div>
         </div>
       </article>
-
-      <!-- 分享菜单 -->
-      <div v-if="showShareMenu" class="share-menu" @click.stop>
-        <div class="share-platforms">
-          <button class="share-platform-btn weibo" title="分享到微博" @click="shareToSocial('weibo')">
-            <span class="platform-icon">📱</span>
-            <span>微博</span>
-          </button>
-          <button class="share-platform-btn qq" title="分享到QQ" @click="shareToSocial('qq')">
-            <span class="platform-icon">💬</span>
-            <span>QQ</span>
-          </button>
-          <button class="share-platform-btn wechat" title="分享到微信" @click="shareToSocial('wechat')">
-            <span class="platform-icon">💚</span>
-            <span>微信</span>
-          </button>
-          <button class="share-platform-btn twitter" title="分享到Twitter" @click="shareToSocial('twitter')">
-            <span class="platform-icon">🐦</span>
-            <span>Twitter</span>
-          </button>
-          <button class="share-platform-btn facebook" title="分享到Facebook" @click="shareToSocial('facebook')">
-            <span class="platform-icon">📘</span>
-            <span>Facebook</span>
-          </button>
-          <button class="share-platform-btn copy" title="复制链接" @click="copyToClipboard()">
-            <span class="platform-icon">🔗</span>
-            <span>复制链接</span>
-          </button>
-        </div>
-      </div>
 
       <!-- 相关文章推荐 -->
       <RelatedArticles
@@ -241,12 +215,12 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import { getArticleByID } from '@/api/Articles/browse'
 import { getCommentsByID } from '@/api/Comments/browse'
 import { createComment, deleteComment as deleteCommentAPI } from '@/api/Comments/edit'
-import { showErrorMessage, showSuccessMessage, showWarningMessage } from '@/utils/waifuMessage'
+import { showErrorMessage, showSuccessMessage, showWarningMessage, showCustomMessage } from '@/utils/waifuMessage'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import '@/assets/styles/github-highlight.css'
@@ -270,6 +244,7 @@ const props = defineProps({
 
 const store = useStore()
 const route = useRoute()
+const router = useRouter()
 const user = computed(() => store.state.user)
 
 // 添加复制按钮到代码块
@@ -542,9 +517,38 @@ const scrollToHeading = (id) => {
   }
 }
 
-// 分享功能
-const toggleShareMenu = () => {
-  showShareMenu.value = !showShareMenu.value
+// 点赞功能
+const handleLike = () => {
+  if (isLiked.value) {
+    isLiked.value = false
+    likeCount.value = Math.max(0, likeCount.value - 1)
+  } else {
+    isLiked.value = true
+    likeCount.value += 1
+  }
+}
+
+// 订阅功能
+const handleSubscribe = () => {
+  showCustomMessage('RSS功能取消啦，如果需要可以和我说喔', 5000)
+}
+
+// 分享功能（复制链接）
+const handleShare = async () => {
+  const url = window.location.href
+  const shareText = `${title.value} - ${url}`
+  await copyToClipboard(shareText)
+  showCustomMessage('链接已复制到剪贴板，快去分享给朋友吧～', 4000)
+}
+
+// 滚动到评论区
+const scrollToComments = () => {
+  const commentsSection = document.querySelector('.comments-section')
+  if (commentsSection) {
+    commentsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  } else {
+    showWarningMessage('评论区域未找到')
+  }
 }
 
 // 切换目录显示功能已移除
@@ -696,57 +700,33 @@ const initializeTocScrollPosition = () => {
   }
 }
 
-const shareToSocial = (platform) => {
-  const url = window.location.href
-  const shareText = `${title.value} - ${window.location.origin}`
-
-  let shareUrl = ''
-
-  switch (platform) {
-    case 'weibo':
-      shareUrl = `https://service.weibo.com/share/share.php?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareText)}`
-      break
-    case 'qq':
-      shareUrl = `https://connect.qq.com/widget/shareqq/index.html?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareText)}`
-      break
-    case 'wechat':
-      // 微信分享需要特殊处理，这里显示提示
-      showWarningMessage('微信分享需要手动复制链接哦～')
-      copyToClipboard()
-      return
-    case 'twitter':
-      shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`
-      break
-    case 'facebook':
-      shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
-      break
-  }
-
-  if (shareUrl) {
-    window.open(shareUrl, '_blank', 'width=600,height=400')
-    showShareMenu.value = false
-  }
-}
-
-const copyToClipboard = async () => {
+const copyToClipboard = async (text = window.location.href) => {
   try {
-    await navigator.clipboard.writeText(window.location.href)
-    showSuccessMessage('copy')
-    showShareMenu.value = false
+    await navigator.clipboard.writeText(text)
   } catch (err) {
     // 降级方案
     const textArea = document.createElement('textarea')
-    textArea.value = window.location.href
+    textArea.value = text
     document.body.appendChild(textArea)
     textArea.select()
     document.execCommand('copy')
     document.body.removeChild(textArea)
-    showSuccessMessage('copy')
-    showShareMenu.value = false
   }
 }
 
-// 编辑文章功能已移除，因为新的布局中没有编辑按钮
+// 跳转到编辑页面
+const goToEdit = () => {
+  const id = props.articleId || route.params.id
+  const type = props.type || route.params.type
+  router.push({
+    path: `/edit/${id}`,
+    query: {
+      contentType: 'article',
+      articleType: type
+    }
+  })
+}
+
 const image = ref('')
 const title = ref('')
 const tags = ref([])
@@ -760,7 +740,8 @@ const replyingTo = ref(null)
 const replyTargetName = ref('')
 const viewCount = ref(0)
 const toc = ref([]) // 文章目录
-const showShareMenu = ref(false) // 显示分享菜单
+const isLiked = ref(false) // 点赞状态
+const likeCount = ref(0) // 点赞数
 const readingTime = ref(null) // 阅读时间估算
 const tocVisible = ref(true) // 目录是否可见
 const contentContainer = ref(null) // 内容容器引用
@@ -888,6 +869,50 @@ const loadDetail = async () => {
   // 后处理：修复没有被正确渲染的粗体语法
   // 将 **text:** 这样的模式手动转换为 <strong>text:</strong>
   renderedContent.value = renderedContent.value.replace(/\*\*([^*:]+:\**)\*\*/g, '<strong>$1</strong>')
+
+  // 为图片添加内联样式，确保在渲染时就有宽度和高度限制，避免闪烁
+  renderedContent.value = renderedContent.value.replace(
+    /<img([^>]*)(style="[^"]*")?([^>]*)>/gi,
+    (match, before, existingStyle, after) => {
+      // 如果已经有style属性，则合并样式
+      if (existingStyle) {
+        const newStyle = existingStyle.replace(/"/g, '') + '; max-width: 80% !important; max-height: 750px !important; width: auto !important; height: auto !important; display: block !important; margin: 20px auto !important; box-sizing: border-box !important;'
+        return `<img${before} style="${newStyle}"${after}>`
+      } else {
+        // 如果没有style属性，则添加新的style属性
+        return `<img${before} style="max-width: 80% !important; max-height: 750px !important; width: auto !important; height: auto !important; display: block !important; margin: 20px auto !important; box-sizing: border-box !important;"${after}>`
+      }
+    }
+  )
+
+  // 在渲染后通过 nextTick 为正文中的图片添加错误处理
+  // 这样即使封面图片和正文图片URL相同，也不会互相影响
+  nextTick(() => {
+    // 延迟执行，确保 DOM 完全渲染
+    setTimeout(() => {
+      const markdownBody = document.querySelector('.markdown-body')
+      if (markdownBody) {
+        const images = markdownBody.querySelectorAll('img')
+        images.forEach(img => {
+          // 避免重复添加，也避免覆盖封面图片的错误处理
+          if (!img.dataset.errorHandlerAdded && !img.classList.contains('article-image')) {
+            img.dataset.errorHandlerAdded = 'true'
+            img.addEventListener('error', () => {
+              img.style.display = 'none'
+            })
+            // 确保图片样式正确应用（内联样式优先级最高）
+            img.style.setProperty('max-width', '80%', 'important')
+            img.style.setProperty('max-height', '750px', 'important')
+            img.style.setProperty('width', 'auto', 'important')
+            img.style.setProperty('height', 'auto', 'important')
+            img.style.setProperty('display', 'block', 'important')
+            img.style.setProperty('margin', '20px auto', 'important')
+            img.style.setProperty('box-sizing', 'border-box', 'important')
+          }
+        })
+      }
+    }, 100)
+  })
 
   // 更新SEO信息
   const articleData = {
@@ -1130,13 +1155,6 @@ onMounted(async () => {
     console.warn('ArticleDetail - 组件初始化时ID无效，跳过数据加载')
   }
 
-  // 点击外部关闭分享菜单
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.share-item')) {
-      showShareMenu.value = false
-    }
-  })
-
   // 添加滚动监听器（使用防抖优化性能）
   const debouncedHandleScroll = debounceScroll(handleScroll, 16)
   window.addEventListener('scroll', debouncedHandleScroll, { passive: true })
@@ -1359,7 +1377,7 @@ const fixResidualBoldInDOM = () => {
   gap: 15px;
 }
 
-.like-btn, .subscribe-btn, .comment-btn, .share-btn {
+.like-btn, .subscribe-btn, .comment-btn, .share-btn, .edit-btn {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1373,7 +1391,7 @@ const fixResidualBoldInDOM = () => {
   transition: all 0.3s ease;
 }
 
-.like-btn:hover, .subscribe-btn:hover, .comment-btn:hover, .share-btn:hover {
+.like-btn:hover, .subscribe-btn:hover, .comment-btn:hover, .share-btn:hover, .edit-btn:hover {
   background: #f8f9fa;
   border-color: #d0d0d0;
   color: #333;
@@ -1381,6 +1399,29 @@ const fixResidualBoldInDOM = () => {
 
 .like-btn svg {
   color: #ff6b6b;
+  transition: all 0.3s ease;
+}
+
+.like-btn.liked svg {
+  color: #ff4757;
+  animation: likeAnimation 0.5s ease;
+}
+
+@keyframes likeAnimation {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.like-btn.liked {
+  border-color: #ff4757;
+  background: rgba(255, 71, 87, 0.1);
 }
 
 .subscribe-btn svg {
@@ -1393,6 +1434,14 @@ const fixResidualBoldInDOM = () => {
 
 .share-btn svg {
   color: #50c878;
+}
+
+.edit-btn svg {
+  color: #a855f7;
+}
+
+.edit-btn:hover svg {
+  color: #7c3aed;
 }
 
 /* 文章统计信息 */
@@ -1448,10 +1497,13 @@ const fixResidualBoldInDOM = () => {
   background: transparent !important; /* 覆盖github-markdown.css中的白色背景 */
 }
 
-/* 文章内容中的图片样式 */
+/* 文章内容中的图片样式 - 宽度不超过容器80%，高度不超过750px，居中显示 */
+.article-content .markdown-body img,
+.content-container .markdown-body img,
+.detail-view .markdown-body img,
 .markdown-body img {
   max-width: 80% !important;
-  max-height: 400px !important;
+  max-height: 750px !important;
   width: auto !important;
   height: auto !important;
   display: block !important;
@@ -1459,6 +1511,7 @@ const fixResidualBoldInDOM = () => {
   border-radius: 8px !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
   object-fit: contain !important;
+  box-sizing: border-box !important;
 }
 
 .markdown-body * {

@@ -29,8 +29,8 @@
             </div>
           </div>
           <div class="image-actions">
-            <button class="btn-copy" title="复制链接" @click="copyUrl(image)">
-              <font-awesome-icon icon="link" />
+            <button class="btn-view" title="查看引用" @click="viewReferences(image)">
+              <font-awesome-icon icon="eye" />
             </button>
             <button class="btn-delete" title="删除" @click="deleteImage(image)">
               <font-awesome-icon icon="trash" />
@@ -38,6 +38,27 @@
           </div>
         </div>
       </div>
+
+      <!-- 删除确认对话框 -->
+      <Teleport to="body">
+        <transition name="modal-fade">
+          <div v-if="showDeleteConfirm" class="delete-confirm-overlay" @click="cancelDelete">
+            <div class="delete-confirm-container" @click.stop>
+              <div class="delete-confirm-header">
+                <h3>确认删除</h3>
+              </div>
+              <div class="delete-confirm-body">
+                <p>确定要删除 <strong>{{ deleteTargetImage?.name }}</strong> 吗？</p>
+                <p class="warning-text">⚠️ 此操作不可撤销！</p>
+              </div>
+              <div class="delete-confirm-actions">
+                <button class="btn-cancel" @click="cancelDelete">取消</button>
+                <button class="btn-confirm-delete" @click="confirmDelete">删除</button>
+              </div>
+            </div>
+          </div>
+        </transition>
+      </Teleport>
 
       <!-- 翻页组件 -->
       <div v-if="images.length > 0" class="pagination">
@@ -78,15 +99,21 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeMount } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import NavBar from '@/components/NavBar.vue'
 import apiConfig from '@/config/api'
-import { showSuccessMessage, showErrorMessage } from '@/utils/waifuMessage'
+import { showSuccessMessage, showErrorMessage, showWarningMessage, showCustomMessage } from '@/utils/waifuMessage'
 import { requestFunc } from '@/api/req'
+
+const router = useRouter()
+const route = useRoute()
 
 const images = ref([])
 const loading = ref(true)
 const previewingImage = ref(null)
+const showDeleteConfirm = ref(false)
+const deleteTargetImage = ref(null)
 
 // 翻页相关
 const currentPage = ref(1)
@@ -100,10 +127,22 @@ const paginatedImages = computed(() => {
   return images.value.slice(start, end)
 })
 
+// 从路由恢复状态（返回时恢复页码）
+onBeforeMount(() => {
+  if (route.query.page) {
+    const page = parseInt(route.query.page)
+    if (page >= 1) {
+      currentPage.value = page
+    }
+  }
+})
+
 // 翻页方法
 const goToPage = (page) => {
   if (page >= 1 && page <= totalPages.value) {
     currentPage.value = page
+    // 更新URL以便返回时恢复
+    router.replace({ query: { ...route.query, page } })
   }
 }
 
@@ -160,28 +199,78 @@ const getImageUrl = (path) => {
   return apiConfig.baseURL + path
 }
 
-// 复制URL
-const copyUrl = async (image) => {
-  const url = getImageUrl(image.path)
+// 查看引用
+const viewReferences = async (image) => {
   try {
-    await navigator.clipboard.writeText(url)
-    showSuccessMessage('copy')
+    loading.value = true
+    const response = await requestFunc(`/images/usages?path=${encodeURIComponent(image.path)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }, true) // 需要token
+
+    if (!response) {
+      return
+    }
+
+    const usages = response.data.usages || []
+    if (usages.length === 0) {
+      showWarningMessage('该图片未被使用')
+      return
+    }
+
+    // 如果有多个引用，显示第一个；如果有多个，可以后续改进为选择列表
+    const usage = usages[0]
+
+    // 保存当前状态到sessionStorage，以便返回时恢复
+    sessionStorage.setItem('imageManageState', JSON.stringify({
+      page: currentPage.value,
+      path: route.path
+    }))
+
+    // 根据类型跳转
+    if (usage.type === 'blog') {
+      router.push(`/blog/${usage.id}`)
+    } else if (usage.type === 'research') {
+      router.push(`/research/${usage.id}`)
+    } else if (usage.type === 'project') {
+      router.push(`/project/${usage.id}`)
+    } else if (usage.type === 'moment') {
+      router.push(`/moments/${usage.id}`)
+    } else if (usage.type === 'media') {
+      // 书影集：统一跳转到书影集界面（/fragments/novels），并传递mediaId以便打开详情框
+      router.push({
+        path: '/fragments/novels',
+        query: { mediaId: usage.id }
+      })
+    }
   } catch (error) {
-    // 降级方案
-    const textarea = document.createElement('textarea')
-    textarea.value = url
-    document.body.appendChild(textarea)
-    textarea.select()
-    document.execCommand('copy')
-    document.body.removeChild(textarea)
-    showSuccessMessage('copy')
+    console.error('获取图片引用失败:', error)
+    showErrorMessage('获取图片引用失败')
+  } finally {
+    loading.value = false
   }
 }
 
 // 删除图片
-const deleteImage = async (image) => {
-  const confirmed = confirm(`确定要删除 "${image.name}" 吗？\n\n⚠️ 此操作不可撤销！`)
-  if (!confirmed) return
+const deleteImage = (image) => {
+  deleteTargetImage.value = image
+  showDeleteConfirm.value = true
+}
+
+// 取消删除
+const cancelDelete = () => {
+  showDeleteConfirm.value = false
+  deleteTargetImage.value = null
+}
+
+// 确认删除
+const confirmDelete = async () => {
+  if (!deleteTargetImage.value) return
+
+  const image = deleteTargetImage.value
+  showDeleteConfirm.value = false
 
   try {
     const response = await requestFunc('/images', {
@@ -199,11 +288,40 @@ const deleteImage = async (image) => {
       return
     }
 
+    // 检查是否删除成功
+    if (response.error === 'Image is in use') {
+      // 图片正在被使用，显示详细的使用情况
+      let usageMsg = '该图片正在被使用，无法删除：\n'
+      if (response.usageList && Array.isArray(response.usageList)) {
+        usageMsg += response.usageList.join('、')
+      } else if (response.message) {
+        usageMsg += response.message
+      }
+      showCustomMessage(usageMsg, 6000)
+      showErrorMessage('该图片正在被文章或媒体使用，无法删除。请先移除相关引用后再试。')
+      return
+    }
+
+    // 删除成功
     images.value = images.value.filter(img => img.path !== image.path)
     showSuccessMessage('delete')
   } catch (error) {
     console.error('删除图片失败:', error)
-    showErrorMessage(error)
+    // 检查是否是图片正在使用的错误
+    if (error.response && error.response.data && error.response.data.error === 'Image is in use') {
+      let usageMsg = '该图片正在被使用，无法删除：\n'
+      if (error.response.data.usageList && Array.isArray(error.response.data.usageList)) {
+        usageMsg += error.response.data.usageList.join('、')
+      } else if (error.response.data.message) {
+        usageMsg += error.response.data.message
+      }
+      showCustomMessage(usageMsg, 6000)
+      showErrorMessage('该图片正在被文章或媒体使用，无法删除。请先移除相关引用后再试。')
+    } else {
+      showErrorMessage(error)
+    }
+  } finally {
+    deleteTargetImage.value = null
   }
 }
 
@@ -217,8 +335,24 @@ const closePreview = () => {
   previewingImage.value = null
 }
 
+// 恢复页面状态（从其他页面返回时）
 onMounted(() => {
   loadImages()
+
+  // 检查是否从其他页面返回，恢复页码
+  const savedState = sessionStorage.getItem('imageManageState')
+  if (savedState) {
+    try {
+      const state = JSON.parse(savedState)
+      if (state.page) {
+        currentPage.value = parseInt(state.page)
+      }
+      // 清除保存的状态
+      sessionStorage.removeItem('imageManageState')
+    } catch (e) {
+      console.error('恢复页面状态失败:', e)
+    }
+  }
 })
 </script>
 
@@ -366,16 +500,16 @@ onMounted(() => {
   transition: all 0.3s ease;
 }
 
-.btn-copy {
-  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+.btn-view {
+  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
   color: white;
-  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
 }
 
-.btn-copy:hover {
-  background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+.btn-view:hover {
+  background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+  box-shadow: 0 8px 25px rgba(33, 150, 243, 0.4);
 }
 
 .btn-delete {
@@ -571,5 +705,114 @@ onMounted(() => {
     font-size: 1rem;
     padding: 0.8rem 1.5rem;
   }
+}
+
+/* 删除确认对话框样式 */
+.delete-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 2rem;
+}
+
+.delete-confirm-container {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.delete-confirm-header {
+  margin-bottom: 1.5rem;
+}
+
+.delete-confirm-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.delete-confirm-body {
+  margin-bottom: 2rem;
+}
+
+.delete-confirm-body p {
+  margin: 0.5rem 0;
+  color: #666;
+  line-height: 1.6;
+}
+
+.delete-confirm-body strong {
+  color: #333;
+  font-weight: 600;
+}
+
+.warning-text {
+  color: #f44336 !important;
+  font-weight: 600;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.btn-cancel,
+.btn-confirm-delete {
+  padding: 0.75rem 2rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-cancel {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.btn-cancel:hover {
+  background: #d0d0d0;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-confirm-delete {
+  background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+}
+
+.btn-confirm-delete:hover {
+  background: linear-gradient(135deg, #da190b 0%, #c62828 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(244, 67, 54, 0.4);
+}
+
+/* 模态框动画 */
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
 }
 </style>
