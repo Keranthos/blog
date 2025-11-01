@@ -27,6 +27,9 @@ build/
 .env.local
 .env.production
 
+# 后端配置文件（包含敏感信息）
+backend/config/config.yml
+
 # 日志文件
 *.log
 logs/

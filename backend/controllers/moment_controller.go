@@ -118,6 +118,27 @@ func UpdateMoment(c *gin.Context) {
 func DeleteMoment(c *gin.Context) {
 	id := c.Param("id")
 
+	// 先获取碎碎念信息，以便删除相关图片
+	var moment models.Moment
+	if err := config.DB.Where("id = ?", id).First(&moment).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Moment not found"})
+		return
+	}
+
+	// 删除封面图片
+	if moment.Image != "" {
+		utils.DeleteImageFileSafely(moment.Image)
+	}
+
+	// 从内容中提取并删除所有图片
+	if moment.Content != "" {
+		imageURLs := utils.ExtractImageURLsFromContent(moment.Content)
+		for _, imgURL := range imageURLs {
+			utils.DeleteImageFileSafely(imgURL)
+		}
+	}
+
+	// 删除碎碎念记录
 	if err := config.DB.Delete(&models.Moment{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete moment"})
 		return

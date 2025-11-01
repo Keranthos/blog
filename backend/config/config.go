@@ -1,7 +1,6 @@
 package config
 
 import (
-	"backend/middlewares"
 	"backend/models"
 	"fmt"
 	"log"
@@ -107,8 +106,7 @@ func InitDB() error { // 初始化全局连接池DB
 		// 索引创建失败不影响程序运行，仅记录警告
 	}
 
-	// 启用慢查询监控
-	middlewares.SlowQueryMonitor(DB)
+	// 注意：慢查询监控在 main.go 中初始化，避免循环依赖
 
 	return nil
 }

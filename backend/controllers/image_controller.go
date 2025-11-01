@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"backend/config"
+	"backend/models"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -68,6 +71,363 @@ func GetImages(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"images": images})
 }
 
+// ImageUsage 图片使用位置信息
+type ImageUsage struct {
+	Type      string `json:"type"`                // "blog", "research", "project", "moment", "media"
+	ID        uint   `json:"id"`                  // 文章/媒体ID
+	Title     string `json:"title"`               // 标题
+	UsageType string `json:"usageType"`           // "cover" 封面, "content" 正文
+	MediaType string `json:"mediaType,omitempty"` // 仅当type为"media"时，值为"novels"/"books"/"movies"
+}
+
+// checkImageInUse 检查图片是否正在被使用（返回简单描述）
+func checkImageInUse(imagePath string) ([]string, error) {
+	var usageList []string
+
+	// 转换为Web路径格式（统一使用正斜杠）
+	webPath := "/" + strings.ReplaceAll(imagePath, "\\", "/")
+
+	// 检查博客文章封面
+	var blogCount int64
+	config.DB.Model(&models.BlogArticle{}).Where("image = ?", webPath).Count(&blogCount)
+	if blogCount > 0 {
+		usageList = append(usageList, fmt.Sprintf("博客文章封面 (%d篇)", blogCount))
+	}
+
+	// 检查博客文章正文内容
+	var blogContentCount int64
+	config.DB.Model(&models.BlogArticle{}).Where("content LIKE ?", "%"+webPath+"%").Count(&blogContentCount)
+	if blogContentCount > 0 {
+		usageList = append(usageList, fmt.Sprintf("博客文章正文 (%d篇)", blogContentCount))
+	}
+
+	// 检查科研文章封面
+	var researchCount int64
+	config.DB.Model(&models.ResearchArticle{}).Where("image = ?", webPath).Count(&researchCount)
+	if researchCount > 0 {
+		usageList = append(usageList, fmt.Sprintf("科研文章封面 (%d篇)", researchCount))
+	}
+
+	// 检查科研文章正文（如果有内容字段）
+	// 注意：ResearchArticle可能没有Content字段，这里先检查Abstract
+	var researchAbstractCount int64
+	config.DB.Model(&models.ResearchArticle{}).Where("abstract LIKE ?", "%"+webPath+"%").Count(&researchAbstractCount)
+	if researchAbstractCount > 0 {
+		usageList = append(usageList, fmt.Sprintf("科研文章摘要 (%d篇)", researchAbstractCount))
+	}
+
+	// 检查项目文章封面
+	var projectCount int64
+	config.DB.Model(&models.ProjectArticle{}).Where("image = ?", webPath).Count(&projectCount)
+	if projectCount > 0 {
+		usageList = append(usageList, fmt.Sprintf("项目文章封面 (%d篇)", projectCount))
+	}
+
+	// 检查媒体（书影集）封面
+	var mediaCount int64
+	config.DB.Model(&models.Media{}).Where("poster = ?", webPath).Count(&mediaCount)
+	if mediaCount > 0 {
+		usageList = append(usageList, fmt.Sprintf("书影集封面 (%d个)", mediaCount))
+	}
+
+	// 检查媒体（书影集）正文内容
+	var mediaReviewCount int64
+	config.DB.Model(&models.Media{}).Where("review LIKE ?", "%"+webPath+"%").Count(&mediaReviewCount)
+	if mediaReviewCount > 0 {
+		usageList = append(usageList, fmt.Sprintf("书影集正文 (%d个)", mediaReviewCount))
+	}
+
+	// 检查随笔封面
+	var momentCount int64
+	config.DB.Model(&models.Moment{}).Where("image = ?", webPath).Count(&momentCount)
+	if momentCount > 0 {
+		usageList = append(usageList, fmt.Sprintf("随笔封面 (%d篇)", momentCount))
+	}
+
+	// 检查随笔内容
+	var momentContentCount int64
+	config.DB.Model(&models.Moment{}).Where("content LIKE ?", "%"+webPath+"%").Count(&momentContentCount)
+	if momentContentCount > 0 {
+		usageList = append(usageList, fmt.Sprintf("随笔正文 (%d篇)", momentContentCount))
+	}
+
+	return usageList, nil
+}
+
+// GetImageUsages 获取图片的所有使用位置（返回详细信息）
+func GetImageUsages(c *gin.Context) {
+	imagePath := c.Query("path")
+	if imagePath == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Image path is required"})
+		return
+	}
+
+	// 转换为Web路径格式（统一使用正斜杠）
+	// 先去掉反斜杠，然后确保以 / 开头
+	webPath := strings.ReplaceAll(imagePath, "\\", "/")
+	if !strings.HasPrefix(webPath, "/") {
+		webPath = "/" + webPath
+	}
+
+	var usages []ImageUsage
+
+	// 调试日志：打印查询的路径
+	fmt.Printf("查询图片路径: %s\n", webPath)
+
+	// 调试：查询一个博客文章的image字段示例，查看实际存储格式
+	var sampleBlog models.BlogArticle
+	if err := config.DB.First(&sampleBlog).Error; err == nil {
+		fmt.Printf("数据库中博客文章image字段示例: %s\n", sampleBlog.Image)
+	}
+
+	// 检查博客文章封面
+	var blogArticles []models.BlogArticle
+	// 尝试多种路径格式进行匹配
+	pathVariations := []string{
+		webPath,
+		strings.TrimPrefix(webPath, "/"),
+		strings.TrimSuffix(webPath, "/"),
+		strings.Trim(strings.TrimPrefix(webPath, "/"), "/"),
+	}
+
+	// 构建查询条件：尝试精确匹配多种路径格式
+	query := config.DB
+	for i, path := range pathVariations {
+		if i == 0 {
+			query = query.Where("image = ?", path)
+		} else {
+			query = query.Or("image = ?", path)
+		}
+	}
+	query.Find(&blogArticles)
+
+	// 如果还是找不到，尝试LIKE模糊匹配
+	if len(blogArticles) == 0 {
+		// 提取文件名（路径的最后一部分）
+		fileName := filepath.Base(webPath)
+		config.DB.Where("image LIKE ?", "%"+fileName+"%").Find(&blogArticles)
+	}
+
+	fmt.Printf("找到博客文章: %d 篇\n", len(blogArticles))
+	for _, article := range blogArticles {
+		usages = append(usages, ImageUsage{
+			Type:      "blog",
+			ID:        article.ID,
+			Title:     article.Title,
+			UsageType: "cover",
+		})
+	}
+
+	// 检查博客文章正文
+	var blogContentArticles []models.BlogArticle
+	config.DB.Where("content LIKE ?", "%"+webPath+"%").Find(&blogContentArticles)
+	for _, article := range blogContentArticles {
+		// 避免重复（如果封面和正文都是同一图片）
+		exists := false
+		for _, u := range usages {
+			if u.Type == "blog" && u.ID == article.ID {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			usages = append(usages, ImageUsage{
+				Type:      "blog",
+				ID:        article.ID,
+				Title:     article.Title,
+				UsageType: "content",
+			})
+		}
+	}
+
+	// 检查科研文章封面
+	var researchArticles []models.ResearchArticle
+	pathVariations = []string{
+		webPath,
+		strings.TrimPrefix(webPath, "/"),
+		strings.TrimSuffix(webPath, "/"),
+		strings.Trim(strings.TrimPrefix(webPath, "/"), "/"),
+	}
+	query = config.DB
+	for i, path := range pathVariations {
+		if i == 0 {
+			query = query.Where("image = ?", path)
+		} else {
+			query = query.Or("image = ?", path)
+		}
+	}
+	query.Find(&researchArticles)
+	if len(researchArticles) == 0 {
+		fileName := filepath.Base(webPath)
+		config.DB.Where("image LIKE ?", "%"+fileName+"%").Find(&researchArticles)
+	}
+	for _, article := range researchArticles {
+		usages = append(usages, ImageUsage{
+			Type:      "research",
+			ID:        article.ID,
+			Title:     article.Title,
+			UsageType: "cover",
+		})
+	}
+
+	// 检查科研文章摘要
+	config.DB.Where("abstract LIKE ?", "%"+webPath+"%").Find(&researchArticles)
+	for _, article := range researchArticles {
+		exists := false
+		for _, u := range usages {
+			if u.Type == "research" && u.ID == article.ID {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			usages = append(usages, ImageUsage{
+				Type:      "research",
+				ID:        article.ID,
+				Title:     article.Title,
+				UsageType: "content",
+			})
+		}
+	}
+
+	// 检查项目文章封面
+	var projectArticles []models.ProjectArticle
+	pathVariations = []string{
+		webPath,
+		strings.TrimPrefix(webPath, "/"),
+		strings.TrimSuffix(webPath, "/"),
+		strings.Trim(strings.TrimPrefix(webPath, "/"), "/"),
+	}
+	query = config.DB
+	for i, path := range pathVariations {
+		if i == 0 {
+			query = query.Where("image = ?", path)
+		} else {
+			query = query.Or("image = ?", path)
+		}
+	}
+	query.Find(&projectArticles)
+	if len(projectArticles) == 0 {
+		fileName := filepath.Base(webPath)
+		config.DB.Where("image LIKE ?", "%"+fileName+"%").Find(&projectArticles)
+	}
+	for _, article := range projectArticles {
+		usages = append(usages, ImageUsage{
+			Type:      "project",
+			ID:        article.ID,
+			Title:     article.Title,
+			UsageType: "cover",
+		})
+	}
+
+	// 检查媒体（书影集）封面
+	var mediaItems []models.Media
+	pathVariations = []string{
+		webPath,
+		strings.TrimPrefix(webPath, "/"),
+		strings.TrimSuffix(webPath, "/"),
+		strings.Trim(strings.TrimPrefix(webPath, "/"), "/"),
+	}
+	query = config.DB
+	for i, path := range pathVariations {
+		if i == 0 {
+			query = query.Where("poster = ?", path)
+		} else {
+			query = query.Or("poster = ?", path)
+		}
+	}
+	query.Find(&mediaItems)
+	if len(mediaItems) == 0 {
+		fileName := filepath.Base(webPath)
+		config.DB.Where("poster LIKE ?", "%"+fileName+"%").Find(&mediaItems)
+	}
+	for _, media := range mediaItems {
+		usages = append(usages, ImageUsage{
+			Type:      "media",
+			ID:        media.ID,
+			Title:     media.Name,
+			UsageType: "cover",
+			MediaType: media.Type, // "novels"/"books"/"movies"
+		})
+	}
+
+	// 检查媒体（书影集）正文内容
+	config.DB.Where("review LIKE ?", "%"+webPath+"%").Find(&mediaItems)
+	for _, media := range mediaItems {
+		exists := false
+		for _, u := range usages {
+			if u.Type == "media" && u.ID == media.ID {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			usages = append(usages, ImageUsage{
+				Type:      "media",
+				ID:        media.ID,
+				Title:     media.Name,
+				UsageType: "content",
+				MediaType: media.Type, // "novels"/"books"/"movies"
+			})
+		}
+	}
+
+	// 检查随笔封面
+	var moments []models.Moment
+	pathVariations = []string{
+		webPath,
+		strings.TrimPrefix(webPath, "/"),
+		strings.TrimSuffix(webPath, "/"),
+		strings.Trim(strings.TrimPrefix(webPath, "/"), "/"),
+	}
+	query = config.DB
+	for i, path := range pathVariations {
+		if i == 0 {
+			query = query.Where("image = ?", path)
+		} else {
+			query = query.Or("image = ?", path)
+		}
+	}
+	query.Find(&moments)
+	if len(moments) == 0 {
+		fileName := filepath.Base(webPath)
+		config.DB.Where("image LIKE ?", "%"+fileName+"%").Find(&moments)
+	}
+	for _, moment := range moments {
+		usages = append(usages, ImageUsage{
+			Type:      "moment",
+			ID:        moment.ID,
+			Title:     moment.Title,
+			UsageType: "cover",
+		})
+	}
+
+	// 检查随笔内容
+	config.DB.Where("content LIKE ?", "%"+webPath+"%").Find(&moments)
+	for _, moment := range moments {
+		exists := false
+		for _, u := range usages {
+			if u.Type == "moment" && u.ID == moment.ID {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			usages = append(usages, ImageUsage{
+				Type:      "moment",
+				ID:        moment.ID,
+				Title:     moment.Title,
+				UsageType: "content",
+			})
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"usages": usages,
+		"count":  len(usages),
+	})
+}
+
 // DeleteImage 删除图片
 func DeleteImage(c *gin.Context) {
 	var req struct {
@@ -92,6 +452,24 @@ func DeleteImage(c *gin.Context) {
 	// 检查文件是否存在
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+		return
+	}
+
+	// 检查图片是否正在被使用
+	usageList, err := checkImageInUse(filePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check image usage"})
+		return
+	}
+
+	if len(usageList) > 0 {
+		usageMsg := "该图片正在被使用，无法删除：\n" + strings.Join(usageList, "\n")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":     "Image is in use",
+			"message":   usageMsg,
+			"usageList": usageList,
+			"userToast": true, // 需要看板娘提示
+		})
 		return
 	}
 

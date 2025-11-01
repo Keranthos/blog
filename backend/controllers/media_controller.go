@@ -4,6 +4,7 @@ import (
 	"backend/config"
 	"backend/models"
 	"backend/utils"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -121,6 +122,28 @@ func UpdateMedia(c *gin.Context) {
 
 func DeleteMedia(c *gin.Context) {
 	mediaID := c.Param("mediaId")
+
+	// 先获取媒体信息，以便删除封面图片
+	var media models.Media
+	if err := config.DB.Where("id = ?", mediaID).First(&media).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Media not found"})
+		return
+	}
+
+	// 删除封面图片
+	if media.Poster != "" {
+		utils.DeleteImageFileSafely(media.Poster)
+	}
+
+	// 从评论内容中提取并删除所有图片（如果有Review字段包含图片）
+	if media.Review != "" {
+		imageURLs := utils.ExtractImageURLsFromContent(media.Review)
+		for _, imgURL := range imageURLs {
+			utils.DeleteImageFileSafely(imgURL)
+		}
+	}
+
+	// 删除媒体记录
 	if err := config.DB.Where("id = ?", mediaID).Delete(&models.Media{}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete media"})
 		return
@@ -139,20 +162,45 @@ func MigrateMediaImages(c *gin.Context) {
 
 	migrated := 0
 	failed := 0
+	skipped := 0
+
 	for i := range items {
 		m := &items[i]
-		if local, err := utils.FetchAndStoreImageTo(m.Poster, "media"); err == nil && local != m.Poster {
+		if m.Poster == "" {
+			skipped++
+			continue
+		}
+
+		// 只处理外链图片，本地图片跳过
+		if !utils.IsExternalImageURL(m.Poster) {
+			skipped++
+			continue
+		}
+
+		// 本地化外链图片
+		local, err := utils.FetchAndStoreImageTo(m.Poster, "media")
+		if err != nil {
+			failed++
+			continue
+		}
+
+		// 只有当返回的路径与原始路径不同时才更新（说明已经下载并保存）
+		if local != m.Poster {
 			if err := config.DB.Model(&models.Media{}).Where("id = ?", m.ID).Update("poster", local).Error; err == nil {
 				migrated++
 			} else {
 				failed++
 			}
+		} else {
+			skipped++
 		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"migrated": migrated,
 		"failed":   failed,
+		"skipped":  skipped,
 		"total":    len(items),
+		"message":  fmt.Sprintf("迁移完成：成功 %d 个，失败 %d 个，跳过 %d 个", migrated, failed, skipped),
 	})
 }

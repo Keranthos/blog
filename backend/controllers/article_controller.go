@@ -342,6 +342,54 @@ func DeleteArticle(c *gin.Context) {
 	id := c.Param("id")
 	articleType := c.Query("type")
 
+	var imageField string
+	var contentField string
+
+	// 先获取文章信息，以便删除相关图片
+	switch articleType {
+	case "blog":
+		var blog models.BlogArticle
+		if err := config.DB.Where("id = ?", id).First(&blog).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})
+			return
+		}
+		imageField = blog.Image
+		contentField = blog.Content
+	case "research":
+		var research models.ResearchArticle
+		if err := config.DB.Where("id = ?", id).First(&research).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})
+			return
+		}
+		imageField = research.Image
+		contentField = research.Abstract // 科研文章可能没有Content字段
+	case "project":
+		var project models.ProjectArticle
+		if err := config.DB.Where("id = ?", id).First(&project).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})
+			return
+		}
+		imageField = project.Image
+		contentField = "" // 项目文章可能没有Content字段
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})
+		return
+	}
+
+	// 删除封面图片
+	if imageField != "" {
+		utils.DeleteImageFileSafely(imageField)
+	}
+
+	// 从内容中提取并删除所有图片
+	if contentField != "" {
+		imageURLs := utils.ExtractImageURLsFromContent(contentField)
+		for _, imgURL := range imageURLs {
+			utils.DeleteImageFileSafely(imgURL)
+		}
+	}
+
+	// 删除文章
 	switch articleType {
 	case "blog":
 		if err := config.DB.Delete(&models.BlogArticle{}, id).Error; err != nil {
@@ -358,9 +406,6 @@ func DeleteArticle(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete article"})
 			return
 		}
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})
-		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Article deleted"})

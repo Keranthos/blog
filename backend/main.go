@@ -2,6 +2,7 @@ package main
 
 import (
 	"backend/config"
+	"backend/middlewares"
 	"backend/routes"
 	"log"
 	"os"
@@ -22,6 +23,9 @@ func main() {
 	if err := config.InitDB(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
+
+	// 启用慢查询监控（在数据库初始化后调用，避免循环依赖）
+	middlewares.SlowQueryMonitor(config.DB)
 
 	// 设置路由
 	r := routes.SetupRouter()

@@ -21,7 +21,12 @@ func SetupRouter() *gin.Engine {
 
 	// 自定义 CORS 配置
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:3002"}, // 允许的前端地址
+		AllowOrigins: []string{
+			"http://localhost:3000",
+			"http://localhost:3002",
+			"https://keranthos.me",
+			"https://www.keranthos.me",
+		}, // 允许的前端地址
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"}, // 允许的请求头
 		AllowCredentials: true,                                                                              // 允许携带凭证（如 cookies 或授权头）
@@ -86,6 +91,7 @@ func SetupRouter() *gin.Engine {
 
 		// 图片管理相关路由
 		api.GET("/images", middlewares.Auth(3), controllers.GetImages)                       // 获取图片列表需要管理员权限
+		api.GET("/images/usages", middlewares.Auth(3), controllers.GetImageUsages)           // 获取图片使用位置需要管理员权限
 		api.DELETE("/images", middlewares.Auth(3), controllers.DeleteImage)                  // 删除图片需要管理员权限
 		api.POST("/random-image", middlewares.Auth(1), controllers.GetRandomImage)           // 获取随机图片需要用户权限
 		api.POST("/upload/custom-image", middlewares.Auth(1), controllers.CustomImageUpload) // 上传自定义图片需要用户权限
