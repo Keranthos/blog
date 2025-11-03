@@ -1,172 +1,118 @@
-# 部署步骤指南（针对 keranthos.me - 阿里云服务器）
+# 部署步骤指南（方案A：本地构建 + 服务器部署文件）
 
 ## 服务器信息
 - **域名**: keranthos.me
 - **服务器IP**: 47.242.6.37
 - **云服务商**: 阿里云
 - **CDN**: Cloudflare（已配置）
+- **系统**: Alibaba Cloud Linux / CentOS（使用yum）
 
-## 第一步：连接服务器并初始化环境
+## 📋 方案说明
 
-### 1.1 连接到服务器
+**本方案采用本地构建、服务器仅部署文件的方式：**
+- ✅ 服务器不需要安装 Node.js、npm、Go 编译器
+- ✅ 节省服务器内存（约节省800MB-1.7GB）
+- ✅ 安全性更高（生产环境无开发工具）
+- ✅ 构建速度更快（本地通常比服务器快）
+
+---
+
+## 第一部分：服务器环境准备
+
+### 步骤1：连接服务器
+
 ```bash
 ssh root@47.242.6.37
 # 或使用密钥（如果配置了）
 ssh -i ~/.ssh/your_key root@47.242.6.37
 ```
 
-### 1.2 检查系统类型
-```bash
-# 查看系统信息
-cat /etc/os-release
-# 或
-uname -a
-```
+### 步骤2：更新系统
 
-**常见阿里云系统类型：**
-- **Alibaba Cloud Linux** 或 **Aliyun Linux**（基于CentOS，使用yum）
-- **Ubuntu**（使用apt）
-- **CentOS**（使用yum）
-
-### 1.3 更新系统
-
-**如果是 Aliyun Linux / CentOS（使用yum）：**
 ```bash
 yum update -y
-# 阿里云通常已经配置好国内镜像源，速度较快
 ```
 
-**如果是 Ubuntu（使用apt）：**
+### 步骤3：安装基础工具
+
 ```bash
-apt update && apt upgrade -y
-# 如果速度慢，可以切换到阿里云镜像源
+yum install -y curl wget git vim unzip
 ```
 
-### 1.4 安装必要软件
+### 步骤4：安装 Nginx
 
-#### 安装基础工具
-
-**Aliyun Linux / CentOS:**
-```bash
-yum install -y curl wget git vim
-```
-
-**Ubuntu:**
-```bash
-apt install -y curl wget git vim
-```
-
-#### 安装 Nginx
-
-**Aliyun Linux / CentOS:**
 ```bash
 yum install -y nginx
 systemctl start nginx
 systemctl enable nginx
 ```
 
-**Ubuntu:**
+验证 Nginx 是否运行：
 ```bash
-apt install -y nginx
-systemctl start nginx
-systemctl enable nginx
+systemctl status nginx
+curl http://localhost
+# 应该能看到 Nginx 默认页面
 ```
 
-#### 安装 MySQL（推荐使用 MariaDB，兼容MySQL）
+### 步骤5：安装数据库
 
-**Aliyun Linux / CentOS:**
+**说明：** 
+- 后端代码使用 `gorm.io/driver/mysql`（MySQL驱动）
+- MariaDB 完全兼容 MySQL 协议和语法，可以直接使用
+- 在 CentOS/Alibaba Cloud Linux 中，默认 yum 源提供的是 **MariaDB**（而不是 MySQL）
+- 两者在代码层面**完全相同**，无需修改任何代码
+
+**选择方案A：安装 MariaDB（推荐，默认源，安装简单）**
+
 ```bash
 # 安装 MariaDB（MySQL的替代，完全兼容）
 yum install -y mariadb-server mariadb
 systemctl start mariadb
 systemctl enable mariadb
-mysql_secure_installation  # 按提示设置root密码
+
+# 初始化数据库（设置root密码）
+mysql_secure_installation
 ```
 
-**Ubuntu:**
-```bash
-apt install -y mysql-server
-systemctl start mysql
-systemctl enable mysql
-mysql_secure_installation  # 按提示设置root密码
-```
-
-**注意：** MariaDB的命令是 `mysql` 而不是 `mysqld`，其他使用方式相同。
-
-#### 安装 Go
+**选择方案B：安装 MySQL（如果需要官方 MySQL）**
 
 ```bash
-# 下载 Go 1.21+ (根据你的go.mod版本，从阿里云镜像下载更快)
-# 方式1：使用阿里云镜像（推荐，速度快）
-wget https://mirrors.aliyun.com/golang/go1.21.5.linux-amd64.tar.gz
+# 添加 MySQL 官方仓库
+wget https://dev.mysql.com/get/mysql80-community-release-el7-3.noarch.rpm
+rpm -ivh mysql80-community-release-el7-3.noarch.rpm
 
-# 方式2：官方源（如果镜像不可用）
-# wget https://go.dev/dl/go1.21.5.linux-amd64.tar.gz
+# 安装 MySQL 8.0
+yum install -y mysql-community-server
+systemctl start mysqld
+systemctl enable mysqld
 
-rm -rf /usr/local/go && tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz
+# 获取临时密码
+grep 'temporary password' /var/log/mysqld.log
 
-# 添加到 PATH
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-source ~/.bashrc
-
-# 验证
-go version
-
-# 配置 Go 代理（使用阿里云镜像，加速依赖下载）
-go env -w GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
-go env -w GOSUMDB=off  # 可选：关闭校验（如果网络不稳定）
+# 使用临时密码登录并修改
+mysql -u root -p
+ALTER USER 'root'@'localhost' IDENTIFIED BY '你的新密码';
+# MySQL 8.0 需要设置密码策略
+SET GLOBAL validate_password.policy=LOW;
+SET GLOBAL validate_password.length=8;
 ```
 
-#### 安装 Node.js 和 npm
+**按提示操作（mysql_secure_installation）：**
+- 设置 root 密码（请记住这个密码）
+- 移除匿名用户：Y
+- 禁止 root 远程登录：Y（如果只需要本地登录）
+- 移除测试数据库：Y
+- 重新加载权限表：Y
 
-**Aliyun Linux / CentOS:**
-```bash
-# 使用 NodeSource 仓库（需要先安装 EPEL）
-yum install -y epel-release
+**注意：** MariaDB 和 MySQL 使用的命令相同（都是 `mysql`），后续步骤完全一致。
 
-# 安装 Node.js 18 LTS
-curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
-yum install -y nodejs
+### 步骤6：创建数据库和用户
 
-# 验证
-node -v
-npm -v
-
-# 配置 npm 镜像（使用阿里云镜像，加速下载）
-npm config set registry https://registry.npmmirror.com
-```
-
-**Ubuntu:**
-```bash
-# 使用 NodeSource 仓库安装 Node.js 18 LTS
-curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-apt install -y nodejs
-
-# 验证
-node -v
-npm -v
-
-# 配置 npm 镜像（使用阿里云镜像，加速下载）
-npm config set registry https://registry.npmmirror.com
-```
-
-## 第二步：配置数据库
-
-### 2.1 创建数据库和用户
-
-**如果安装的是 MariaDB（Aliyun Linux/CentOS）：**
 ```bash
 mysql -u root -p
 ```
 
-**如果安装的是 MySQL（Ubuntu）：**
-```bash
-sudo mysql -u root -p
-# 或者
-mysql -u root -p
-```
-
-在 MySQL/MariaDB 中执行：
+在 MySQL 中执行：
 ```sql
 CREATE DATABASE my_blog CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'blog_user'@'localhost' IDENTIFIED BY '你的数据库密码';
@@ -175,187 +121,427 @@ FLUSH PRIVILEGES;
 EXIT;
 ```
 
-### 2.2 测试数据库连接
+测试连接：
 ```bash
 mysql -u blog_user -p my_blog
 # 如果成功连接说明配置正确
 EXIT;
 ```
 
-**注意：** MariaDB 和 MySQL 的使用方式完全相同，代码中无需修改。
+---
 
-## 第三步：上传代码到服务器
+## 第二部分：本地构建（Windows）
 
-### 3.1 创建项目目录
-```bash
-mkdir -p /opt/blog
-cd /opt/blog
-```
+### 步骤1：构建前端
 
-### 3.2 阿里云特殊提示
+在本地 Windows PowerShell 中执行：
 
-**推荐方式：使用阿里云的文件上传功能**
-1. 在阿里云控制台使用 **文件管理** 或 **Workbench** 功能直接上传
-2. 或使用 `scp` 从本地直接上传（如果服务器安全组已开放22端口）
-
-### 3.3 上传代码（选择一种方式）
-
-**方式A：使用 Git（推荐，如果代码已推送到远程仓库）**
-```bash
-git clone https://github.com/your-username/your-blog-repo.git .
-# 或
-git clone https://github.com/your-username/your-blog-repo.git /opt/blog
-```
-
-**方式B：使用 SCP 从本地上传（Windows PowerShell）**
 ```powershell
-# 在本地 Windows PowerShell 执行
-cd D:\blog
+cd D:\blog\frontend
 
-# Windows 使用 Compress-Archive（如果 tar 不可用）
-# 或者先安装 Git Bash，使用其中的 tar 命令
+# 安装依赖（如果还没安装）
+npm install
 
-# 如果有 tar 命令（Git Bash 或 WSL）
-tar -czf blog.tar.gz --exclude='node_modules' --exclude='frontend/node_modules' --exclude='frontend/dist' --exclude='backend/uploads' --exclude='backend/main.exe' --exclude='backend/test-*' --exclude='.git' backend/ frontend/ .gitignore DEPLOYMENT.txt DEPLOY_CHECKLIST.md DEPLOY_STEPS.md
-
-# 上传到服务器
-scp blog.tar.gz root@47.242.6.37:/opt/blog/
-
-# 然后在服务器上解压
-ssh root@47.242.6.37
-cd /opt/blog
-tar -xzf blog.tar.gz
+# 构建生产版本（使用相对路径，通过 Nginx 代理访问 API）
+npm run build
 ```
 
-**如果 Windows 没有 tar 命令：**
+**注意：** 
+- 前端已配置为生产环境自动使用相对路径 `/api`（而不是 `http://localhost:3000/api`）
+- 这样可以通过 Nginx 代理统一访问后端 API
+- 无需设置环境变量，代码会自动检测生产环境
+
+构建完成后，`frontend/dist/` 目录包含所有静态文件。
+
+### 步骤2：编译后端
+
 ```powershell
-# 方法1：使用 Git Bash（如果有 Git）
-# 打开 Git Bash，然后执行上面的 tar 命令
+cd D:\blog\backend
 
-# 方法2：使用 PowerShell 压缩（但无法精确排除，需要手动排除）
-Compress-Archive -Path backend,frontend -DestinationPath blog.zip -Force
-scp blog.zip root@47.242.6.37:/opt/blog/
+# 编译为Linux可执行文件（交叉编译）
+$env:GOOS="linux"
+$env:GOARCH="amd64"
+go build -o main.exe main.go
 
-# 然后在服务器上（需要安装 unzip）
-yum install -y unzip  # Aliyun Linux/CentOS
-# 或
-apt install -y unzip  # Ubuntu
-cd /opt/blog
-unzip blog.zip
+# 或使用 Git Bash（推荐）
+# GOOS=linux GOARCH=amd64 go build -o main main.go
 ```
 
-**方式C：使用 rsync（如果有rsync）**
-```bash
-# 在本地执行
-rsync -avz --exclude 'node_modules' --exclude 'dist' --exclude 'uploads' \
-  ./ root@47.242.6.37:/opt/blog/
+编译完成后，`backend/main.exe`（或 `backend/main`）就是 Linux 可执行文件。
+
+**验证编译结果：**
+```powershell
+file backend/main.exe  # 如果是Git Bash
+# 应该显示：ELF 64-bit LSB executable, x86-64
 ```
 
-## 第四步：配置后端
+---
 
-### 4.1 配置后端配置文件
-```bash
-cd /opt/blog/backend
-vim config/config.yml
-```
+## 第三部分：准备配置文件
 
-更新为生产环境配置：
+### 步骤1：创建服务器端配置文件
+
+在本地创建 `backend/config/config.yml`（参考 `config.yml.example`）：
+
 ```yaml
 app:
   name: "WWJ_Blog"
-  port: "3000" 
+  port: "3000"
 
 database:
   host: "localhost"
   port: "3306"
-  username: "blog_user"  # 改为你创建的用户名
-  password: "你的数据库密码"  # 改为你设置的密码
+  username: "blog_user"
+  password: "你的数据库密码"  # 改为步骤1.6中设置的密码
   name: "my_blog"
 
 jwt:
-  secretkey: "你的JWT密钥_建议使用32位以上随机字符串"  # 改为更强的密钥
+  secretkey: "你的JWT密钥"  # 建议使用 openssl rand -hex 32 生成
   expiration: 86400
 ```
 
-**⚠️ 重要：生成强密钥**
+**生成 JWT 密钥（在 Git Bash 中）：**
 ```bash
-# 生成随机密钥
 openssl rand -hex 32
 # 将输出复制到 config.yml 的 secretkey 字段
 ```
 
-### 4.2 创建必要的目录
+### 步骤2：创建服务器目录结构
+
+在服务器上执行：
+
 ```bash
-cd /opt/blog/backend
-mkdir -p uploads/images/content
-mkdir -p uploads/images/media
-chmod -R 755 uploads
+# 创建项目目录
+mkdir -p /opt/blog/backend
+mkdir -p /opt/blog/backend/uploads/images/content
+mkdir -p /opt/blog/backend/uploads/images/media
+mkdir -p /var/www/blog
+
+# 设置权限
+chmod -R 755 /opt/blog/backend/uploads
 ```
 
-### 4.3 初始化数据库表
-```bash
-cd /opt/blog/backend
+---
 
-# 先确保 go.mod 依赖已安装
-go mod download
+## 第四部分：上传文件到服务器
 
-# 编译并运行一次以触发 AutoMigrate（或创建迁移脚本）
-go run main.go
-# 运行几秒后按 Ctrl+C 停止，表结构应该已经创建
+### 方式A：使用 SCP（推荐）
 
-# 或者直接编译
-go build -o /opt/blog/backend/main .
+在本地 Windows PowerShell 或 Git Bash 中执行：
+
+**首次部署或完整更新：**
+
+```powershell
+# 1. 清理服务器上的旧文件（可选，推荐在首次部署或重大更新时）
+ssh root@47.242.6.37 "rm -rf /var/www/blog/*"
+
+# 2. 上传前端构建文件
+scp -r frontend/dist/* root@47.242.6.37:/var/www/blog/
+
+# 3. 上传后端二进制文件
+scp backend/main root@47.242.6.37:/opt/blog/backend/
+# 或如果文件名为 main.exe
+scp backend/main.exe root@47.242.6.37:/opt/blog/backend/main
+
+# 4. 上传配置文件（如果需要更新）
+scp backend/config/config.yml root@47.242.6.37:/opt/blog/backend/config/
 ```
 
-### 4.4 测试后端运行
+**增量更新（只更新前端，不清除旧文件）：**
+
+```powershell
+# 直接上传新文件（会覆盖同名文件，但不会删除旧文件）
+scp -r frontend/dist/* root@47.242.6.37:/var/www/blog/
+```
+
+**注意：**
+- 首次部署或重大更新时，建议先清理旧文件避免缓存问题
+- 如果只是代码小更新，可以直接覆盖，不需要清理
+- 清理命令会删除 `/var/www/blog/` 下所有文件，确保重要文件已备份
+
+**如果上传失败，检查：**
+1. 阿里云安全组是否开放 22 端口（SSH）
+2. SSH 是否可用：`ssh root@47.242.6.37`
+
+### 方式B：使用阿里云控制台（适合大文件）
+
+1. 在本地压缩文件：
+   ```powershell
+   # 压缩前端
+   Compress-Archive -Path frontend/dist/* -DestinationPath dist.zip
+   
+   # 压缩后端（包含二进制和配置）
+   # 先创建临时目录
+   mkdir temp_backend
+   copy backend\main.exe temp_backend\main
+   copy backend\config\config.yml temp_backend\config.yml
+   Compress-Archive -Path temp_backend/* -DestinationPath backend.zip
+   ```
+
+2. 在阿里云控制台使用 **Workbench** 或 **文件管理** 功能上传
+
+3. 在服务器上解压：
+   ```bash
+   cd /var/www/blog
+   unzip dist.zip
+   
+   cd /opt/blog/backend
+   unzip backend.zip
+   ```
+
+### 步骤：设置后端文件权限
+
+在服务器上执行：
+
 ```bash
 cd /opt/blog/backend
+chmod +x main  # 给可执行文件添加执行权限
+```
+
+---
+
+## 第五部分：初始化数据库
+
+**⚠️ 重要：表结构是在后端程序首次运行时自动创建的，而不是手动创建。必须先运行后端程序！**
+
+**🔒 数据安全说明：**
+- `AutoMigrate` **不会删除**已有数据和表
+- 如果表已存在，只会**添加缺失的列**，不会删除列或数据
+- 如果表不存在，才会创建新表
+- 每次启动时，只是检查和更新表结构（增量更新）
+- **你的文章、评论、媒体等所有数据都是安全的**
+
+### 步骤1：检查必要文件是否存在
+
+在服务器上执行：
+
+```bash
+cd /opt/blog/backend
+
+# 检查文件是否存在
+ls -la main                    # 应该看到可执行文件
+ls -la config/config.yml       # 应该看到配置文件
+
+# 如果文件不存在，说明还没有上传，请先完成"第四部分：上传文件到服务器"
+```
+
+### 步骤2：检查配置文件
+
+```bash
+# 查看配置文件内容（确认数据库配置正确）
+cat config/config.yml
+```
+
+确认以下配置正确：
+- `database.host`: 应该是 `localhost`
+- `database.port`: 应该是 `3306`
+- `database.username`: 应该是 `blog_user`
+- `database.password`: 应该是你创建的密码
+- `database.name`: 应该是 `my_blog`
+
+### 步骤3：首次运行后端以创建表结构
+
+在服务器上执行：
+
+```bash
+cd /opt/blog/backend
+
+# 确保文件有执行权限
+chmod +x main
+
+# 运行后端程序（会输出日志）
 GIN_MODE=release ./main
-# 在另一个终端测试
-curl http://localhost:3000/api/articles?type=blog&page=1&limit=10
-# 如果返回数据说明后端正常，按 Ctrl+C 停止
 ```
 
-## 第五步：构建前端
-
-### 5.1 安装前端依赖
-```bash
-cd /opt/blog/frontend
-npm ci  # 使用 package-lock.json，确保依赖版本一致
+**预期输出（成功的情况）：**
+```
+Created directory: uploads
+Created directory: uploads/images
+开始创建数据库索引...
+数据库索引创建完成
 ```
 
-### 5.2 配置前端环境变量（如果需要）
-```bash
-# 如果前后端同源部署（推荐），则不需要修改
-# 前端会使用相对路径 /api
+**注意：** 
+- 程序会一直运行（这是正常的！），不会自动退出
+- 在生产模式下（`GIN_MODE=release`），路由信息不会显示在日志中
+- 看到"数据库索引创建完成"说明**程序已成功启动，表已经创建**
+- **首次运行会创建表，后续运行只会检查并更新表结构，不会删除任何数据**
 
-# 如果异源部署，创建 .env.production
-echo 'VUE_APP_API_BASE_URL=https://keranthos.me' > .env.production
-echo 'VUE_APP_API_PREFIX=/api' >> .env.production
+**验证程序正在运行：**
+- 在**另一个终端窗口**（或新开一个SSH连接）执行：
+  ```bash
+  # ⚠️ 注意：URL 必须用引号括起来，否则 & 会被 shell 解析
+  curl "http://localhost:3000/api/articles?type=blog&page=1&limit=10"
+  ```
+  - 如果返回 JSON 数据，说明程序正常运行 ✅
+  - 如果返回错误信息（如 `{"error":"..."}`），说明程序在运行，只是参数问题
+  - 如果返回 `curl: (7) Failed to connect`，说明程序可能没有启动
+
+**确认程序正常运行后，在原终端按 `Ctrl+C` 停止程序。**
+
+**如果出现错误：**
+
+**错误1：配置文件不存在或读取失败**
+```
+Error reading config file: ...
+```
+- 检查 `config/config.yml` 是否存在
+- 检查配置文件格式是否正确（YAML格式）
+
+**错误2：数据库连接失败**
+```
+error connecting to database: ...
+```
+- 检查数据库服务是否运行：`systemctl status mariadb`
+- 检查数据库用户名、密码是否正确
+- 测试数据库连接：`mysql -u blog_user -p my_blog`
+
+**错误3：权限不足**
+```
+permission denied
+```
+- 检查文件权限：`chmod +x main`
+- 检查目录权限：`chmod -R 755 /opt/blog/backend`
+
+**运行几秒后，按 `Ctrl+C` 停止后端程序。**
+
+### 步骤4：验证表是否创建
+
+```bash
+mysql -u blog_user -p my_blog
 ```
 
-### 5.3 构建前端
-```bash
-cd /opt/blog/frontend
-npm run build
-# 构建完成后，dist/ 目录包含静态文件
+在 MySQL 中执行：
+```sql
+SHOW TABLES;
 ```
 
-## 第六步：配置 Nginx
+**预期结果（应该看到以下表）：**
+```
++--------------------------+
+| Tables_in_my_blog         |
++--------------------------+
+| blog_articles            |
+| comments                 |
+| media                    |
+| moments                  |
+| presentations            |
+| project_articles         |
+| questions                |
+| research_articles        |
+| users                    |
+| weather                  |
++--------------------------+
+```
 
-### 6.1 创建 Nginx 配置
+**如果 `SHOW TABLES;` 后没有任何显示（Empty set）：**
+
+说明表还没有创建，可能的原因和解决方法：
+
+1. **后端程序还没有运行**
+   - 返回步骤3，运行 `./main` 并确认没有错误
+
+2. **后端程序运行失败**
+   - 检查后端程序输出的错误信息
+   - 重新运行并查看完整日志：`GIN_MODE=release ./main 2>&1 | tee startup.log`
+
+3. **数据库连接失败**
+   ```bash
+   # 测试数据库连接
+   mysql -u blog_user -p my_blog
+   # 如果连接失败，检查：
+   # - 数据库服务：systemctl status mariadb
+   # - 配置文件中的密码是否正确
+   ```
+
+4. **配置文件路径错误**
+   ```bash
+   # 确认配置文件在正确的位置
+   ls -la /opt/blog/backend/config/config.yml
+   # 确认后端程序从正确的工作目录运行
+   cd /opt/blog/backend && pwd
+   ```
+
+5. **数据库用户权限不足**
+   ```bash
+   # 检查用户权限
+   mysql -u root -p
+   SHOW GRANTS FOR 'blog_user'@'localhost';
+   # 如果没有权限，重新授权：
+   GRANT ALL PRIVILEGES ON my_blog.* TO 'blog_user'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+
+**验证成功后：**
+```sql
+EXIT;
+```
+
+### 步骤5：再次验证（可选）
+
+如果想确认表结构是否正确：
+
 ```bash
-vim /etc/nginx/sites-available/keranthos.me
+mysql -u blog_user -p my_blog
+```
+
+```sql
+-- 查看某个表的结构
+DESCRIBE blog_articles;
+
+-- 或查看所有表
+SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'my_blog';
+
+EXIT;
+```
+
+---
+
+## 第六部分：配置 Nginx
+
+### 步骤1：创建 Nginx 配置文件
+
+```bash
+vim /etc/nginx/conf.d/keranthos.me.conf
 ```
 
 配置内容：
 ```nginx
+# 如果使用 Cloudflare 代理，需要先配置真实 IP 获取
+# Cloudflare IP 段（用于信任 CF 的真实 IP 头部）
+# 在 http 块中添加（如果不在 http 块中，也可以放在 server 块之前）
+
+# 在 /etc/nginx/nginx.conf 的 http 块中添加以下配置（如果使用 CF）
+# set_real_ip_from 103.21.244.0/22;
+# set_real_ip_from 103.22.200.0/22;
+# set_real_ip_from 103.31.4.0/22;
+# set_real_ip_from 104.16.0.0/13;
+# set_real_ip_from 104.24.0.0/14;
+# set_real_ip_from 108.162.192.0/18;
+# set_real_ip_from 131.0.72.0/22;
+# set_real_ip_from 141.101.64.0/18;
+# set_real_ip_from 162.158.0.0/15;
+# set_real_ip_from 172.64.0.0/13;
+# set_real_ip_from 173.245.48.0/20;
+# set_real_ip_from 188.114.96.0/20;
+# set_real_ip_from 190.93.240.0/20;
+# set_real_ip_from 197.234.240.0/22;
+# set_real_ip_from 198.41.128.0/17;
+# set_real_ip_from 2400:cb00::/32;
+# set_real_ip_from 2606:4700::/32;
+# set_real_ip_from 2803:f800::/32;
+# set_real_ip_from 2405:b500::/32;
+# set_real_ip_from 2405:8100::/32;
+# set_real_ip_from 2c0f:f248::/32;
+# set_real_ip_from 2a06:98c0::/29;
+# real_ip_header CF-Connecting-IP;
+
 server {
     listen 80;
     server_name keranthos.me www.keranthos.me;
 
     # 前端静态资源
-    root /opt/blog/frontend/dist;
+    root /var/www/blog;
     index index.html;
 
     # 前端路由历史模式支持
@@ -367,9 +553,17 @@ server {
     location /api/ {
         proxy_pass http://127.0.0.1:3000/;
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+        
+        # 真实 IP 获取（如果使用 Cloudflare 代理）
+        # 优先使用 CF-Connecting-IP，如果不存在则使用 X-Forwarded-For
+        proxy_set_header X-Real-IP $http_cf_connecting_ip;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Cloudflare 相关头部（如果使用 CF 代理）
+        proxy_set_header CF-Connecting-IP $http_cf_connecting_ip;
+        proxy_set_header CF-Ray $http_cf_ray;
+        proxy_set_header CF-Visitor $http_cf_visitor;
         
         # WebSocket 支持（如果需要）
         proxy_http_version 1.1;
@@ -377,17 +571,16 @@ server {
         proxy_set_header Connection "upgrade";
     }
 
-    # 后端静态上传文件
-    location /uploads/ {
-        proxy_pass http://127.0.0.1:3000/;
-        proxy_set_header Host $host;
+    # 后端静态上传文件（使用 ^~ 确保优先级高于正则 location）
+    location ^~ /uploads/ {
+        alias /opt/blog/backend/uploads/;
         
         # 缓存设置（可选）
         expires 7d;
         add_header Cache-Control "public, immutable";
     }
 
-    # 静态资源缓存（CSS、JS）
+    # 静态资源缓存（CSS、JS）- /uploads/ 已用 ^~ 排除，不会被此规则匹配
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
         expires 30d;
         add_header Cache-Control "public, immutable";
@@ -401,60 +594,146 @@ server {
 }
 ```
 
-### 6.2 启用站点
+**⚠️ 如果使用 Cloudflare 代理，还需要修改 Nginx 主配置：**
+
+编辑 `/etc/nginx/nginx.conf`，在 `http` 块中添加：
+
+```nginx
+http {
+    # ... 其他配置 ...
+    
+    # Cloudflare 真实 IP 配置（如果使用 CF 代理）
+    # 信任 Cloudflare IP 段，从 CF-Connecting-IP 获取真实 IP
+    include /etc/nginx/cloudflare.conf;  # 或者直接在下面添加 IP 段
+}
+```
+
+创建 Cloudflare IP 配置文件（可选，但推荐）：
 ```bash
-# 创建软链接
-ln -s /etc/nginx/sites-available/keranthos.me /etc/nginx/sites-enabled/
+vim /etc/nginx/cloudflare.conf
+```
 
-# 删除默认站点（可选）
-rm /etc/nginx/sites-enabled/default
+内容：
+```nginx
+# Cloudflare IP 段（2024年更新）
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 104.16.0.0/13;
+set_real_ip_from 104.24.0.0/14;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 131.0.72.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 162.158.0.0/15;
+set_real_ip_from 172.64.0.0/13;
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+# IPv6
+set_real_ip_from 2400:cb00::/32;
+set_real_ip_from 2606:4700::/32;
+set_real_ip_from 2803:f800::/32;
+set_real_ip_from 2405:b500::/32;
+set_real_ip_from 2405:8100::/32;
+set_real_ip_from 2c0f:f248::/32;
+set_real_ip_from 2a06:98c0::/29;
 
+# 从 CF-Connecting-IP 头部获取真实 IP
+real_ip_header CF-Connecting-IP;
+```
+
+**然后在 `/etc/nginx/nginx.conf` 的 `http` 块中添加：**
+```nginx
+include /etc/nginx/cloudflare.conf;
+```
+
+**注意：**
+- 如果**不使用** Cloudflare 代理（仅DNS模式），则不需要添加上述配置
+- 如果**使用** Cloudflare 代理（橙色云朵开启），则建议添加上述配置以正确获取用户真实 IP
+
+### 步骤2：配置 Cloudflare 真实 IP（如果使用 CF 代理）
+
+**如果使用 Cloudflare 代理（橙色云朵开启）：**
+
+1. 创建 Cloudflare IP 配置文件：
+```bash
+vim /etc/nginx/cloudflare.conf
+```
+
+内容：
+```nginx
+# Cloudflare IP 段（2024年更新）
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 104.16.0.0/13;
+set_real_ip_from 104.24.0.0/14;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 131.0.72.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 162.158.0.0/15;
+set_real_ip_from 172.64.0.0/13;
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+# IPv6
+set_real_ip_from 2400:cb00::/32;
+set_real_ip_from 2606:4700::/32;
+set_real_ip_from 2803:f800::/32;
+set_real_ip_from 2405:b500::/32;
+set_real_ip_from 2405:8100::/32;
+set_real_ip_from 2c0f:f248::/32;
+set_real_ip_from 2a06:98c0::/29;
+
+# 从 CF-Connecting-IP 头部获取真实 IP
+real_ip_header CF-Connecting-IP;
+```
+
+2. 在主配置文件中引入：
+```bash
+vim /etc/nginx/nginx.conf
+```
+
+在 `http` 块中添加：
+```nginx
+http {
+    # ... 其他配置 ...
+    
+    # Cloudflare 真实 IP 配置（如果使用 CF 代理）
+    include /etc/nginx/cloudflare.conf;
+    
+    # ... 其他配置 ...
+}
+```
+
+**如果只使用 Cloudflare DNS（不开启代理），可以跳过此步骤。**
+
+### 步骤3：测试并重新加载 Nginx
+
+```bash
 # 测试配置
 nginx -t
 
-# 重新加载 Nginx
+# 重新加载
 systemctl reload nginx
 ```
 
-### 6.3 测试 HTTP 访问
-在浏览器访问 `http://keranthos.me`，应该能看到前端页面（如果后端已启动）。
+### 步骤4：测试 HTTP 访问
 
-## 第七步：配置 HTTPS（SSL证书）
+在浏览器访问 `http://47.242.6.37` 或 `http://keranthos.me`，应该能看到前端页面（如果后端已启动）。
 
-### 7.1 安装 Certbot
-```bash
-apt install -y certbot python3-certbot-nginx
-```
+**注意：** 如果使用 Cloudflare 代理，访问域名会通过 CF，速度可能更快。直接访问 IP 则不会经过 CF。
 
-### 7.2 配置 Cloudflare DNS
-在 Cloudflare 控制台确认：
-- A记录：`keranthos.me` → `47.242.6.37`，代理状态：仅DNS（橙色云朵关闭）
-- A记录：`www.keranthos.me` → `47.242.6.37`，代理状态：仅DNS（橙色云朵关闭）
+---
 
-**⚠️ 重要：申请证书时需要关闭 Cloudflare 代理（仅DNS模式），证书申请成功后再开启。**
+## 第七部分：配置后端服务（Systemd）
 
-### 7.3 申请 SSL 证书
-```bash
-certbot --nginx -d keranthos.me -d www.keranthos.me
-```
+### 步骤1：创建 Systemd 服务文件
 
-按提示操作：
-- 输入邮箱地址
-- 同意服务条款
-- 选择是否共享邮箱（建议选择否）
-- 选择是否重定向 HTTP 到 HTTPS（建议选择是）
-
-### 7.4 测试证书自动续期
-```bash
-certbot renew --dry-run
-```
-
-### 7.5 开启 Cloudflare 代理
-证书申请成功后，在 Cloudflare 控制台将 DNS 记录的代理状态改为：已代理（橙色云朵开启）
-
-## 第八步：配置后端服务（Systemd）
-
-### 8.1 创建 Systemd 服务文件
 ```bash
 vim /etc/systemd/system/blog-backend.service
 ```
@@ -463,7 +742,7 @@ vim /etc/systemd/system/blog-backend.service
 ```ini
 [Unit]
 Description=Blog Backend Service
-After=network.target mysql.service
+After=network.target mariadb.service
 
 [Service]
 Type=simple
@@ -483,7 +762,8 @@ SyslogIdentifier=blog-backend
 WantedBy=multi-user.target
 ```
 
-### 8.2 启用并启动服务
+### 步骤2：启用并启动服务
+
 ```bash
 # 重新加载 systemd
 systemctl daemon-reload
@@ -497,138 +777,221 @@ systemctl start blog-backend
 # 查看状态
 systemctl status blog-backend
 
-# 查看日志
+# 查看日志（实时）
 journalctl -u blog-backend -f
 ```
 
-### 8.3 测试服务
+### 步骤3：测试服务
+
 ```bash
 # 检查服务是否运行
 systemctl status blog-backend
 
 # 测试 API
-curl https://keranthos.me/api/articles?type=blog&page=1&limit=10
+curl http://localhost:3000/api/articles?type=blog&page=1&limit=10
 ```
 
-## 第九步：配置防火墙和安全组
+---
 
-### 9.1 阿里云安全组配置（重要！）
+## 第八部分：配置 HTTPS（SSL证书）
 
-**⚠️ 必须先在阿里云控制台配置安全组规则，否则无法访问！**
+### 步骤1：安装 Certbot
+
+```bash
+# CentOS/Alibaba Cloud Linux 需要先安装 EPEL
+yum install -y epel-release
+yum install -y certbot python3-certbot-nginx
+```
+
+### 步骤2：配置 Cloudflare DNS
+
+在 Cloudflare 控制台确认：
+- A记录：`keranthos.me` → `47.242.6.37`，**代理状态：仅DNS（橙色云朵关闭）**
+- A记录：`www.keranthos.me` → `47.242.6.37`，**代理状态：仅DNS（橙色云朵关闭）**
+
+**⚠️ 重要：申请证书时必须关闭 Cloudflare 代理（仅DNS模式），证书申请成功后再开启。**
+
+### 步骤3：申请 SSL 证书
+
+```bash
+certbot --nginx -d keranthos.me -d www.keranthos.me
+```
+
+按提示操作：
+- 输入邮箱地址
+- 同意服务条款（A）
+- 选择是否共享邮箱（N）
+- 选择是否重定向 HTTP 到 HTTPS（2，推荐选择重定向）
+
+### 步骤4：测试证书自动续期
+
+```bash
+certbot renew --dry-run
+```
+
+### 步骤5：开启 Cloudflare 代理
+
+证书申请成功后，在 Cloudflare 控制台将 DNS 记录的代理状态改为：**已代理（橙色云朵开启）**
+
+---
+
+## 第九部分：配置防火墙和安全组
+
+### 步骤1：阿里云安全组配置（必须！）
+
+**⚠️ 必须在阿里云控制台配置安全组规则，否则无法访问！**
 
 1. 登录 [阿里云控制台](https://ecs.console.aliyun.com)
 2. 进入 **云服务器ECS** → **实例** → 找到你的服务器
-3. 点击 **安全组** → **配置规则**
-4. 添加以下入方向规则：
-   - **22/tcp** (SSH) - 来源：你的IP或 0.0.0.0/0（不推荐，建议限制IP）
-   - **80/tcp** (HTTP) - 来源：0.0.0.0/0
-   - **443/tcp** (HTTPS) - 来源：0.0.0.0/0
-   - **3000/tcp** (后端服务，仅限内网) - 来源：127.0.0.1/32
+3. 点击 **安全组** → **配置规则** → **入方向** → **添加安全组规则**
+4. 添加以下规则：
+   - **22/tcp** (SSH) - 授权对象：你的IP或 0.0.0.0/0（不推荐，建议限制IP）
+   - **80/tcp** (HTTP) - 授权对象：0.0.0.0/0
+   - **443/tcp** (HTTPS) - 授权对象：0.0.0.0/0
+   - **3000/tcp** (后端服务，仅限内网) - 授权对象：127.0.0.1/32
 
-### 9.2 系统防火墙配置（可选，如果启用了系统防火墙）
+### 步骤2：系统防火墙（可选）
 
-**Aliyun Linux / CentOS（firewalld）：**
+**检查系统防火墙状态：**
 ```bash
-# 检查防火墙状态
 systemctl status firewalld
+```
 
-# 如果启用，配置规则
+**如果启用了防火墙，配置规则：**
+```bash
 firewall-cmd --permanent --add-service=http
 firewall-cmd --permanent --add-service=https
 firewall-cmd --permanent --add-service=ssh
 firewall-cmd --reload
+```
 
-# 如果不需要系统防火墙（阿里云安全组已提供保护），可以关闭
+**如果不需要系统防火墙（阿里云安全组已提供保护）：**
+```bash
 systemctl stop firewalld
 systemctl disable firewalld
 ```
 
-**Ubuntu（UFW）：**
-```bash
-# 检查防火墙状态
-ufw status
-
-# 配置规则
-ufw allow 22/tcp    # SSH
-ufw allow 80/tcp    # HTTP
-ufw allow 443/tcp   # HTTPS
-ufw enable
-
-# 如果不需要系统防火墙（阿里云安全组已提供保护），可以关闭
-ufw disable
-```
-
 **注意：** 阿里云的安全组已经提供了网络层防火墙，系统防火墙通常是关闭的。建议保持系统防火墙关闭，避免配置冲突。
 
-## 第十步：更新后端 CORS 配置
+---
 
-### 10.1 更新允许的域名
-```bash
-vim /opt/blog/backend/routes/routes.go
+## 第十部分：验证部署
+
+### 验证清单
+
+- [ ] **前端验证**
+  - 访问 https://keranthos.me 能正常显示
+  - 路由跳转正常（博客、随笔、书影集等）
+  - 图片能正常加载
+
+- [ ] **后端验证**
+  - API 请求正常：`curl https://keranthos.me/api/articles?type=blog&page=1&limit=10`
+  - 登录功能正常
+  - 图片上传功能正常
+
+- [ ] **数据库验证**
+  ```bash
+  mysql -u blog_user -p my_blog
+  SHOW TABLES;
+  # 应该能看到 blog_articles, research_articles 等表
+  EXIT;
+  ```
+
+- [ ] **服务状态验证**
+  ```bash
+  systemctl status blog-backend
+  systemctl status nginx
+  # MariaDB 使用 mariadb，MySQL 使用 mysqld
+  systemctl status mariadb  # 或 systemctl status mysqld
+  ```
+
+---
+
+## 第十一部分：后续维护
+
+### 更新代码流程
+
+**当需要更新代码时：**
+
+#### 方式一：使用自动化脚本（推荐）⚡
+
+**后端更新（一键完成）：**
+
+在项目根目录下执行：
+```powershell
+cd backend; .\..\update-backend.ps1
 ```
 
-修改 CORS 配置：
-```go
-AllowOrigins: []string{
-    "http://localhost:3000",
-    "http://localhost:3002",
-    "https://keranthos.me",        // 添加
-    "https://www.keranthos.me",    // 添加
-},
+或者在 backend 目录下直接执行：
+```powershell
+.\update-backend.ps1
 ```
 
-### 10.2 重新编译并重启
-```bash
-cd /opt/blog/backend
-go build -o main .
-systemctl restart blog-backend
+**脚本功能：**
+- ✅ 自动编译 Linux 版本
+- ✅ 自动停止服务器上的后端服务
+- ✅ 自动上传文件（使用临时文件名避免冲突）
+- ✅ 自动替换文件并设置权限
+- ✅ 自动启动服务并检查状态
+
+**脚本参数（可选）：**
+```powershell
+# 指定服务器IP和用户
+.\update-backend.ps1 -ServerIP "47.242.6.37" -ServerUser "root"
 ```
 
-## 第十一步：验证部署
+---
 
-### 11.1 前端验证
-- [ ] 访问 https://keranthos.me 能正常显示
-- [ ] 路由跳转正常（博客、随笔、书影集等）
-- [ ] 图片能正常加载
+#### 方式二：手动更新
 
-### 11.2 后端验证
-- [ ] API 请求正常：`curl https://keranthos.me/api/articles?type=blog&page=1&limit=10`
-- [ ] 登录功能正常
-- [ ] 图片上传功能正常
+**当需要更新代码时：**
 
-### 11.3 数据库验证
+1. **本地构建（Windows）：**
+   ```powershell
+   # 更新代码
+   cd D:\blog
+   git pull
+   
+   # 构建前端
+   cd frontend
+   npm install  # 如果 package.json 有更新
+   npm run build
+   
+   # 编译后端
+   cd ../backend
+   $env:GOOS="linux"
+   $env:GOARCH="amd64"
+   go build -o main.exe main.go
+   ```
+
+2. **上传到服务器：**
+   ```powershell
+   # 方式A：增量更新（推荐，只覆盖同名文件）
+   # 上传前端
+   scp -r frontend/dist/* root@47.242.6.37:/var/www/blog/
+   
+   # 上传后端（先停止服务避免文件锁定）
+   ssh root@47.242.6.37 "systemctl stop blog-backend"
+   scp backend/main.exe root@47.242.6.37:/opt/blog/backend/main.new
+   ssh root@47.242.6.37 "cd /opt/blog/backend && mv -f main.new main && chmod +x main && systemctl start blog-backend"
+   
+   # 方式B：完全清理后更新（如果有缓存问题）
+   # 清理旧文件
+   ssh root@47.242.6.37 "rm -rf /var/www/blog/*"
+   # 上传新文件
+   scp -r frontend/dist/* root@47.242.6.37:/var/www/blog/
+   ```
+
+3. **重启服务（服务器上）：**
+   ```bash
+   systemctl restart blog-backend
+   systemctl reload nginx
+   ```
+
+### 备份数据库
+
+创建备份脚本：
 ```bash
-mysql -u blog_user -p my_blog
-SHOW TABLES;
-# 应该能看到 blog_articles, research_articles 等表
-EXIT;
-```
-
-## 第十二步：后续维护
-
-### 12.1 更新代码
-```bash
-# 如果使用 Git
-cd /opt/blog
-git pull
-
-# 重新构建前端
-cd frontend
-npm ci
-npm run build
-
-# 重新编译后端
-cd ../backend
-go build -o main .
-
-# 重启服务
-systemctl restart blog-backend
-systemctl reload nginx
-```
-
-### 12.2 备份数据库
-```bash
-# 创建备份脚本
 vim /opt/blog/backup-db.sh
 ```
 
@@ -657,15 +1020,20 @@ crontab -e
 
 **阿里云建议：** 除了本地备份，还可以使用阿里云的快照功能定期备份整个服务器，或使用OSS对象存储备份数据库文件。
 
-### 12.3 监控日志
+### 查看日志
+
 ```bash
 # 后端日志
 journalctl -u blog-backend -f
 
-# Nginx 日志
+# Nginx 访问日志
 tail -f /var/log/nginx/access.log
+
+# Nginx 错误日志
 tail -f /var/log/nginx/error.log
 ```
+
+---
 
 ## 常见问题排查
 
@@ -679,36 +1047,123 @@ tail -f /var/log/nginx/error.log
 - 检查端口是否被占用：`netstat -tlnp | grep 3000` 或 `ss -tlnp | grep 3000`
 - 查看后端日志：`journalctl -u blog-backend -n 50`
 - **检查阿里云安全组**：确保3000端口已对127.0.0.1开放（内网访问）
+- 检查后端可执行文件权限：`ls -la /opt/blog/backend/main`
 
 ### 问题3：前端页面空白或无法访问
 - 检查 Nginx 配置：`nginx -t`
-- 检查 dist 目录权限：`ls -la /opt/blog/frontend/dist`
+- 检查 dist 目录权限：`ls -la /var/www/blog`
 - 查看 Nginx 错误日志：`tail -f /var/log/nginx/error.log`
 - **检查阿里云安全组**：确保80和443端口已开放
 
+### 问题3.1：前端控制台报错 `ERR_CONNECTION_REFUSED` 或 `ERR_CONNECTION_RESET`
+**错误现象：**
+```
+Failed to load resource: net::ERR_CONNECTION_REFUSED
+localhost:3000/api/articles?page=1&limit=3&type=blog:1
+```
+
+**原因：** 前端在尝试连接 `localhost:3000`，但在生产环境中应该通过 Nginx 代理访问 API。
+
+**解决方法：**
+1. **检查前端构建是否正确：**
+   - 前端代码已修复，生产环境会自动使用相对路径 `/api`
+   - 如果使用的是旧版本构建，需要重新构建：
+   ```powershell
+   cd D:\blog\frontend
+   npm run build
+   ```
+   - 重新上传 `frontend/dist/*` 到服务器
+
+2. **检查 Nginx 代理配置：**
+   ```bash
+   # 确认 Nginx 配置中有 API 代理
+   cat /etc/nginx/conf.d/keranthos.me.conf | grep -A 10 "location /api/"
+   ```
+   - 应该看到 `proxy_pass http://127.0.0.1:3000/;`
+
+3. **检查后端服务是否运行：**
+   ```bash
+   systemctl status blog-backend
+   curl http://localhost:3000/api/articles?type=blog&page=1&limit=10
+   ```
+
+4. **清除浏览器缓存：**
+   - 按 `Ctrl+Shift+R` 强制刷新
+   - 或在浏览器中清除缓存后重新访问
+
+5. **检查浏览器控制台网络请求：**
+   - 打开浏览器开发者工具（F12）
+   - 查看 Network 标签
+   - 检查 API 请求的 URL 是否为 `https://keranthos.me/api/...`（正确）
+   - 如果是 `http://localhost:3000/api/...`（错误），说明前端需要重新构建
+
 ### 问题4：数据库连接失败
 - 检查 MySQL/MariaDB 服务：
-  - Aliyun Linux/CentOS: `systemctl status mariadb`
-  - Ubuntu: `systemctl status mysql`
+  - MariaDB: `systemctl status mariadb`
+  - MySQL: `systemctl status mysqld`
 - 测试连接：`mysql -u blog_user -p my_blog`
 - 检查配置文件：`cat /opt/blog/backend/config/config.yml`
 - 检查数据库用户权限：`mysql -u root -p -e "SHOW GRANTS FOR 'blog_user'@'localhost';"`
+
+### 问题4.1：SHOW TABLES 没有显示任何表（Empty set）
+**原因：** 后端程序还没有运行或者运行失败，表还没有创建。
+
+**解决方法：**
+1. **确认后端程序已运行**：
+   ```bash
+   cd /opt/blog/backend
+   GIN_MODE=release ./main
+   # 看到 "Listening and serving HTTP on :3000" 说明启动成功
+   # 运行几秒后按 Ctrl+C 停止
+   ```
+
+2. **检查后端程序运行日志**：
+   ```bash
+   # 查看是否有错误信息
+   cd /opt/blog/backend
+   ./main 2>&1 | tee startup.log
+   # 查看日志文件
+   cat startup.log
+   ```
+
+3. **手动检查数据库连接**：
+   ```bash
+   # 测试连接
+   mysql -u blog_user -p my_blog
+   # 如果连接失败，检查配置文件中的密码
+   ```
+
+4. **检查配置文件**：
+   ```bash
+   cat /opt/blog/backend/config/config.yml
+   # 确认所有配置项都正确，特别是数据库密码
+   ```
+
+5. **重新授权数据库用户**（如果权限问题）：
+   ```bash
+   mysql -u root -p
+   GRANT ALL PRIVILEGES ON my_blog.* TO 'blog_user'@'localhost';
+   FLUSH PRIVILEGES;
+   EXIT;
+   ```
 
 ### 问题5：图片上传失败
 - 检查 uploads 目录权限：`ls -la /opt/blog/backend/uploads`
 - 确保目录可写：`chmod -R 755 /opt/blog/backend/uploads`
 - 检查磁盘空间：`df -h`
 
-### 问题6：npm/yum 安装速度慢
-- **npm 镜像**：已配置阿里云镜像 `https://registry.npmmirror.com`
-- **Go 代理**：已配置阿里云镜像 `https://mirrors.aliyun.com/goproxy/`
-- **yum 源**：阿里云系统默认已配置阿里云镜像源，通常速度较快
+### 问题6：后端编译失败（交叉编译）
+- 确保 Go 版本 >= 1.21：`go version`
+- 检查环境变量：`echo $GOOS $GOARCH`（应该在 Git Bash 中显示 `linux amd64`）
+- 如果使用 PowerShell，确保正确设置：`$env:GOOS="linux"; $env:GOARCH="amd64"`
 
 ### 问题7：SSL证书申请失败
 - **检查 Cloudflare 代理状态**：申请证书时必须关闭（仅DNS模式）
 - 检查域名DNS解析：`nslookup keranthos.me`
 - 确保80端口已开放（Let's Encrypt需要验证）
 - 检查 Nginx 配置是否正确：`nginx -t`
+
+---
 
 ## 完成 ✅
 
@@ -720,4 +1175,24 @@ tail -f /var/log/nginx/error.log
 3. 配置图片 CDN（如使用对象存储）
 4. 设置监控告警（可选）
 
+---
 
+## 快速参考命令
+
+```bash
+# 服务管理
+systemctl start blog-backend    # 启动后端
+systemctl stop blog-backend     # 停止后端
+systemctl restart blog-backend   # 重启后端
+systemctl status blog-backend   # 查看状态
+journalctl -u blog-backend -f   # 查看日志
+
+# Nginx
+systemctl reload nginx          # 重新加载配置
+nginx -t                        # 测试配置
+tail -f /var/log/nginx/error.log # 查看错误日志
+
+# 数据库
+mysql -u blog_user -p my_blog   # 连接数据库
+systemctl status mariadb        # 查看 MariaDB 状态（或 mysqld 如果是 MySQL）
+```

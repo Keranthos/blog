@@ -196,6 +196,7 @@ h2 {
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: left;
   transition: color 0s;
 }
 

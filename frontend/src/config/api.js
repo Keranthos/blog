@@ -2,7 +2,11 @@
 // 统一管理 API 地址
 
 // 基础 URL（从环境变量读取）
-export const API_BASE_URL = process.env.VUE_APP_API_BASE_URL || 'http://localhost:3000'
+// 生产环境：使用相对路径（空字符串），通过 Nginx 代理访问
+// 开发环境：使用 localhost:3000
+export const API_BASE_URL = process.env.VUE_APP_API_BASE_URL || (
+  process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000'
+)
 
 // API 前缀
 export const API_PREFIX = process.env.VUE_APP_API_PREFIX || '/api'

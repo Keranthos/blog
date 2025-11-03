@@ -734,6 +734,8 @@ onMounted(async () => {
   padding: 40px 20px;
   background: transparent;
   min-height: 100vh;
+  overflow-x: hidden; /* 防止横向滚动 */
+  box-sizing: border-box;
 }
 
 .main-layout {
@@ -824,6 +826,9 @@ onMounted(async () => {
   flex-direction: column;
   gap: 20px;
   margin-bottom: 40px;
+  width: 100%;
+  min-width: 0; /* 允许收缩 */
+  overflow-x: hidden; /* 防止横向滚动 */
 }
 
 /* 现代化卡片设计 - 与背景融为一体，无边框 */
@@ -835,6 +840,8 @@ onMounted(async () => {
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  width: 100%;
+  min-width: 0; /* 允许卡片收缩，防止横向滚动 */
 }
 
 .blog-card:hover {
@@ -849,8 +856,10 @@ onMounted(async () => {
   gap: 15px;
   padding: 20px;
   min-height: 100px;
+  min-width: 0; /* 允许容器收缩 */
   border-radius: 15px;
   transition: all 0.3s ease;
+  flex-direction: row; /* 明确指定桌面端为横向布局 */
 }
 
 .blog-card:hover .card-content {
@@ -859,11 +868,13 @@ onMounted(async () => {
 
 .card-text {
   flex: 0 0 65%;
+  min-width: 0; /* 允许在 flex 容器中收缩 */
   display: flex;
   flex-direction: column;
   gap: 12px;
   text-align: left;
   justify-content: space-between;
+  order: 1; /* 明确指定顺序 */
 }
 
 .card-header {
@@ -914,6 +925,36 @@ onMounted(async () => {
   margin-right: -20px;
   padding-left: 20px;
   padding-right: 20px;
+  /* 桌面端：限制在 card-text 宽度内 */
+  flex: 0 0 65%; /* 与 card-text 同宽 */
+  order: 3; /* 在 card-text 和 card-thumbnail 之后 */
+}
+
+/* 桌面端：确保 card-meta 只在左侧文字区域显示 */
+@media (min-width: 769px) {
+  .card-content {
+    flex-wrap: nowrap; /* 不允许换行，保持横向布局 */
+    align-items: flex-start; /* 顶部对齐 */
+    position: relative; /* 为绝对定位的 card-meta 提供定位上下文 */
+  }
+
+  .card-meta {
+    position: absolute;
+    left: 20px; /* 与 card-content 的内边距对齐 */
+    right: calc(35% + 15px + 20px); /* 避开右侧图片区域（35%宽度 + 15px gap + 20px padding） */
+    bottom: 20px; /* 底部对齐 */
+    width: auto;
+    margin: 0;
+    padding-left: 0;
+    padding-right: 0;
+    flex: 0 0 auto; /* 不使用 flex 布局 */
+    order: 1; /* 不影响 flex order */
+  }
+
+  /* 为 card-text 添加底部 padding，为 card-meta 留出空间 */
+  .card-text {
+    padding-bottom: 60px;
+  }
 }
 
 .card-date {
@@ -963,14 +1004,16 @@ onMounted(async () => {
 /* 卡片缩略图 - 右侧，35%宽度，高度增加 */
 .card-thumbnail {
   flex: 0 0 35%;
+  min-width: 0; /* 允许在 flex 容器中收缩 */
   height: 120px;
   border-radius: 8px;
   overflow: hidden;
-  flex-shrink: 0;
+  flex-shrink: 0; /* 不允许收缩，保持固定宽度 */
   border: 2px solid rgba(255, 255, 255, 0.8);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
+  order: 2; /* 明确指定顺序，在 card-text 之后 */
 }
 
 .card-thumbnail img {
@@ -1415,11 +1458,11 @@ onMounted(async () => {
   .main-layout {
     gap: 20px;
   }
-  /* 手机端也保持主体 2/3 宽度，左右留边距 */
+  /* 手机端自适应宽度，不限制最小宽度 */
   .main-content {
-    width: 66.666%;
+    width: 100%;
     margin: 0 auto;
-    min-width: 480px; /* 手机端主体区域最小宽度不小于 480px */
+    padding: 0 15px;
   }
 
   .blog-cards {
@@ -1435,11 +1478,16 @@ onMounted(async () => {
     flex-direction: column; /* 垂直布局，便于重排 */
   }
 
-  .card-text { order: 1; }
+  .card-text {
+    flex: 0 0 100% !important; /* 手机端占满整行 */
+    order: 1;
+    width: 100% !important;
+  }
 
   .card-thumbnail {
     order: 2; /* 图片位于简介与底部行之间 */
-    width: 100%;
+    width: 100% !important;
+    flex: 0 0 100% !important; /* 手机端占满整行 */
     height: auto;
     /* 不超过卡片高度的 2/5（若父级有高度时生效）；并提供基于视口宽度的兜底限制 */
     max-height: 40%;

@@ -214,7 +214,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, onActivated } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import { getArticleByID } from '@/api/Articles/browse'
@@ -1134,26 +1134,10 @@ const handleDeleteComment = async (commentId) => {
 
 // 在组件挂载时加载文章和评论
 onMounted(async () => {
-  // 重置页面滚动位置到顶部（使用smooth避免突然跳转触发hover）
-  window.scrollTo({ top: 0, behavior: 'instant' })
-
   // 延迟执行，确保路由参数完全加载
   await nextTick()
 
-  const id = props.articleId || route.params.id
-  // console.log('ArticleDetail - 组件初始化:', {
-  //   propsArticleId: props.articleId,
-  //   routeParamsId: route.params.id,
-  //   finalId: id
-  // })
-
-  // 只有当ID有效时才加载数据
-  if (id && id !== 'undefined') {
-    await loadDetail()
-    await loadComments()
-  } else {
-    console.warn('ArticleDetail - 组件初始化时ID无效，跳过数据加载')
-  }
+  await initializeDetail()
 
   // 添加滚动监听器（使用防抖优化性能）
   const debouncedHandleScroll = debounceScroll(handleScroll, 16)
@@ -1175,6 +1159,18 @@ onMounted(async () => {
   nextTick(() => {
     handleScroll()
   })
+})
+
+// keep-alive 激活时重新初始化（处理路由切换但组件未卸载的情况）
+onActivated(async () => {
+  await nextTick()
+  await initializeDetail()
+
+  // 重新初始化目录位置
+  setTimeout(() => {
+    adjustTocPosition()
+    initializeTocScrollPosition()
+  }, 300)
 })
 
 // 组件卸载时清理事件监听器
@@ -1207,21 +1203,43 @@ const formatCommentTime = (timestamp) => {
   return `${year}-${month}-${day}`
 }
 
+// 初始化文章详情（可复用的函数）
+const initializeDetail = async () => {
+  // 重置页面滚动位置到顶部（使用instant避免触发hover）
+  window.scrollTo({ top: 0, behavior: 'instant' })
+
+  const id = props.articleId || route.params.id
+  // 只有当ID存在且有效时才加载
+  if (id && id !== 'undefined') {
+    await loadDetail()
+    await loadComments()
+  }
+}
+
 // 监听路由变化，重新加载文章和评论
 watch(
-  () => route.params.id,
-  async (newId) => {
-    // console.log('ArticleDetail - 路由变化:', { newId, routeParams: route.params })
+  () => [route.params.id, route.params.type, props.articleId, props.type],
+  async ([newRouteId, newRouteType, newPropsId, newPropsType], [oldRouteId, oldRouteType, oldPropsId, oldPropsType]) => {
+    // 如果路由参数或props发生变化，重新加载
+    const idChanged = newRouteId !== oldRouteId || newPropsId !== oldPropsId
+    const typeChanged = newRouteType !== oldRouteType || newPropsType !== oldPropsType
 
-    // 重置页面滚动位置到顶部（使用instant避免触发hover）
-    window.scrollTo({ top: 0, behavior: 'instant' })
-
-    // 只有当新ID存在且有效时才重新加载
-    if (newId && newId !== 'undefined') {
-      await loadDetail()
-      await loadComments()
+    if (idChanged || typeChanged) {
+      await initializeDetail()
     }
-  }
+  },
+  { immediate: false }
+)
+
+// keep-alive 激活时重新初始化（处理路由切换但组件未卸载的情况）
+watch(
+  () => route.path,
+  async (newPath, oldPath) => {
+    if (newPath !== oldPath) {
+      await initializeDetail()
+    }
+  },
+  { immediate: false }
 )
 
 const fixResidualBoldInDOM = () => {

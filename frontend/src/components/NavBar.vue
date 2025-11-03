@@ -2238,6 +2238,47 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 
+@media (max-width: 500px) {
+  /* 小屏幕：只保留头像和"其他"/"菜单"图标 */
+
+  /* 隐藏右侧功能区（搜索、写点什么、评论、登录） */
+  .navbar-actions {
+    display: none !important;
+  }
+
+  /* 隐藏所有中间菜单项 */
+  .navbar-menu-center .menu-item {
+    display: none !important;
+  }
+
+  /* 显示"其他"下拉菜单（排除"设置"） */
+  .navbar-menu-center .menu-item.dropdown:not(:has([icon="gear"])) {
+    display: flex !important;
+  }
+
+  /* 显示紧凑模式的"菜单"按钮（非dropdown的menu-item） */
+  /* 使用更具体的选择器，确保优先级高于隐藏规则 */
+  .navbar-menu-center > .menu-item:not(.dropdown),
+  .navbar-menu-center .menu-item:not(.dropdown):last-child {
+    display: flex !important;
+  }
+
+  .navbar-brand {
+    margin-left: 0;
+    padding-left: 0;
+  }
+
+  .navbar-menu-center {
+    margin-left: auto;
+    margin-right: 0;
+    gap: 8px;
+  }
+
+  .navbar-container {
+    padding: 4px 12px;
+  }
+}
+
 @media (max-width: 768px) {
   .navbar-container {
     padding: 4px 16px;

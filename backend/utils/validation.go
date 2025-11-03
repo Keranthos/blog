@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -137,19 +138,35 @@ func ValidateTags(tags []string) error {
 		return errors.New("标签最多10个")
 	}
 
-	for _, tag := range tags {
-		if utf8.RuneCountInString(tag) > 20 {
-			return errors.New("单个标签最多20个字符")
-		}
+	// 标签可以为空数组
+	if len(tags) == 0 {
+		return nil
+	}
+
+	// 正则表达式：允许字母、数字、下划线、中文字符
+	// \p{Han} 表示所有中文字符（CJK统一汉字）
+	// 注意：不包含空格，标签内不能有空格（但标签本身可以有空格作为分隔）
+	tagRegex := regexp.MustCompile(`^[a-zA-Z0-9_\p{Han}]+$`)
+
+	for i, tag := range tags {
+		// 先去除首尾空格
+		tag = strings.TrimSpace(tag)
 
 		if utf8.RuneCountInString(tag) < 1 {
-			return errors.New("标签不能为空")
+			return fmt.Errorf("标签不能为空（索引: %d）", i)
+		}
+
+		if utf8.RuneCountInString(tag) > 20 {
+			return fmt.Errorf("单个标签最多20个字符（当前标签: '%s'，长度: %d）", tag, utf8.RuneCountInString(tag))
 		}
 
 		// 检查标签是否包含非法字符
-		matched, _ := regexp.MatchString(`^[a-zA-Z0-9_\u4e00-\u9fa5]+$`, tag)
+		// 允许：字母、数字、下划线、中文字符（不含空格）
+		matched := tagRegex.MatchString(tag)
 		if !matched {
-			return errors.New("标签只能包含字母、数字、下划线和中文")
+			// 输出更详细的错误信息以便调试
+			return fmt.Errorf("标签只能包含字母、数字、下划线和中文（当前标签[%d]: '%s'，长度: %d，字节: %v）",
+				i, tag, utf8.RuneCountInString(tag), []byte(tag))
 		}
 	}
 
@@ -231,17 +248,23 @@ func ValidateImageURL(url string) error {
 		return nil // 图片URL可以为空
 	}
 
-	// 检查URL格式
-	urlRegex := regexp.MustCompile(`^https?:\/\/[^\s/$.?#].[^\s]*$`)
-	if !urlRegex.MatchString(url) {
-		return errors.New("图片URL格式不正确")
-	}
-
 	if len(url) > 500 {
 		return errors.New("图片URL最多500个字符")
 	}
 
-	return nil
+	// 支持三种格式：
+	// 1. HTTP/HTTPS 外链: https://example.com/image.jpg
+	// 2. 本地绝对路径: /uploads/images/xxx.jpg
+	// 3. 本地相对路径: uploads/images/xxx.jpg
+	httpRegex := regexp.MustCompile(`^https?:\/\/[^\s/$.?#].[^\s]*$`)
+	localAbsoluteRegex := regexp.MustCompile(`^\/uploads\/[^\s]*$`)
+	localRelativeRegex := regexp.MustCompile(`^uploads\/[^\s]*$`)
+
+	if httpRegex.MatchString(url) || localAbsoluteRegex.MatchString(url) || localRelativeRegex.MatchString(url) {
+		return nil
+	}
+
+	return errors.New("图片URL格式不正确（支持：http/https外链或/uploads/本地路径）")
 }
 
 // 清理和标准化输入

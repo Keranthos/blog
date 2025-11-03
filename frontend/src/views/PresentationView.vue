@@ -410,7 +410,8 @@ const loadPdfDocument = async (presentation) => {
       await loadPdfJs()
     }
 
-    const pdfUrl = `http://localhost:3000/api/presentations/${presentation.id}/preview`
+    // 使用相对路径，在生产环境中通过 Nginx 代理
+    const pdfUrl = `/api/presentations/${presentation.id}/preview`
     console.log('PDF URL:', pdfUrl)
 
     // 设置PDF.js worker，利用浏览器缓存
@@ -553,7 +554,7 @@ const verifyPassword = async () => {
   }
 
   try {
-    const response = await fetch(`http://localhost:3000/api/presentations/${pendingPresentation.value.id}/verify-password`, {
+    const response = await fetch(`/api/presentations/${pendingPresentation.value.id}/verify-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -622,8 +623,9 @@ const getThumbnailUrl = (thumbnail) => {
     return `${thumbnail}${separator}t=${Date.now()}`
   }
 
-  // 如果是相对路径，构建完整URL
-  const fullUrl = `http://localhost:3000${thumbnail}`
+  // 如果已经是完整URL则直接使用，否则使用相对路径（生产环境通过Nginx代理）
+  // 不需要添加 localhost:3000，直接使用相对路径即可
+  const fullUrl = thumbnail
   console.log('构建完整URL:', fullUrl)
   // 添加时间戳强制刷新图片
   const separator = fullUrl.includes('?') ? '&' : '?'
@@ -798,6 +800,8 @@ const loadPdfJs = () => {
   min-height: 100vh;
   position: relative;
   padding-top: 40px;
+  overflow-x: hidden; /* 防止横向滚动 */
+  box-sizing: border-box;
 }
 
 /* 英雄图片区域 */
@@ -1433,10 +1437,17 @@ const loadPdfJs = () => {
 @media (max-width: 1330px) {
   .presentation-view { padding-top: 40px; }
   .hero-section { padding-left: 0; padding-right: 0; }
-  .hero-image-wrapper, .content-container, .separator-section .separator-text { width: 66.666%; margin: 0 auto; min-width: 480px; }
+  .hero-image-wrapper, .content-container, .separator-section .separator-text { width: 66.666%; margin: 0 auto; }
 }
 
 @media (max-width: 768px) {
+  /* 手机端：移除最小宽度限制，使用 100% 宽度 */
+  .hero-image-wrapper, .content-container, .separator-section .separator-text {
+    width: 100% !important;
+    margin: 0 auto;
+    padding: 0 15px;
+    min-width: 0 !important;
+  }
   .cards-grid {
     grid-template-columns: 1fr;
     gap: 20px;

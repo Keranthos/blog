@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -106,6 +107,12 @@ func InitDB() error { // 初始化全局连接池DB
 		// 索引创建失败不影响程序运行，仅记录警告
 	}
 
+	// 创建默认管理员账户（如果不存在）
+	if err := createDefaultAdmin(); err != nil {
+		log.Printf("警告: 创建默认管理员账户时出现错误: %v", err)
+		// 管理员创建失败不影响程序运行，仅记录警告
+	}
+
 	// 注意：慢查询监控在 main.go 中初始化，避免循环依赖
 
 	return nil
@@ -116,4 +123,41 @@ func GetJWT() (string, string) {
 		log.Fatalf("shit!AppConfig is not initialized")
 	}
 	return AppConfig.Jwt.SecretKey, AppConfig.Jwt.Expiration
+}
+
+// createDefaultAdmin 创建默认管理员账户（如果不存在）
+func createDefaultAdmin() error {
+	username := "山角函兽"
+	password := "Wan05609"
+	level := 3 // 管理员权限
+
+	// 检查用户是否已存在
+	var existingUser models.User
+	if err := DB.Where("username = ?", username).First(&existingUser).Error; err == nil {
+		// 用户已存在，跳过创建
+		log.Printf("管理员账户已存在: %s (ID: %d)", username, existingUser.ID)
+		return nil
+	}
+
+	// 生成密码哈希（直接在config包中实现，避免循环依赖）
+	hashedPasswordBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("生成密码哈希失败: %v", err)
+	}
+	hashedPassword := string(hashedPasswordBytes)
+
+	// 创建新用户
+	user := models.User{
+		Username: username,
+		Password: hashedPassword,
+		Level:    level,
+		Avatar:   "",
+	}
+
+	if err := DB.Create(&user).Error; err != nil {
+		return fmt.Errorf("创建管理员账户失败: %v", err)
+	}
+
+	log.Printf("默认管理员账户创建成功: %s (ID: %d, Level: %d)", username, user.ID, user.Level)
+	return nil
 }

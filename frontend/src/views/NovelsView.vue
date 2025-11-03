@@ -199,7 +199,13 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.media-view { min-height: 100vh; padding-top: 56px; padding-bottom: 100px; }
+.media-view {
+  min-height: 100vh;
+  padding-top: 56px;
+  padding-bottom: 100px;
+  overflow-x: hidden; /* 防止横向滚动 */
+  box-sizing: border-box;
+}
 
 .media-layout { width: 80%; max-width: 1280px; margin: 20px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
 
@@ -301,7 +307,7 @@ onMounted(() => {
 /* 紧凑模式：头图与卡片区域等宽（2/3 居中），高度不限制 */
 @media (max-width: 1330px) {
   .media-view { padding-top: 40px; }
-  .media-layout { width: 66.666%; margin: 0 auto; min-width: 480px; gap: 20px; }
+  .media-layout { width: 66.666%; margin: 0 auto; gap: 20px; }
   .right-col { padding-right: 0; }
 }
 
@@ -316,7 +322,14 @@ onMounted(() => {
     padding-top: 80px;
   }
 
-  .media-layout { width: 66.666%; margin: 0 auto; min-width: 480px; }
+  /* 手机端：移除最小宽度限制，使用 100% 宽度 */
+  .media-layout {
+    width: 100% !important;
+    margin: 0 auto;
+    padding: 0 15px;
+    min-width: 0 !important;
+  }
+
   /* 手机端隐藏图片下方文案，仅展示卡片 */
   .intro { display: none; }
 

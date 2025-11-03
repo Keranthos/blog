@@ -127,6 +127,8 @@ onMounted(() => {
   min-height: 100vh;
   padding-top: 40px;
   padding-bottom: 200px;
+  overflow-x: hidden; /* 防止横向滚动 */
+  box-sizing: border-box;
 }
 
 .header {
@@ -486,8 +488,18 @@ onMounted(() => {
 /* 紧凑模式：头图与内容等宽（2/3 居中），高度不限制 */
 @media (max-width: 1330px) {
   .question-box-view { padding-top: 40px; }
-  .header, .content { width: 66.666%; margin: 0 auto; min-width: 480px; }
+  .header, .content { width: 66.666%; margin: 0 auto; }
   .header { padding: 0; }
+}
+
+/* 手机端：移除最小宽度限制，使用 100% 宽度 */
+@media (max-width: 768px) {
+  .header, .content {
+    width: 100% !important;
+    margin: 0 auto;
+    padding: 0 15px;
+    min-width: 0 !important;
+  }
 }
 
 /* 翻页组件样式 */

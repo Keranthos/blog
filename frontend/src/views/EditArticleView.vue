@@ -528,7 +528,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, computed, onBeforeUnmount, onMounted } from 'vue'
+import { ref, nextTick, computed, onBeforeUnmount, onMounted, watch, onActivated } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import axios from 'axios'
@@ -1859,6 +1859,30 @@ const cleanup = () => {
   pendingCoverUploads.value.clear()
 }
 
+// 清空表单数据
+const resetFormData = () => {
+  articleData.value = {
+    title: '',
+    type: 'blog',
+    image: '',
+    tags: [],
+    isTop: false
+  }
+  mediaData.value = {
+    name: '',
+    type: 'books',
+    image: '',
+    rating: 8,
+    description: ''
+  }
+  markdownContent.value = ''
+  tagsInput.value = ''
+  originalArticleData.value = null
+  originalMediaData.value = null
+  originalMarkdownContent.value = ''
+  originalTagsInput.value = ''
+}
+
 // 加载现有文章数据
 const loadExistingArticle = async () => {
   if (!isEditing.value) return
@@ -1945,8 +1969,8 @@ const loadExistingMedia = async () => {
   }
 }
 
-// 组件挂载时初始化
-onMounted(async () => {
+// 初始化组件数据（可复用的函数）
+const initializeComponent = async () => {
   // 从路由query参数设置内容类型
   if (route.query.contentType) {
     contentType.value = route.query.contentType
@@ -1973,14 +1997,42 @@ onMounted(async () => {
       updatePreview()
     }
   } else {
-    // 非编辑模式也要初始化预览
+    // 非编辑模式清空数据并初始化预览
+    resetFormData()
     if (contentType.value === 'media') {
       updateMediaPreview()
     } else {
       updatePreview()
     }
   }
+}
+
+// 组件挂载时初始化
+onMounted(async () => {
+  await initializeComponent()
 })
+
+// keep-alive 激活时重新初始化（处理路由切换但组件未卸载的情况）
+onActivated(async () => {
+  await initializeComponent()
+})
+
+// 监听路由参数变化
+watch(
+  () => [route.params.id, route.query.contentType, route.query.articleType, route.query.mediaType],
+  async ([newId, newContentType, newArticleType, newMediaType], [oldId, oldContentType, oldArticleType, oldMediaType]) => {
+    // 如果路由参数发生变化，重新初始化
+    const idChanged = newId !== oldId
+    const contentTypeChanged = newContentType !== oldContentType
+    const articleTypeChanged = newArticleType !== oldArticleType
+    const mediaTypeChanged = newMediaType !== oldMediaType
+
+    if (idChanged || contentTypeChanged || articleTypeChanged || mediaTypeChanged) {
+      await initializeComponent()
+    }
+  },
+  { immediate: false }
+)
 
 // 组件卸载时清理
 onBeforeUnmount(() => {

@@ -249,9 +249,10 @@ const getRelatedArticles = async () => {
       }
     }
 
-    // 过滤掉当前文章
+    // 过滤掉当前文章（使用字符串比较避免类型不一致）
+    const currentArticleId = String(props.currentArticle.id)
     const filteredArticles = allArticles.filter(
-      article => article.id !== props.currentArticle.id
+      article => String(article.id) !== currentArticleId
     )
 
     // 计算相似度并排序

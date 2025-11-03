@@ -5,6 +5,7 @@ import (
 	"backend/models"
 	"backend/utils"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,15 +18,17 @@ import (
 
 // 获取文章列表
 func GetArticles(c *gin.Context) {
-	page, err := strconv.Atoi(c.Query("page"))
+	// 使用默认值：如果参数缺失或无效，使用默认值
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "9")
+
+	page, err := strconv.Atoi(pageStr)
 	if err != nil || page < 1 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid page parameter"})
-		return
+		page = 1 // 默认第一页
 	}
-	limit, err := strconv.Atoi(c.Query("limit"))
+	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit < 1 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit parameter"})
-		return
+		limit = 9 // 默认每页9条
 	}
 	// 分页上限校验：防止 limit 过大导致性能问题
 	const maxLimit = 100
@@ -33,6 +36,10 @@ func GetArticles(c *gin.Context) {
 		limit = maxLimit
 	}
 	articleType := c.Query("type")
+	if articleType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing type parameter"})
+		return
+	}
 	var articles interface{}
 	offset := (page - 1) * limit
 
@@ -164,31 +171,42 @@ func GetArticleById(c *gin.Context) {
 
 // 创建文章
 func CreateArticle(c *gin.Context) {
-	var article interface{}
 	articleType := c.Query("type")
+	if articleType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing type parameter"})
+		return
+	}
 
 	switch articleType {
 	case "blog":
 		var blogArticle models.BlogArticle
 		if err := c.ShouldBindJSON(&blogArticle); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			log.Printf("创建博客文章失败 - JSON绑定错误: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "JSON绑定失败: " + err.Error()})
 			return
 		}
 
+		log.Printf("创建博客文章 - 标题: %s, 内容长度: %d, 图片: %s, 标签数: %d",
+			blogArticle.Title, len(blogArticle.Content), blogArticle.Image, len(blogArticle.Tags))
+
 		// 验证文章数据
 		if err := utils.ValidateArticleTitle(blogArticle.Title); err != nil {
+			log.Printf("创建博客文章失败 - 标题验证错误: %v", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		if err := utils.ValidateArticleContent(blogArticle.Content); err != nil {
+			log.Printf("创建博客文章失败 - 内容验证错误: %v", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		if err := utils.ValidateTags(blogArticle.Tags); err != nil {
+			log.Printf("创建博客文章失败 - 标签验证错误: %v", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		if err := utils.ValidateImageURL(blogArticle.Image); err != nil {
+			log.Printf("创建博客文章失败 - 图片URL验证错误: %v (URL: %s)", err, blogArticle.Image)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -198,7 +216,13 @@ func CreateArticle(c *gin.Context) {
 			blogArticle.Image = newURL
 		}
 
-		article = blogArticle
+		if err := config.DB.Create(&blogArticle).Error; err != nil {
+			log.Printf("创建博客文章失败 - 数据库错误: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create article"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Article created"})
 	case "research":
 		var researchArticle models.ResearchArticle
 		if err := c.ShouldBindJSON(&researchArticle); err != nil {
@@ -228,7 +252,12 @@ func CreateArticle(c *gin.Context) {
 			researchArticle.Image = newURL
 		}
 
-		article = researchArticle
+		if err := config.DB.Create(&researchArticle).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create article"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Article created"})
 	case "project":
 		var projectArticle models.ProjectArticle
 		if err := c.ShouldBindJSON(&projectArticle); err != nil {
@@ -258,18 +287,16 @@ func CreateArticle(c *gin.Context) {
 			projectArticle.Image = newURL
 		}
 
-		article = projectArticle
+		if err := config.DB.Create(&projectArticle).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create article"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Article created"})
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})
 		return
 	}
-
-	if err := config.DB.Create(article).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create article"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Article created"})
 }
 
 // 更新文章

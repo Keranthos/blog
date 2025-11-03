@@ -529,6 +529,8 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   background: transparent;
+  overflow-x: hidden; /* 防止横向滚动 */
+  box-sizing: border-box;
 }
 
 /* 头部图片区域 */
@@ -799,7 +801,6 @@ onBeforeUnmount(() => {
     margin: 0 auto;
     padding-left: 0;
     padding-right: 0;
-    min-width: 480px;
   }
   .header-section { margin-top: 0; }
 }
@@ -815,18 +816,23 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 768px) {
-  .article-list-view { margin-top: 30px; }
-  /* 手机端也保持主体 2/3 宽度与最小宽度 480px（与主页一致） */
+  .article-list-view {
+    margin-top: 30px;
+    overflow-x: hidden; /* 防止横向滚动 */
+  }
+
+  /* 手机端：移除最小宽度限制，使用 100% 宽度 */
   .header-section,
   .tabs-section,
   .content-section,
   .pagination-section {
-    width: 66.666%;
+    width: 100% !important;
     margin: 0 auto;
-    padding-left: 0;
-    padding-right: 0;
-    min-width: 480px;
+    padding-left: 15px;
+    padding-right: 15px;
+    min-width: 0 !important;
   }
+
   .header-section { margin-top: 0; }
 
   .header-image {
