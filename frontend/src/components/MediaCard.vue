@@ -78,6 +78,7 @@
             </div>
             <div class="media-modal-body">
               <div class="media-modal-content">
+                <!-- eslint-disable-next-line vue/no-v-html -->
                 <div class="media-modal-review markdown-body" v-html="renderedReview"></div>
               </div>
             </div>

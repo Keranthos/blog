@@ -36,14 +36,14 @@
         </div>
         <div class="suggestions-list">
           <div
-            v-for="(keyword, index) in filteredHotKeywords"
+            v-for="(hotKeyword, index) in filteredHotKeywords"
             :key="`hot-${index}`"
             class="suggestion-item hot-item"
-            @click="selectSuggestion(keyword)"
+            @click="selectSuggestion(hotKeyword)"
             @mouseenter="setActiveIndex(filteredHistory.length + index)"
           >
             <font-awesome-icon icon="fire" class="item-icon" />
-            <span class="item-text">{{ keyword }}</span>
+            <span class="item-text">{{ hotKeyword }}</span>
             <span class="hot-badge">{{ index + 1 }}</span>
           </div>
         </div>

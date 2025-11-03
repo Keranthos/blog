@@ -6,6 +6,16 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <link rel="icon" href="<%= BASE_URL %>favicon.ico">
     
+    <!-- DNS 预解析和预连接优化 -->
+    <link rel="dns-prefetch" href="https://keranthos.me">
+    <link rel="preconnect" href="https://keranthos.me" crossorigin>
+    <!-- 如果使用外部字体或 API，添加预连接 -->
+    <!-- <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin> -->
+    
+    <!-- 关键 CSS 预加载（Vue CLI 会自动处理） -->
+    <!-- 关键字体预加载（如果有自定义字体） -->
+    <!-- <link rel="preload" href="/fonts/custom-font.woff2" as="font" type="font/woff2" crossorigin> -->
+    
     <!-- SEO Meta Tags -->
     <meta name="description" content="山角函兽的个人博客 - 记录生活、分享技术、探索未知。包含技术博客、项目分享、科研记录、生活感悟等内容。">
     <meta name="keywords" content="个人博客,技术博客,项目分享,科研记录,生活感悟,山角函兽">

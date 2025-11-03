@@ -81,10 +81,12 @@
           </div>
           <div class="result-content">
             <div class="result-type">{{ getTypeName(result.type) }}</div>
+            <!-- eslint-disable-next-line vue/no-v-html -->
             <h3 class="result-title" v-html="highlightKeyword(result.title)"></h3>
             <div v-if="result.tags && result.tags.length" class="result-tags">
               <span v-for="tag in result.tags" :key="tag" class="tag">{{ tag }}</span>
             </div>
+            <!-- eslint-disable-next-line vue/no-v-html -->
             <p v-if="result.excerpt" class="result-excerpt" v-html="highlightKeyword(result.excerpt)"></p>
             <div class="result-meta">
               <span class="meta-item">
@@ -115,6 +117,7 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import DOMPurify from 'dompurify'
 import NavBar from '@/components/NavBar.vue'
 import SearchSuggestions from '@/components/SearchSuggestions.vue'
 import { getArticlesList } from '@/api/Articles/browse'
@@ -220,12 +223,19 @@ const formatDate = (dateStr) => {
   return date.toLocaleDateString('zh-CN')
 }
 
-// 高亮关键词
+// 高亮关键词（使用 DOMPurify 防止 XSS）
 const highlightKeyword = (text) => {
   if (!text || !searchKeyword.value) return text
   const keyword = searchKeyword.value.trim()
-  const regex = new RegExp(`(${keyword})`, 'gi')
-  return text.replace(regex, '<mark>$1</mark>')
+  // 转义特殊字符，防止正则注入
+  const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`(${escapedKeyword})`, 'gi')
+  const highlighted = text.replace(regex, '<mark>$1</mark>')
+  // 使用 DOMPurify 清理，只允许 <mark> 标签
+  return DOMPurify.sanitize(highlighted, {
+    ALLOWED_TAGS: ['mark'],
+    ALLOWED_ATTR: []
+  })
 }
 
 // 执行搜索

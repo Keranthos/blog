@@ -1388,6 +1388,7 @@ const fixResidualBoldInDOM = () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  flex-wrap: nowrap; /* 强制保持一行 */
 }
 
 .left-buttons, .right-buttons {
@@ -1407,6 +1408,8 @@ const fixResidualBoldInDOM = () => {
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.3s ease;
+  white-space: nowrap; /* 防止文字换行 */
+  flex-shrink: 0; /* 默认不收缩，但在小屏幕时可以收缩 */
 }
 
 .like-btn:hover, .subscribe-btn:hover, .comment-btn:hover, .share-btn:hover, .edit-btn:hover {
@@ -2437,7 +2440,20 @@ pre:hover .copy-btn {
   box-shadow: none;
 }
 
-/* 响应式 */
+/* 响应式 - 平板和中等屏幕优化 */
+@media (max-width: 800px) {
+  .left-buttons, .right-buttons {
+    /* 减少按钮间距，节省空间 */
+    gap: 10px;
+  }
+
+  .like-btn, .subscribe-btn, .comment-btn, .share-btn, .edit-btn {
+    /* 稍微减小按钮 padding，节省空间 */
+    padding: 7px 14px;
+    font-size: 0.85rem;
+  }
+}
+
 @media (max-width: 768px) {
   .article-title-section {
     padding: 20px 0 15px;
@@ -2469,18 +2485,20 @@ pre:hover .copy-btn {
   }
 
   .engagement-buttons {
-    flex-direction: column;
-    gap: 15px;
+    /* 保持一行布局，不改为垂直布局 */
     margin-bottom: 15px;
+    /* space-between 会自动处理间距，允许中间收缩 */
   }
 
   .left-buttons, .right-buttons {
-    gap: 10px;
+    gap: 8px; /* 进一步减小间距 */
   }
 
-  .like-btn, .subscribe-btn, .comment-btn, .share-btn {
+  .like-btn, .subscribe-btn, .comment-btn, .share-btn, .edit-btn {
     padding: 6px 12px;
     font-size: 0.8rem;
+    min-width: 0; /* 允许按钮内容收缩 */
+    flex-shrink: 1; /* 允许按钮收缩 */
   }
 
   .article-stats {
@@ -2489,6 +2507,18 @@ pre:hover .copy-btn {
 
   .article-image {
     max-height: 300px;
+    /* 确保图片在移动端也有侧边距 */
+    margin: 0 20px;
+    max-width: calc(100% - 40px); /* 减去左右各20px的边距 */
+  }
+
+  /* 确保内容中的图片在移动端也保持侧边距 */
+  .article-content .markdown-body img,
+  .content-container .markdown-body img,
+  .detail-view .markdown-body img,
+  .markdown-body img {
+    max-width: calc(100% - 40px) !important; /* 减去左右各20px的边距，确保至少有20px侧边距 */
+    margin: 20px auto !important;
   }
 
   .content-container {

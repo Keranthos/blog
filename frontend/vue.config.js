@@ -32,7 +32,9 @@ module.exports = defineConfig({
             name: 'chunk-vendors',
             test: /[\\/]node_modules[\\/]/,
             priority: 10,
-            reuseExistingChunk: true
+            reuseExistingChunk: true,
+            minChunks: 1,
+            minSize: 0
           },
           // Markdown 相关库（marked, DOMPurify）单独打包
           markdown: {
@@ -54,9 +56,45 @@ module.exports = defineConfig({
             test: /[\\/]node_modules[\\/](vue-router|vuex)[\\/]/,
             priority: 15,
             reuseExistingChunk: true
+          },
+          // Highlight.js 单独打包（代码高亮，按需加载）
+          highlightjs: {
+            name: 'chunk-highlightjs',
+            test: /[\\/]node_modules[\\/](highlight\.js|@highlightjs)[\\/]/,
+            priority: 18,
+            reuseExistingChunk: true
           }
         }
+      },
+      // 运行时 chunk 单独提取，便于长期缓存
+      runtimeChunk: {
+        name: 'runtime'
       }
-    }
+    },
+    // 生产环境优化
+    ...(process.env.NODE_ENV === 'production' ? {
+      performance: {
+        hints: 'warning',
+        maxEntrypointSize: 512000,  // 500KB
+        maxAssetSize: 512000
+      }
+    } : {})
+  },
+  // 生产环境优化
+  productionSourceMap: false,  // 禁用 source map 减小构建体积
+  // 图片优化（使用 imagemin-webpack-plugin 需要额外安装）
+  chainWebpack: config => {
+    // 压缩图片（需要安装 imagemin-webpack-plugin）
+    // config.module
+    //   .rule('images')
+    //   .use('image-webpack-loader')
+    //   .loader('image-webpack-loader')
+    //   .options({
+    //     mozjpeg: { progressive: true, quality: 85 },
+    //     optipng: { enabled: false },
+    //     pngquant: { quality: [0.65, 0.90], speed: 4 },
+    //     gifsicle: { interlaced: false },
+    //     webp: { quality: 85 }
+    //   })
   }
 })

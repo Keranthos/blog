@@ -505,94 +505,19 @@ EXIT;
 vim /etc/nginx/conf.d/keranthos.me.conf
 ```
 
-配置内容：
-```nginx
-# 如果使用 Cloudflare 代理，需要先配置真实 IP 获取
-# Cloudflare IP 段（用于信任 CF 的真实 IP 头部）
-# 在 http 块中添加（如果不在 http 块中，也可以放在 server 块之前）
+**完整配置内容（包含性能优化）：**
 
-# 在 /etc/nginx/nginx.conf 的 http 块中添加以下配置（如果使用 CF）
-# set_real_ip_from 103.21.244.0/22;
-# set_real_ip_from 103.22.200.0/22;
-# set_real_ip_from 103.31.4.0/22;
-# set_real_ip_from 104.16.0.0/13;
-# set_real_ip_from 104.24.0.0/14;
-# set_real_ip_from 108.162.192.0/18;
-# set_real_ip_from 131.0.72.0/22;
-# set_real_ip_from 141.101.64.0/18;
-# set_real_ip_from 162.158.0.0/15;
-# set_real_ip_from 172.64.0.0/13;
-# set_real_ip_from 173.245.48.0/20;
-# set_real_ip_from 188.114.96.0/20;
-# set_real_ip_from 190.93.240.0/20;
-# set_real_ip_from 197.234.240.0/22;
-# set_real_ip_from 198.41.128.0/17;
-# set_real_ip_from 2400:cb00::/32;
-# set_real_ip_from 2606:4700::/32;
-# set_real_ip_from 2803:f800::/32;
-# set_real_ip_from 2405:b500::/32;
-# set_real_ip_from 2405:8100::/32;
-# set_real_ip_from 2c0f:f248::/32;
-# set_real_ip_from 2a06:98c0::/29;
-# real_ip_header CF-Connecting-IP;
+见文件：`nginx_keranthos.conf`（项目根目录）
 
-server {
-    listen 80;
-    server_name keranthos.me www.keranthos.me;
+**关键配置要点：**
+- HTML 文件不缓存（确保更新及时）
+- JS/CSS/字体 365 天长期缓存
+- 图片 90 天缓存
+- Gzip 压缩优化（级别 6）
+- HTTP/2 协议启用
+- API 代理：`proxy_pass http://127.0.0.1:3000/api/;`（注意路径包含 `/api`）
 
-    # 前端静态资源
-    root /var/www/blog;
-    index index.html;
-
-    # 前端路由历史模式支持
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # 后端 API
-    location /api/ {
-        proxy_pass http://127.0.0.1:3000/;
-        proxy_set_header Host $host;
-        
-        # 真实 IP 获取（如果使用 Cloudflare 代理）
-        # 优先使用 CF-Connecting-IP，如果不存在则使用 X-Forwarded-For
-        proxy_set_header X-Real-IP $http_cf_connecting_ip;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # Cloudflare 相关头部（如果使用 CF 代理）
-        proxy_set_header CF-Connecting-IP $http_cf_connecting_ip;
-        proxy_set_header CF-Ray $http_cf_ray;
-        proxy_set_header CF-Visitor $http_cf_visitor;
-        
-        # WebSocket 支持（如果需要）
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-
-    # 后端静态上传文件（使用 ^~ 确保优先级高于正则 location）
-    location ^~ /uploads/ {
-        alias /opt/blog/backend/uploads/;
-        
-        # 缓存设置（可选）
-        expires 7d;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # 静态资源缓存（CSS、JS）- /uploads/ 已用 ^~ 排除，不会被此规则匹配
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # Gzip 压缩
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss application/json;
-}
-```
+**完整配置文件内容请参考项目根目录的 `nginx_keranthos.conf` 文件。**
 
 **⚠️ 如果使用 Cloudflare 代理，还需要修改 Nginx 主配置：**
 
@@ -911,40 +836,93 @@ systemctl disable firewalld
 
 ### 更新代码流程
 
-**当需要更新代码时：**
+### 更新前端代码
 
-#### 方式一：使用自动化脚本（推荐）⚡
+**当需要更新前端代码时：**
 
-**后端更新（一键完成）：**
+1. **本地构建（Windows）：**
+   ```powershell
+   # 更新代码
+   cd D:\blog
+   git pull
+   
+   # 构建前端
+   cd frontend
+   npm install  # 如果 package.json 有更新
+   npm run build
+   ```
 
-在项目根目录下执行：
+2. **上传到服务器：**
+   ```powershell
+   # 方式A：增量更新（推荐，只覆盖同名文件）
+   scp -r frontend/dist/* root@47.242.6.37:/var/www/blog/
+   
+   # 方式B：完全清理后更新（如果有缓存问题）
+   ssh root@47.242.6.37 "rm -rf /var/www/blog/*"
+   scp -r frontend/dist/* root@47.242.6.37:/var/www/blog/
+   ```
+
+3. **清除 Cloudflare 缓存（如果使用 CF）：**
+   - 登录 Cloudflare 控制台
+   - 进入 **Caching** → **Purge Everything**
+   - 或者使用 API 清除特定文件缓存
+
+### 更新 Nginx 配置文件
+
+**方法一：使用 SCP 上传（推荐）**
+
+在本地 PowerShell 执行：
 ```powershell
-cd backend; .\..\update-backend.ps1
+# 1. 备份服务器上的原配置文件
+ssh root@47.242.6.37 "cp /etc/nginx/conf.d/keranthos.me.conf /etc/nginx/conf.d/keranthos.me.conf.bak.$(date +%Y%m%d_%H%M%S)"
+
+# 2. 上传新的配置文件（从项目根目录）
+scp nginx_keranthos.conf root@47.242.6.37:/etc/nginx/conf.d/keranthos.me.conf
+
+# 3. 在服务器上测试配置文件（非常重要！）
+ssh root@47.242.6.37 "nginx -t"
+
+# 4. 如果测试通过，重新加载 Nginx（不中断服务）
+ssh root@47.242.6.37 "systemctl reload nginx"
+
+# 5. 检查 Nginx 服务状态
+ssh root@47.242.6.37 "systemctl status nginx --no-pager -l"
 ```
 
-或者在 backend 目录下直接执行：
-```powershell
-.\update-backend.ps1
+**方法二：手动操作**
+
+在服务器上执行：
+```bash
+# 1. 备份原配置
+cp /etc/nginx/conf.d/keranthos.me.conf /etc/nginx/conf.d/keranthos.me.conf.bak.$(date +%Y%m%d_%H%M%S)
+
+# 2. 使用 vim 编辑配置文件
+vim /etc/nginx/conf.d/keranthos.me.conf
+
+# 3. 将本地的 nginx_keranthos.conf 内容全部复制粘贴进去（覆盖原有内容）
+
+# 4. 测试配置（非常重要！）
+nginx -t
+
+# 5. 如果测试通过，重新加载 Nginx
+systemctl reload nginx
 ```
 
-**脚本功能：**
-- ✅ 自动编译 Linux 版本
-- ✅ 自动停止服务器上的后端服务
-- ✅ 自动上传文件（使用临时文件名避免冲突）
-- ✅ 自动替换文件并设置权限
-- ✅ 自动启动服务并检查状态
+**验证优化是否生效：**
+```bash
+# 测试 HTTP/2
+curl -I --http2 https://keranthos.me
 
-**脚本参数（可选）：**
-```powershell
-# 指定服务器IP和用户
-.\update-backend.ps1 -ServerIP "47.242.6.37" -ServerUser "root"
+# 测试 Gzip 压缩
+curl -H "Accept-Encoding: gzip" -I https://keranthos.me | grep -i "content-encoding"
+
+# 测试缓存头
+curl -I https://keranthos.me/js/app.js | grep -i "cache-control"
 ```
 
----
+### 更新后端代码
 
-#### 方式二：手动更新
-
-**当需要更新代码时：**
+**当需要更新后端代码时：**
 
 1. **本地构建（Windows）：**
    ```powershell
@@ -1165,15 +1143,89 @@ localhost:3000/api/articles?page=1&limit=3&type=blog:1
 
 ---
 
+## 第十二部分：性能优化与进阶配置
+
+### Nginx 性能优化配置
+
+完整的 Nginx 配置文件请参考项目根目录的 `nginx_keranthos.conf`。
+
+**已实施的优化：**
+- ✅ HTTP/2 协议（多路复用、头部压缩）
+- ✅ Gzip 压缩（级别 6，压缩率 60-80%）
+- ✅ 分层缓存策略（HTML 不缓存，JS/CSS 365天，图片 90天）
+- ✅ 连接优化（keepalive、tcp_nodelay、tcp_nopush）
+- ✅ 静态资源访问日志关闭（减少 I/O）
+
+**可选优化：Brotli 压缩**
+
+Brotli 比 Gzip 压缩率高 15-20%，但需要额外安装 Nginx 模块。
+
+**如果使用 Cloudflare CDN：** 不需要安装（Cloudflare 免费版已自动处理 Brotli）
+
+**如果需要服务器端安装：**
+```bash
+# 检查是否已安装
+nginx -V 2>&1 | grep -i brotli
+
+# 如果未安装，可参考项目根目录的 INSTALL_BROTLI.md（可选）
+```
+
+**验证 Cloudflare 是否已启用 Brotli：**
+```bash
+curl -H "Accept-Encoding: br" -I https://keranthos.me | grep -i "content-encoding"
+# 如果返回 content-encoding: br，说明已启用
+```
+
+### Cloudflare 配置
+
+**Cloudflare IP 配置文件：** 见项目根目录 `cloudflare.conf`
+
+如果使用 Cloudflare 代理（橙色云朵开启），需要配置真实 IP 获取：
+
+1. 在服务器上创建配置文件：
+```bash
+vim /etc/nginx/cloudflare.conf
+# 复制项目根目录 cloudflare.conf 的内容
+```
+
+2. 在 `/etc/nginx/nginx.conf` 的 `http` 块中添加：
+```nginx
+include /etc/nginx/cloudflare.conf;
+```
+
+3. 重新加载 Nginx：
+```bash
+nginx -t && systemctl reload nginx
+```
+
+### 服务器配置建议
+
+**最低配置（适合初期）：**
+- CPU: 1核
+- 内存: 2GB（使用对象存储可降到 1.5GB）
+- 硬盘: 20GB SSD
+- 带宽: 1-3Mbps
+
+**推荐配置（适合中小型博客）：**
+- CPU: 2核
+- 内存: 4GB（不使用对象存储）或 2GB（使用对象存储）
+- 硬盘: 40GB SSD
+- 带宽: 3-5Mbps
+
+**注意：** 当前配置已足够，无需 jsDelivr CDN 优化（Cloudflare CDN 已足够）。
+
+---
+
 ## 完成 ✅
 
 部署完成后，你的博客应该可以通过 https://keranthos.me 访问了！
 
 **建议的后续优化：**
-1. 配置 Cloudflare 缓存规则
-2. 启用 Cloudflare 的 Auto Minify（HTML/CSS/JS压缩）
-3. 配置图片 CDN（如使用对象存储）
-4. 设置监控告警（可选）
+1. ✅ 配置 Cloudflare 缓存规则（已完成）
+2. ✅ 启用 Cloudflare 的 Auto Minify（HTML/CSS/JS压缩）
+3. 🔄 配置图片 CDN（如使用对象存储）- 待实施
+4. 🔄 数据库分离（MySQL 主从或独立数据库服务器）- 待实施
+5. 🔄 设置监控告警（可选）
 
 ---
 

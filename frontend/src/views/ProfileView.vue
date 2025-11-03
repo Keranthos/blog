@@ -16,6 +16,7 @@
               </div>
             </div>
             <div class="intro-content">
+              <!-- eslint-disable-next-line vue/no-v-html -->
               <div class="intro-text" v-html="formattedIntro"></div>
               <!-- 底部装饰图片 -->
               <div class="intro-bottom-image">
@@ -82,6 +83,7 @@
 
 <script setup>
 import { ref, onMounted, computed, onUnmounted } from 'vue'
+import DOMPurify from 'dompurify'
 import NavBar from '@/components/NavBar.vue'
 import { getArticlesNum, getArticlesList } from '@/api/Articles/browse'
 import { getMomentsNum, getMomentsList } from '@/api/Moments/browse'
@@ -131,9 +133,9 @@ const projects = ref([
   }
 ])
 
-// 格式化自我介绍内容
+// 格式化自我介绍内容（使用 DOMPurify 防止 XSS）
 const formattedIntro = computed(() => {
-  return introContent.value
+  const html = introContent.value
     .replace(/^# (.*$)/gim, '<h1>$1</h1>')
     .replace(/^## (.*$)/gim, '<h2>$1</h2>')
     .replace(/^### (.*$)/gim, '<h3>$1</h3>')
@@ -147,6 +149,12 @@ const formattedIntro = computed(() => {
     .replace(/^(?!<[h1-3]|<li|<p)/gm, '<p>')
     .replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>')
     .replace(/<\/ul>\s*<ul>/g, '')
+  // 使用 DOMPurify 清理 HTML，只允许安全的标签和属性
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['h1', 'h2', 'h3', 'p', 'strong', 'em', 'code', 'ul', 'li', 'a'],
+    ALLOWED_ATTR: ['href', 'target'],
+    ALLOW_DATA_ATTR: false
+  })
 })
 
 // 图片预览样式
