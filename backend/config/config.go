@@ -4,6 +4,7 @@ import (
 	"backend/models"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/spf13/viper"
@@ -126,9 +127,15 @@ func GetJWT() (string, string) {
 }
 
 // createDefaultAdmin 创建默认管理员账户（如果不存在）
+// ⚠️ 安全提示：生产环境应禁用此功能或通过环境变量设置初始密码
 func createDefaultAdmin() error {
 	username := "山角函兽"
-	password := "Wan05609"
+	// 从环境变量读取初始密码，如果没有则使用默认值（仅用于首次初始化）
+	// 生产环境建议通过环境变量 ADMIN_INITIAL_PASSWORD 设置
+	password := "ChangeMe123!" // 默认密码，生产环境必须修改
+	if envPassword := os.Getenv("ADMIN_INITIAL_PASSWORD"); envPassword != "" {
+		password = envPassword
+	}
 	level := 3 // 管理员权限
 
 	// 检查用户是否已存在
