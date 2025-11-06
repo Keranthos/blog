@@ -59,6 +59,7 @@ const routes = [
   { path: '/images', name: 'ImageManage', component: () => import('@/views/ImageManageView.vue') },
   { path: '/presentation', name: 'Presentation', component: () => import('@/views/PresentationView.vue') },
   { path: '/editpresentation', name: 'EditPresentation', component: () => import('@/views/EditPresentationView.vue') },
+  { path: '/planner', name: 'Planner', component: () => import('@/views/PlannerView.vue') },
   { path: '/error', name: 'Error', component: () => import('@/views/ErrorView.vue') },
   { path: '/:catchAll(.*)', name: 'NotFound', component: () => import('@/views/NotFoundView.vue') }
 ]

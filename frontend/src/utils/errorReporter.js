@@ -83,6 +83,25 @@ async function reportError (errorInfo) {
  * 处理 JavaScript 运行时错误
  */
 function handleError (event) {
+  // 忽略来自浏览器扩展的错误（如 MetaMask）
+  if (event.filename && (
+    event.filename.includes('chrome-extension://') ||
+    event.filename.includes('moz-extension://') ||
+    event.filename.includes('safari-extension://') ||
+    event.filename.includes('extension://')
+  )) {
+    return // 静默忽略扩展错误
+  }
+
+  // 忽略 MetaMask 相关的错误
+  if (event.message && (
+    event.message.includes('MetaMask') ||
+    event.message.includes('Failed to connect to MetaMask') ||
+    event.message.includes('ethereum')
+  )) {
+    return // 静默忽略 MetaMask 错误
+  }
+
   const error = event.error || new Error(event.message)
   const errorInfo = formatError(error, {
     filename: event.filename,
@@ -97,6 +116,18 @@ function handleError (event) {
  * 处理未捕获的 Promise 拒绝
  */
 function handleUnhandledRejection (event) {
+  // 忽略来自浏览器扩展的错误（如 MetaMask）
+  const reasonStr = String(event.reason || '')
+  if (
+    reasonStr.includes('MetaMask') ||
+    reasonStr.includes('Failed to connect to MetaMask') ||
+    reasonStr.includes('ethereum') ||
+    reasonStr.includes('chrome-extension://') ||
+    reasonStr.includes('moz-extension://')
+  ) {
+    return // 静默忽略扩展错误
+  }
+
   const error = event.reason instanceof Error
     ? event.reason
     : new Error(String(event.reason))

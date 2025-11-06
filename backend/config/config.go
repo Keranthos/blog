@@ -98,6 +98,10 @@ func InitDB() error { // 初始化全局连接池DB
 		&models.Moment{},
 		&models.Weather{},
 		&models.Presentation{},
+		&models.Task{},
+		&models.Entertainment{},
+		&models.DailyReflection{},
+		&models.Deadline{},
 	); err != nil {
 		return fmt.Errorf("error migrating database: %v", err)
 	}

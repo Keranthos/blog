@@ -1,33 +1,48 @@
 <template>
   <div class="media-view">
     <NavBar />
-    <div class="media-layout">
-      <!-- 左侧：顶部图片 + 外部文案 -->
-      <div class="left-col">
-        <div class="header">
-          <img :src="novelsBackground" alt="Background Image" class="header-image" loading="lazy" decoding="async" @error="onImgError($event)" />
-        </div>
-        <div class="intro">
-          <div v-if="introTitle" class="intro-title">{{ introTitle }}</div>
-          <pre v-if="introBody" class="intro-text">{{ introBody }}</pre>
-        </div>
+    <!-- 加载界面 -->
+    <Transition name="fade">
+      <div v-if="isLoading" key="loading" class="loading-wrapper">
+        <ModernLoading
+          :progress="loadingProgress"
+          :title="'书影集'"
+          :subtitle="'Loading……'"
+        />
       </div>
+    </Transition>
+    <!-- 内容界面（带过渡动画） -->
+    <Transition name="fade-slide">
+      <div v-if="!isLoading" key="content" class="content-fade-in">
+        <div class="media-layout">
+          <!-- 左侧：顶部图片 + 外部文案 -->
+          <div class="left-col">
+            <div class="header">
+              <img :src="novelsBackground" alt="Background Image" class="header-image" loading="lazy" decoding="async" @error="onImgError($event)" />
+            </div>
+            <div class="intro">
+              <div v-if="introTitle" class="intro-title">{{ introTitle }}</div>
+              <pre v-if="introBody" class="intro-text">{{ introBody }}</pre>
+            </div>
+          </div>
 
-      <!-- 右侧：长条列表卡片（无图片） -->
-      <div class="right-col" @scroll="handleScroll">
-        <div class="media-rows">
-          <MediaCard
-            v-for="media in mediaList"
-            :key="media.ID + '_' + (media.__type || '')"
-            :ref="el => { if (el) mediaCardRefs[media.ID] = el }"
-            :media="media"
-            :type="media.__type || 'novels'"
-            variant="row"
-            @media-deleted="removeMedia"
-          />
+          <!-- 右侧：长条列表卡片（无图片） -->
+          <div class="right-col" @scroll="handleScroll">
+            <div class="media-rows">
+              <MediaCard
+                v-for="media in mediaList"
+                :key="media.ID + '_' + (media.__type || '')"
+                :ref="el => { if (el) mediaCardRefs[media.ID] = el }"
+                :media="media"
+                :type="media.__type || 'novels'"
+                variant="row"
+                @media-deleted="removeMedia"
+              />
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
@@ -39,13 +54,15 @@ import MediaCard from '@/components/MediaCard.vue'
 import novelsBackgroundImg from '@/assets/novels_background.jpg'
 
 const NavBar = defineAsyncComponent(() => import('@/components/NavBar.vue'))
+const ModernLoading = defineAsyncComponent(() => import('@/components/ModernLoading.vue'))
 const route = useRoute()
 const router = useRouter()
 
 const novelsBackground = novelsBackgroundImg
 const mediaList = ref([])
 const currentPage = ref(1)
-const isLoading = ref(false)
+const isLoading = ref(true) // 初始加载状态为 true，确保先显示加载界面
+const loadingProgress = ref(0)
 const mediaCache = ref({})
 const introText = ref('')
 const introTitle = ref('')
@@ -90,12 +107,27 @@ const onImgError = (e) => {
   }
 }
 
-const loadMedia = async () => {
-  if (isLoading.value) return
+const loadMedia = async (isInitialLoad = false) => {
+  // 如果是初始加载，允许执行；如果是后续加载且正在加载中，则阻止
+  if (!isInitialLoad && isLoading.value) return
   isLoading.value = true
+  loadingProgress.value = 0
+
+  // 模拟加载进度
+  const progressInterval = setInterval(() => {
+    if (loadingProgress.value < 90) {
+      loadingProgress.value += Math.random() * 20
+    }
+  }, 100)
+
   try {
     if (mediaCache.value[currentPage.value]) {
       mediaList.value.push(...mediaCache.value[currentPage.value])
+      loadingProgress.value = 100
+      clearInterval(progressInterval)
+      setTimeout(() => {
+        isLoading.value = false
+      }, 300)
     } else {
       const [novelsRes, booksRes, moviesRes] = await Promise.all([
         getMediaList('novels', currentPage.value),
@@ -116,11 +148,20 @@ const loadMedia = async () => {
       merged.sort((a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt))
       mediaList.value.push(...merged)
       mediaCache.value[currentPage.value] = merged
+
+      // 完成加载
+      loadingProgress.value = 100
+      clearInterval(progressInterval)
+
+      // 延迟一点时间让用户看到100%的进度
+      setTimeout(() => {
+        isLoading.value = false
+      }, 300)
     }
     currentPage.value++
   } catch (error) {
     console.error('Failed to load media:', error)
-  } finally {
+    clearInterval(progressInterval)
     isLoading.value = false
   }
 }
@@ -128,7 +169,7 @@ const loadMedia = async () => {
 const handleScroll = (event) => {
   const { scrollTop, scrollHeight, clientHeight } = event.target
   if (scrollTop + clientHeight >= scrollHeight - 10) {
-    loadMedia()
+    loadMedia(false) // 后续加载
   }
 }
 
@@ -172,7 +213,7 @@ watch(() => route.query.mediaId, async (mediaId) => {
 }, { immediate: true })
 
 onMounted(() => {
-  loadMedia()
+  loadMedia(true) // 初始加载
   // 加载左侧文案（来自 public/data/media-intro.txt）
   fetch('/data/media-intro.txt')
     .then(res => res.ok ? res.text() : '')
@@ -205,6 +246,67 @@ onMounted(() => {
   padding-bottom: 100px;
   overflow-x: hidden; /* 防止横向滚动 */
   box-sizing: border-box;
+}
+
+/* 加载包装器样式 */
+.loading-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+}
+
+/* 过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.fade-slide-enter-active {
+  transition: all 0.5s ease-out;
+}
+
+.fade-slide-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.fade-slide-enter-to,
+.fade-slide-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 内容淡入动画 */
+.content-fade-in {
+  animation: contentFadeIn 0.6s ease-out;
+}
+
+@keyframes contentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .media-layout { width: 80%; max-width: 1280px; margin: 20px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }

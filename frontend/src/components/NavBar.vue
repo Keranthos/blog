@@ -64,6 +64,10 @@
               <div v-if="settingsDropdownVisible" class="dropdown-menu-arrow settings-arrow"></div>
               <transition name="dropdown-fade">
                 <div v-if="settingsDropdownVisible" class="dropdown-menu">
+                  <div class="dropdown-item" :class="{ active: route.path === '/planner' }" @click="navigateToPlanner">
+                    <font-awesome-icon icon="calendar" />
+                    <span>计划管理</span>
+                  </div>
                   <div class="dropdown-item" :class="{ active: route.path === '/images' }" @click="navigateToImages">
                     <font-awesome-icon icon="images" />
                     <span>图片管理</span>
@@ -343,6 +347,9 @@
                   <span class="chevron" :class="{ open: expand.settings }">›</span>
                 </button>
                 <div v-if="expand.settings" class="nav-more-sublist">
+                  <button class="nav-more-subitem" @click="goAndClose('/planner')">
+                    <font-awesome-icon icon="calendar" /> 计划管理
+                  </button>
                   <button class="nav-more-subitem" @click="goAndClose('/images')">
                     <font-awesome-icon icon="images" /> 图片管理
                   </button>
@@ -601,6 +608,11 @@ const copyEmailAndClose = async () => { await copyEmail(); closeNavMoreModal() }
 
 const navigateToImages = () => {
   router.push('/images')
+}
+
+const navigateToPlanner = () => {
+  router.push('/planner')
+  settingsDropdownVisible.value = false
 }
 
 const navigateToLocationUpdate = () => {

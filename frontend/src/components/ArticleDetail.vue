@@ -61,8 +61,29 @@
       <!-- 标题位置占位容器 -->
       <div class="title-spacer"></div>
 
-      <article class="article-content">
+      <article ref="articleContentRef" class="article-content">
         <div class="markdown-body" v-html="renderedContent"></div>
+
+        <!-- 文本选择菜单 -->
+        <TextSelectionMenu
+          :visible="textSelectionMenuVisible"
+          :position="textSelectionPosition"
+          :selected-text="selectedText"
+          :is-highlighted="isTextHighlighted"
+          @copy="handleTextCopy"
+          @highlight="handleTextHighlight"
+          @share="handleTextShare"
+        />
+
+        <!-- 分享卡片 -->
+        <ShareCard
+          :visible="shareCardVisible"
+          :selected-text="shareSelectedText"
+          :article-title="title"
+          :article-subtitle="getArticleSubtitle()"
+          :article-url="articleUrl"
+          @close="shareCardVisible = false"
+        />
 
         <!-- 悬浮文章目录 -->
         <div v-if="toc.length > 0 && tocVisible" class="floating-toc">
@@ -227,6 +248,8 @@ import '@/assets/styles/github-highlight.css'
 import { generateArticleSEO } from '@/utils/seo'
 import RelatedArticles from '@/components/RelatedArticles.vue'
 import { estimateReadingTime } from '@/utils/readingTime'
+import TextSelectionMenu from '@/components/TextSelectionMenu.vue'
+import ShareCard from '@/components/ShareCard.vue'
 
 // 防抖函数
 let scrollTimeout = null
@@ -742,6 +765,17 @@ const viewCount = ref(0)
 const toc = ref([]) // 文章目录
 const isLiked = ref(false) // 点赞状态
 const likeCount = ref(0) // 点赞数
+
+// 文本选择相关
+const articleContentRef = ref(null)
+const textSelectionMenuVisible = ref(false)
+const textSelectionPosition = ref({ x: 0, y: 0 })
+const selectedText = ref('')
+const isTextHighlighted = ref(false)
+const highlightedRange = ref(null)
+const shareCardVisible = ref(false)
+const shareSelectedText = ref('')
+const articleUrl = ref('')
 const readingTime = ref(null) // 阅读时间估算
 const tocVisible = ref(true) // 目录是否可见
 const contentContainer = ref(null) // 内容容器引用
@@ -944,6 +978,11 @@ const loadDetail = async () => {
 
       // 生成目录
       generateTOC()
+
+      // 恢复高亮（在DOM完全渲染后）
+      setTimeout(() => {
+        restoreHighlights()
+      }, 200)
     }, 100) // 延迟100ms确保渲染完成
   })
 }
@@ -1133,6 +1172,785 @@ const handleDeleteComment = async (commentId) => {
 }
 
 // 在组件挂载时加载文章和评论
+// 文本选择处理函数
+const handleTextSelection = (e) => {
+  // 如果点击的是文本选择菜单，不处理文本选择
+  if (e.target && (e.target.closest('.text-selection-menu') || e.target.closest('.menu-btn'))) {
+    return
+  }
+
+  const selection = window.getSelection()
+  const selectedTextValue = selection.toString().trim()
+
+  // 如果选择为空或不在文章内容区域内，隐藏菜单
+  if (!selectedTextValue || !articleContentRef.value) {
+    textSelectionMenuVisible.value = false
+    return
+  }
+
+  // 检查选择是否在 markdown-body 内
+  const markdownBody = articleContentRef.value.querySelector('.markdown-body')
+  if (!markdownBody || !markdownBody.contains(selection.anchorNode)) {
+    textSelectionMenuVisible.value = false
+    return
+  }
+
+  // 获取选择的位置
+  const range = selection.getRangeAt(0).cloneRange() // 克隆 range，避免选择被清除时丢失
+  const rect = range.getBoundingClientRect()
+
+  // 设置菜单位置（鼠标位置）
+  textSelectionPosition.value = {
+    x: rect.left + rect.width / 2,
+    y: rect.top
+  }
+
+  selectedText.value = selectedTextValue
+  highlightedRange.value = range
+
+  // 检查是否已高亮
+  isTextHighlighted.value = checkIfHighlighted(range)
+
+  textSelectionMenuVisible.value = true
+}
+
+// 清除选择（只隐藏菜单，不清除高亮）
+// 注意：此函数目前未被直接使用，但保留以备将来需要
+// const clearTextSelection = () => {
+//   textSelectionMenuVisible.value = false
+//   selectedText.value = ''
+//   highlightedRange.value = null
+// }
+
+// 复制文本
+const handleTextCopy = async (text) => {
+  try {
+    await copyToClipboard(text)
+    showSuccessMessage('copy')
+    // 只隐藏菜单，不清除高亮
+    textSelectionMenuVisible.value = false
+    selectedText.value = ''
+    highlightedRange.value = null
+  } catch (error) {
+    showErrorMessage('复制失败')
+  }
+}
+
+// 检查选择是否已高亮
+const checkIfHighlighted = (range) => {
+  if (!range) return false
+  const container = range.commonAncestorContainer
+  const parent = container.nodeType === Node.TEXT_NODE ? container.parentElement : container
+  return parent?.closest('.text-highlight') !== null
+}
+
+// 高亮文本 - 使用 span 标签，但设置 display: contents 以避免破坏布局
+// 获取范围内的所有文本节点
+const getTextNodesInRange = (range) => {
+  const textNodes = []
+  const walker = document.createTreeWalker(
+    range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+      ? range.commonAncestorContainer.parentNode
+      : range.commonAncestorContainer,
+    NodeFilter.SHOW_TEXT,
+    null
+  )
+
+  let node
+  while ((node = walker.nextNode())) {
+    if (range.intersectsNode(node)) {
+      textNodes.push(node)
+    }
+  }
+  return textNodes
+}
+
+// 检查文本节点是否已经高亮（或其祖先元素是否高亮）
+const isTextNodeHighlighted = (textNode) => {
+  let current = textNode.parentElement || textNode.parentNode
+  while (current) {
+    // 跳过 highlight.js 添加的元素（如 hljs 相关的类）
+    if (current.classList) {
+      if (current.classList.contains('text-highlight')) {
+        return true
+      }
+      // 跳过 highlight.js 的 span（通常有 hljs-* 类）
+      if (Array.from(current.classList).some(cls => cls.startsWith('hljs-'))) {
+        // 继续向上查找，但不把 hljs span 当作高亮
+        current = current.parentElement || current.parentNode
+        continue
+      }
+    }
+    // 如果到达了文章内容容器的边界，停止搜索
+    if (current === articleContentRef.value ||
+        (current.nodeType === Node.ELEMENT_NODE && current.classList?.contains('markdown-body'))) {
+      break
+    }
+    current = current.parentElement || current.parentNode
+  }
+  return false
+}
+
+// 获取范围内的所有高亮span元素
+const getHighlightSpansInRange = (range) => {
+  const highlights = []
+  const walker = document.createTreeWalker(
+    range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+      ? range.commonAncestorContainer.parentNode
+      : range.commonAncestorContainer,
+    NodeFilter.SHOW_ELEMENT,
+    {
+      acceptNode: (node) => {
+        if (node.classList && node.classList.contains('text-highlight')) {
+          return NodeFilter.FILTER_ACCEPT
+        }
+        return NodeFilter.FILTER_SKIP
+      }
+    }
+  )
+
+  let node
+  while ((node = walker.nextNode())) {
+    if (range.intersectsNode(node)) {
+      highlights.push(node)
+    }
+  }
+  return highlights
+}
+
+// 检查选择范围是否完全在高亮区域内
+const isRangeFullyHighlighted = (range) => {
+  // 获取范围内的所有高亮span
+  const highlights = getHighlightSpansInRange(range)
+  if (highlights.length === 0) return false
+
+  // 创建一个范围来检查所有文本节点
+  const textNodes = getTextNodesInRange(range)
+  if (textNodes.length === 0) return false
+
+  // 检查每个文本节点是否都在某个高亮span内
+  for (const textNode of textNodes) {
+    let startOffset = 0
+    let endOffset = textNode.textContent.length
+
+    if (textNode === range.startContainer) {
+      startOffset = range.startOffset
+    }
+    if (textNode === range.endContainer) {
+      endOffset = range.endOffset
+    }
+
+    // 检查这个文本节点（或部分）是否在高亮span内
+    let isCovered = false
+    for (const highlight of highlights) {
+      const highlightRange = document.createRange()
+      highlightRange.selectNodeContents(highlight)
+
+      // 检查文本节点是否与高亮范围相交
+      if (highlightRange.intersectsNode(textNode)) {
+        // 进一步检查偏移量是否在范围内
+        const nodeRange = document.createRange()
+        nodeRange.setStart(textNode, startOffset)
+        nodeRange.setEnd(textNode, endOffset)
+
+        // 检查这个范围是否完全在高亮范围内
+        if (highlightRange.compareBoundaryPoints(Range.START_TO_START, nodeRange) <= 0 &&
+            highlightRange.compareBoundaryPoints(Range.END_TO_END, nodeRange) >= 0) {
+          isCovered = true
+          break
+        }
+      }
+    }
+
+    if (!isCovered) {
+      return false
+    }
+  }
+
+  return true
+}
+
+// 高亮文本 - 支持智能合并，避免嵌套
+const handleTextHighlight = async (text) => {
+  if (!highlightedRange.value) return
+
+  // 使用当前选择重新获取 range（更可靠）
+  const selection = window.getSelection()
+  let range = null
+
+  if (selection.rangeCount > 0) {
+    range = selection.getRangeAt(0).cloneRange()
+  } else if (highlightedRange.value) {
+    range = highlightedRange.value.cloneRange()
+  }
+
+  if (!range || range.collapsed) {
+    showCustomMessage('请先选择文本')
+    return
+  }
+
+  // 检查是否完全在高亮区域内
+  if (isRangeFullyHighlighted(range)) {
+    // 完全在高亮内，不进行任何操作，只隐藏菜单
+    textSelectionMenuVisible.value = false
+    selectedText.value = ''
+    highlightedRange.value = null
+    window.getSelection().removeAllRanges()
+    return
+  }
+
+  // 不移除重叠的高亮，而是只高亮未高亮的部分
+  // 已高亮的部分会通过检查逻辑自动跳过
+
+  // 检查是否包含块级元素（列表、标题等）
+  const blockElements = ['P', 'DIV', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'DL', 'DT', 'DD', 'BLOCKQUOTE', 'PRE', 'CODE', 'TABLE', 'TR', 'TD', 'TH', 'THEAD', 'TBODY']
+  const containsBlockElement = () => {
+    const commonAncestor = range.commonAncestorContainer
+    const startContainer = range.startContainer
+    const endContainer = range.endContainer
+
+    const checkNode = (node) => {
+      let current = node.nodeType === Node.TEXT_NODE ? node.parentElement : node
+      while (current && current !== commonAncestor) {
+        if (blockElements.includes(current.tagName)) {
+          return true
+        }
+        current = current.parentElement
+      }
+      return false
+    }
+
+    return checkNode(startContainer) || checkNode(endContainer)
+  }
+
+  // 如果包含块级元素，逐行处理
+  if (containsBlockElement()) {
+    const textNodes = getTextNodesInRange(range)
+    let hasHighlight = false
+
+    textNodes.forEach(textNode => {
+      // 计算与原始range的交集
+      let startOffset = 0
+      let endOffset = textNode.textContent.length
+
+      if (textNode === range.startContainer) {
+        startOffset = range.startOffset
+      }
+      if (textNode === range.endContainer) {
+        endOffset = range.endOffset
+      }
+
+      if (endOffset > startOffset) {
+        // 检查文本节点是否在高亮span内，以及高亮span覆盖的范围
+        // 注意：跳过 highlight.js 添加的元素
+        let current = textNode.parentElement || textNode.parentNode
+        let highlightSpan = null
+        while (current) {
+          if (current.classList && current.classList.contains('text-highlight')) {
+            highlightSpan = current
+            break
+          }
+          // 跳过 highlight.js 的 span（通常有 hljs-* 类）
+          if (current.classList && Array.from(current.classList).some(cls => cls.startsWith('hljs-'))) {
+            current = current.parentElement || current.parentNode
+            continue
+          }
+          if (current === articleContentRef.value ||
+              (current.nodeType === Node.ELEMENT_NODE && current.classList?.contains('markdown-body'))) {
+            break
+          }
+          current = current.parentElement || current.parentNode
+        }
+
+        let highlightStart = null
+        let highlightEnd = null
+
+        if (highlightSpan) {
+          // 获取高亮span的范围
+          const highlightRange = document.createRange()
+          highlightRange.selectNodeContents(highlightSpan)
+
+          // 检查文本节点是否在高亮span内
+          if (highlightRange.intersectsNode(textNode)) {
+            // 创建文本节点的范围用于比较
+            const textNodeRange = document.createRange()
+            textNodeRange.selectNodeContents(textNode)
+
+            // 检查高亮span的起始和结束位置
+            const startContainer = highlightRange.startContainer
+            const startOffset = highlightRange.startOffset
+            const endContainer = highlightRange.endContainer
+            const endOffset = highlightRange.endOffset
+
+            // 如果文本节点是高亮span的起始容器
+            if (startContainer === textNode) {
+              highlightStart = startOffset
+            } else {
+              // 检查高亮span是否从文本节点之前或开始位置开始
+              const startCompare = highlightRange.compareBoundaryPoints(Range.START_TO_START, textNodeRange)
+              if (startCompare <= 0) {
+                // 高亮span从文本节点之前或开始位置开始
+                highlightStart = 0
+              }
+            }
+
+            // 如果文本节点是高亮span的结束容器
+            if (endContainer === textNode) {
+              highlightEnd = endOffset
+            } else {
+              // 检查高亮span是否延伸到文本节点之后或结束位置
+              const endCompare = highlightRange.compareBoundaryPoints(Range.END_TO_END, textNodeRange)
+              if (endCompare >= 0) {
+                // 高亮span延伸到文本节点之后或结束位置
+                highlightEnd = textNode.textContent.length
+              }
+            }
+
+            // 如果还没有确定，检查文本节点是否完全在高亮span内
+            if (highlightStart === null || highlightEnd === null) {
+              // 检查文本节点是否完全被高亮span包含
+              const startCompare = highlightRange.compareBoundaryPoints(Range.START_TO_START, textNodeRange)
+              const endCompare = highlightRange.compareBoundaryPoints(Range.END_TO_END, textNodeRange)
+
+              if (startCompare <= 0 && endCompare >= 0) {
+                // 文本节点完全在高亮span内
+                highlightStart = 0
+                highlightEnd = textNode.textContent.length
+              }
+            }
+          }
+        }
+
+        // 计算需要高亮的范围（排除已高亮的部分）
+        let needHighlightStart = startOffset
+        let needHighlightEnd = endOffset
+
+        if (highlightStart !== null && highlightEnd !== null) {
+          // 如果选择范围与已高亮范围有重叠
+          if (startOffset < highlightEnd && endOffset > highlightStart) {
+            // 如果选择范围完全在已高亮范围内，跳过
+            if (startOffset >= highlightStart && endOffset <= highlightEnd) {
+              return
+            }
+
+            // 如果选择范围部分重叠，只高亮未重叠的部分
+            if (startOffset < highlightStart && endOffset > highlightStart) {
+              // 选择范围从已高亮之前开始，高亮前面的部分
+              needHighlightEnd = Math.min(endOffset, highlightStart)
+            } else if (startOffset < highlightEnd && endOffset > highlightEnd) {
+              // 选择范围延伸到已高亮之后，高亮后面的部分
+              needHighlightStart = Math.max(startOffset, highlightEnd)
+            } else if (startOffset >= highlightStart && endOffset <= highlightEnd) {
+              // 完全在已高亮内，跳过
+              return
+            }
+          }
+        }
+
+        // 只高亮未高亮的部分
+        if (needHighlightEnd > needHighlightStart) {
+          try {
+            const highlightRange = document.createRange()
+            highlightRange.setStart(textNode, needHighlightStart)
+            highlightRange.setEnd(textNode, needHighlightEnd)
+
+            // 再次检查：确保要高亮的范围不在已高亮的span内
+            // 跳过 highlight.js 添加的元素
+            let parent = textNode.parentElement || textNode.parentNode
+            while (parent) {
+              if (parent.classList) {
+                if (parent.classList.contains('text-highlight')) {
+                  // 要高亮的文本已经在高亮span内，跳过
+                  return
+                }
+                // 跳过 highlight.js 的 span（通常有 hljs-* 类）
+                if (Array.from(parent.classList).some(cls => cls.startsWith('hljs-'))) {
+                  parent = parent.parentElement || parent.parentNode
+                  continue
+                }
+              }
+              if (parent === articleContentRef.value ||
+                  (parent.nodeType === Node.ELEMENT_NODE && parent.classList?.contains('markdown-body'))) {
+                break
+              }
+              parent = parent.parentElement || parent.parentNode
+            }
+
+            const span = document.createElement('span')
+            span.className = 'text-highlight'
+            span.style.setProperty('display', 'inline', 'important')
+            span.style.setProperty('background-color', 'rgba(168, 85, 247, 0.4)', 'important')
+            span.style.setProperty('padding', '0', 'important')
+            span.style.setProperty('margin', '0', 'important')
+            span.style.setProperty('line-height', 'inherit', 'important')
+            span.style.setProperty('vertical-align', 'baseline', 'important')
+
+            highlightRange.surroundContents(span)
+            hasHighlight = true
+          } catch (e) {
+            // 如果 surroundContents 失败，手动分割文本节点
+            try {
+              const text = textNode.textContent
+              const beforeText = text.substring(0, needHighlightStart)
+              const highlightText = text.substring(needHighlightStart, needHighlightEnd)
+              const afterText = text.substring(needHighlightEnd)
+              const parent = textNode.parentNode
+
+              if (parent && highlightText.trim()) {
+                if (beforeText) {
+                  parent.insertBefore(document.createTextNode(beforeText), textNode)
+                }
+                const span = document.createElement('span')
+                span.className = 'text-highlight'
+                span.style.setProperty('display', 'inline', 'important')
+                span.style.setProperty('background-color', 'rgba(168, 85, 247, 0.4)', 'important')
+                span.style.setProperty('padding', '0', 'important')
+                span.style.setProperty('margin', '0', 'important')
+                span.style.setProperty('line-height', 'inherit', 'important')
+                span.style.setProperty('vertical-align', 'baseline', 'important')
+                span.textContent = highlightText
+                parent.insertBefore(span, textNode)
+                if (afterText) {
+                  parent.insertBefore(document.createTextNode(afterText), textNode)
+                }
+                parent.removeChild(textNode)
+                hasHighlight = true
+              }
+            } catch (err) {
+              console.error('高亮文本节点失败:', err)
+            }
+          }
+        }
+      }
+    })
+
+    if (hasHighlight) {
+      saveHighlights()
+      window.getSelection().removeAllRanges()
+      textSelectionMenuVisible.value = false
+      selectedText.value = ''
+      highlightedRange.value = null
+    }
+  } else {
+    // 普通文本，检查是否已高亮，只高亮未高亮的部分
+    // 检查选择范围是否完全在高亮内
+    const textNodes = getTextNodesInRange(range)
+    let allHighlighted = true
+    for (const textNode of textNodes) {
+      if (!isTextNodeHighlighted(textNode)) {
+        allHighlighted = false
+        break
+      }
+    }
+
+    if (allHighlighted) {
+      // 全部已高亮，不做操作
+      textSelectionMenuVisible.value = false
+      selectedText.value = ''
+      highlightedRange.value = null
+      window.getSelection().removeAllRanges()
+      return
+    }
+
+    // 检查是否在已高亮的span内（避免嵌套高亮导致颜色变深）
+    const commonAncestor = range.commonAncestorContainer
+    let parent = commonAncestor.nodeType === Node.TEXT_NODE ? commonAncestor.parentElement : commonAncestor
+    while (parent && parent !== articleContentRef.value) {
+      if (parent.classList && parent.classList.contains('text-highlight')) {
+        // 选择范围在已高亮的span内，不做操作（避免嵌套）
+        textSelectionMenuVisible.value = false
+        selectedText.value = ''
+        highlightedRange.value = null
+        window.getSelection().removeAllRanges()
+        return
+      }
+      parent = parent.parentElement
+    }
+
+    try {
+      const span = document.createElement('span')
+      span.className = 'text-highlight'
+      span.style.setProperty('display', 'inline', 'important')
+      span.style.setProperty('background-color', 'rgba(168, 85, 247, 0.4)', 'important')
+      span.style.setProperty('padding', '0', 'important')
+      span.style.setProperty('margin', '0', 'important')
+      span.style.setProperty('line-height', 'inherit', 'important')
+      span.style.setProperty('vertical-align', 'baseline', 'important')
+      range.surroundContents(span)
+
+      if (span.parentNode) {
+        saveHighlights()
+        window.getSelection().removeAllRanges()
+        textSelectionMenuVisible.value = false
+        selectedText.value = ''
+        highlightedRange.value = null
+      }
+    } catch (error) {
+      // 如果 surroundContents 失败（跨节点选择），使用 extractContents + insertBefore
+      try {
+        // 在 extractContents 之前保存插入位置信息
+        const startContainer = range.startContainer
+        const startOffset = range.startOffset
+        const commonAncestor = range.commonAncestorContainer
+
+        // 保存父节点引用（在 extractContents 之前）
+        let insertParent = null
+        let insertBeforeNode = null
+
+        if (startContainer.nodeType === Node.TEXT_NODE) {
+          insertParent = startContainer.parentNode
+          // 保存下一个兄弟节点作为插入参考（extractContents 后可能仍然存在）
+          insertBeforeNode = startContainer.nextSibling
+        } else {
+          insertParent = startContainer
+          if (startOffset < startContainer.childNodes.length) {
+            insertBeforeNode = startContainer.childNodes[startOffset]
+          }
+        }
+
+        // 提取内容
+        const contents = range.extractContents()
+        if (contents) {
+          const span = document.createElement('span')
+          span.className = 'text-highlight'
+          span.style.setProperty('display', 'inline', 'important')
+          span.style.setProperty('background-color', 'rgba(168, 85, 247, 0.4)', 'important')
+          span.style.setProperty('padding', '0', 'important')
+          span.style.setProperty('margin', '0', 'important')
+          span.style.setProperty('line-height', 'inherit', 'important')
+          span.style.setProperty('vertical-align', 'baseline', 'important')
+          span.appendChild(contents)
+
+          // 尝试插入节点
+          try {
+            // 首先尝试使用保存的父节点信息
+            if (insertParent) {
+              insertParent.insertBefore(span, insertBeforeNode)
+            } else {
+              // 如果父节点不存在，尝试使用 range 的当前状态
+              try {
+                range.insertNode(span)
+              } catch (rangeError) {
+                // 最后的尝试：使用 commonAncestor
+                if (commonAncestor && commonAncestor.nodeType === Node.ELEMENT_NODE) {
+                  if (commonAncestor.firstChild) {
+                    commonAncestor.insertBefore(span, commonAncestor.firstChild)
+                  } else {
+                    commonAncestor.appendChild(span)
+                  }
+                } else {
+                  throw new Error('无法找到有效的插入位置')
+                }
+              }
+            }
+          } catch (insertError) {
+            // 如果所有方法都失败，尝试在 commonAncestor 中查找
+            if (commonAncestor && commonAncestor.nodeType === Node.ELEMENT_NODE) {
+              // 查找 commonAncestor 中的第一个文本节点或元素节点作为插入参考
+              const walker = document.createTreeWalker(
+                commonAncestor,
+                NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                null
+              )
+              const firstNode = walker.nextNode()
+              if (firstNode) {
+                if (firstNode.nodeType === Node.TEXT_NODE) {
+                  firstNode.parentNode?.insertBefore(span, firstNode)
+                } else {
+                  firstNode.insertBefore(span, firstNode.firstChild)
+                }
+              } else {
+                commonAncestor.appendChild(span)
+              }
+            } else {
+              throw new Error('无法找到有效的插入位置')
+            }
+          }
+
+          if (span.parentNode) {
+            saveHighlights()
+            window.getSelection().removeAllRanges()
+            textSelectionMenuVisible.value = false
+            selectedText.value = ''
+            highlightedRange.value = null
+          }
+        }
+      } catch (extractError) {
+        console.error('高亮失败:', extractError)
+      }
+    }
+  }
+}
+
+// 移除高亮（仅在切换文章时使用）
+const removeHighlight = () => {
+  const highlights = articleContentRef.value?.querySelectorAll('.text-highlight')
+  if (highlights) {
+    highlights.forEach(highlight => {
+      const parent = highlight.parentNode
+      if (parent) {
+        // 将span的内容提取出来，替换span本身
+        while (highlight.firstChild) {
+          parent.insertBefore(highlight.firstChild, highlight)
+        }
+        parent.removeChild(highlight)
+        parent.normalize() // 合并相邻的文本节点
+      }
+    })
+  }
+  saveHighlights() // 保存高亮状态（清除后保存）
+}
+
+// 保存高亮到 sessionStorage（仅在同一会话中保持）
+const saveHighlights = () => {
+  if (!articleContentRef.value) return
+
+  const id = props.articleId || route.params.id
+  if (!id || id === 'undefined') return
+
+  const markdownBody = articleContentRef.value.querySelector('.markdown-body')
+  if (!markdownBody) return
+
+  // 获取所有高亮元素及其文本内容和位置信息
+  const highlights = markdownBody.querySelectorAll('.text-highlight')
+  const highlightData = Array.from(highlights).map(highlight => highlight.textContent.trim()).filter(text => text.length > 0)
+
+  // 保存到 sessionStorage，key 为文章ID
+  const storageKey = `article-highlights-${props.type}-${id}`
+  if (highlightData.length > 0) {
+    sessionStorage.setItem(storageKey, JSON.stringify(highlightData))
+  } else {
+    sessionStorage.removeItem(storageKey)
+  }
+}
+
+// 恢复高亮（从 sessionStorage 恢复）
+const restoreHighlights = () => {
+  if (!articleContentRef.value) return
+
+  const id = props.articleId || route.params.id
+  if (!id || id === 'undefined') return
+
+  const markdownBody = articleContentRef.value.querySelector('.markdown-body')
+  if (!markdownBody) return
+
+  // 从 sessionStorage 读取高亮数据
+  const storageKey = `article-highlights-${props.type}-${id}`
+  const savedHighlights = sessionStorage.getItem(storageKey)
+  if (!savedHighlights) return
+
+  try {
+    const highlightTexts = JSON.parse(savedHighlights)
+    if (!Array.isArray(highlightTexts) || highlightTexts.length === 0) return
+
+    // 获取完整的文本内容（用于匹配）
+    const fullText = markdownBody.textContent || markdownBody.innerText
+
+    // 对每个高亮文本，在完整文本中查找并恢复
+    highlightTexts.forEach(highlightText => {
+      if (!highlightText || highlightText.trim() === '') return
+
+      // 检查文本是否存在于当前DOM中
+      if (fullText.indexOf(highlightText) === -1) {
+        return // 文本不存在，跳过
+      }
+
+      // 创建 Range 对象来查找和标记文本
+      const range = document.createRange()
+
+      // 遍历所有文本节点，查找匹配的文本
+      const walker = document.createTreeWalker(
+        markdownBody,
+        NodeFilter.SHOW_TEXT,
+        null
+      )
+
+      let found = false
+      let node
+      while ((node = walker.nextNode()) && !found) {
+        const text = node.textContent
+        const index = text.indexOf(highlightText)
+
+        if (index !== -1) {
+          // 检查是否已经高亮
+          const parent = node.parentElement
+          if (parent && parent.classList.contains('text-highlight')) {
+            found = true
+            continue // 已经高亮，跳过
+          }
+
+          // 创建高亮 span
+          try {
+            range.setStart(node, index)
+            range.setEnd(node, index + highlightText.length)
+
+            const span = document.createElement('span')
+            span.className = 'text-highlight'
+            span.style.setProperty('display', 'inline', 'important')
+            span.style.setProperty('background-color', 'rgba(168, 85, 247, 0.4)', 'important')
+            span.style.setProperty('padding', '0', 'important')
+            span.style.setProperty('margin', '0', 'important')
+            span.style.setProperty('line-height', 'inherit', 'important')
+            span.style.setProperty('vertical-align', 'baseline', 'important')
+
+            try {
+              range.surroundContents(span)
+            } catch (error) {
+              // 如果 surroundContents 失败，使用另一种方法
+              const contents = range.extractContents()
+              span.appendChild(contents)
+              range.insertNode(span)
+            }
+
+            found = true
+            break
+          } catch (error) {
+            console.error('恢复高亮失败:', error)
+          }
+        }
+      }
+    })
+
+    // 恢复后，确保所有高亮元素都有正确的样式
+    setTimeout(() => {
+      const highlights = markdownBody.querySelectorAll('.text-highlight')
+      highlights.forEach(hl => {
+        hl.style.setProperty('display', 'inline', 'important')
+        hl.style.setProperty('background-color', 'rgba(168, 85, 247, 0.4)', 'important')
+        hl.style.setProperty('padding', '0', 'important')
+        hl.style.setProperty('margin', '0', 'important')
+        hl.style.setProperty('line-height', 'inherit', 'important')
+        hl.style.setProperty('vertical-align', 'baseline', 'important')
+      })
+      console.log('恢复高亮数量:', highlights.length)
+    }, 100)
+  } catch (error) {
+    console.error('恢复高亮失败:', error)
+  }
+}
+
+// 分享文本
+const handleTextShare = (text) => {
+  shareSelectedText.value = text
+  // 生成文章 URL
+  const id = props.articleId || route.params.id
+  const type = props.type || route.params.type
+  const baseUrl = window.location.origin
+  articleUrl.value = `${baseUrl}/${type}/${id}`
+  shareCardVisible.value = true
+  // 只隐藏菜单，不清除高亮
+  textSelectionMenuVisible.value = false
+  selectedText.value = ''
+  highlightedRange.value = null
+}
+
+// 获取文章副标题（用于分享卡片）
+const getArticleSubtitle = () => {
+  // 如果文章有摘要，使用摘要；否则使用前100个字符
+  const abstract = content.value.substring(0, 100)
+  return abstract.length < content.value.length ? abstract + '...' : abstract
+}
+
 onMounted(async () => {
   // 延迟执行，确保路由参数完全加载
   await nextTick()
@@ -1142,6 +1960,31 @@ onMounted(async () => {
   // 添加滚动监听器（使用防抖优化性能）
   const debouncedHandleScroll = debounceScroll(handleScroll, 16)
   window.addEventListener('scroll', debouncedHandleScroll, { passive: true })
+
+  // 添加文本选择监听器
+  document.addEventListener('mouseup', handleTextSelection)
+  document.addEventListener('click', (e) => {
+    // 如果点击的不是菜单按钮和分享卡片，只隐藏菜单（不清除高亮）
+    if (!e.target.closest('.text-selection-menu') && !e.target.closest('.share-card-container')) {
+      setTimeout(() => {
+        const selection = window.getSelection()
+        if (!selection.toString().trim()) {
+          // 只隐藏菜单，不清除高亮
+          textSelectionMenuVisible.value = false
+          selectedText.value = ''
+          highlightedRange.value = null
+        }
+      }, 100)
+    }
+  })
+
+  // 监听路由变化，切换文章时清除高亮
+  watch(() => route.params.id, (newId, oldId) => {
+    // 只有在真正切换文章时才清除高亮
+    if (newId !== oldId && oldId) {
+      removeHighlight()
+    }
+  })
 
   // 添加窗口大小变化监听器 - 延迟执行确保布局稳定
   window.addEventListener('resize', () => {
@@ -1164,7 +2007,19 @@ onMounted(async () => {
 // keep-alive 激活时重新初始化（处理路由切换但组件未卸载的情况）
 onActivated(async () => {
   await nextTick()
+
+  // 保存当前文章ID，用于判断是否切换了文章
+  const previousArticleId = route.params.id || props.articleId
+
   await initializeDetail()
+
+  // 检查是否切换了文章
+  const currentArticleId = route.params.id || props.articleId
+  if (previousArticleId !== currentArticleId) {
+    // 切换了文章，清除高亮
+    removeHighlight()
+  }
+  // 如果没有切换文章，高亮会在 restoreHighlights 中恢复
 
   // 重新初始化目录位置
   setTimeout(() => {
@@ -1181,6 +2036,12 @@ onUnmounted(() => {
   }
   // 注意：由于使用了防抖函数，这里需要保存函数引用才能正确移除
   // 在实际应用中，如果需要严格清理，应该保存函数引用
+
+  // 清理文本选择监听器
+  document.removeEventListener('mouseup', handleTextSelection)
+
+  // 保存高亮状态（在卸载前保存，以便下次访问时恢复）
+  saveHighlights()
 })
 
 // 格式化评论时间
@@ -2360,6 +3221,49 @@ pre:hover .copy-btn {
 .share-platform-btn.twitter:hover { background: rgba(29, 161, 242, 0.1); border-color: rgba(29, 161, 242, 0.3); }
 .share-platform-btn.facebook:hover { background: rgba(24, 119, 242, 0.1); border-color: rgba(24, 119, 242, 0.3); }
 .share-platform-btn.copy:hover { background: rgba(156, 39, 176, 0.1); border-color: rgba(156, 39, 176, 0.3); }
+
+/* 文本选择颜色（浏览器默认选中效果） */
+.article-content ::selection,
+.markdown-body ::selection {
+  background-color: rgba(124, 58, 237, 0.8);
+  color: #ffffff;
+}
+
+.article-content ::-moz-selection,
+.markdown-body ::-moz-selection {
+  background-color: rgba(124, 58, 237, 0.8);
+  color: #ffffff;
+}
+
+/* 文本高亮样式（点击高亮按钮后的效果） */
+/* 高亮文本样式 - 使用 span 标签，display: inline 避免破坏布局 */
+/* 覆盖浏览器和第三方CSS的默认黄色背景，强制使用紫色 */
+.article-content .text-highlight,
+.markdown-body .text-highlight,
+.text-highlight {
+  background-color: rgba(168, 85, 247, 0.4) !important;
+  background: rgba(168, 85, 247, 0.4) !important;
+  color: inherit !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  display: inline !important;
+  position: relative !important;
+  z-index: 1 !important;
+  line-height: inherit !important;
+  vertical-align: baseline !important;
+  white-space: normal !important;
+  word-break: normal !important;
+}
+
+/* 确保高亮在列表中的样式正确 */
+.markdown-body li .text-highlight,
+.article-content li .text-highlight {
+  display: inline !important;
+  line-height: inherit !important;
+  vertical-align: baseline !important;
+}
 
 /* 响应式设计 */
 @media (max-width: 768px) {

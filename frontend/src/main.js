@@ -109,13 +109,16 @@ import {
   faCloud,
   faChalkboard,
   faCloudUploadAlt,
-  faFilePowerpoint
+  faFilePowerpoint,
+  faHighlighter,
+  faCopy,
+  faList as faListCheck,
+  faGamepad,
+  faPlus
 } from '@fortawesome/free-solid-svg-icons'
-
 import {
   faStar as faStarRegular
 } from '@fortawesome/free-regular-svg-icons'
-
 import {
   faGithub,
   faGitlab,
@@ -131,6 +134,47 @@ import {
   faLinkedin,
   faGit
 } from '@fortawesome/free-brands-svg-icons'
+
+// 使用 faCalendar 作为 faCalendarCheck 的别名
+const faCalendarCheck = faCalendar
+
+// 早期错误处理：在应用初始化前捕获浏览器扩展错误（如 MetaMask）
+if (typeof window !== 'undefined') {
+  // 捕获未处理的 Promise 拒绝（来自 MetaMask 等扩展）
+  window.addEventListener('unhandledrejection', (event) => {
+    const reasonStr = String(event.reason || '')
+    if (
+      reasonStr.includes('MetaMask') ||
+      reasonStr.includes('Failed to connect to MetaMask') ||
+      reasonStr.includes('ethereum') ||
+      event.reason?.message?.includes('MetaMask') ||
+      event.reason?.message?.includes('Failed to connect to MetaMask')
+    ) {
+      event.preventDefault() // 阻止错误显示
+      return false
+    }
+  }, { capture: true })
+
+  // 捕获运行时错误（来自浏览器扩展）
+  window.addEventListener('error', (event) => {
+    if (event.filename && (
+      event.filename.includes('chrome-extension://') ||
+      event.filename.includes('moz-extension://') ||
+      event.filename.includes('safari-extension://') ||
+      event.filename.includes('extension://')
+    )) {
+      event.preventDefault() // 阻止错误显示
+      return false
+    }
+    if (event.message && (
+      event.message.includes('MetaMask') ||
+      event.message.includes('Failed to connect to MetaMask')
+    )) {
+      event.preventDefault() // 阻止错误显示
+      return false
+    }
+  }, { capture: true })
+}
 
 library.add(
   faHouse,
@@ -228,6 +272,12 @@ library.add(
   faChalkboard,
   faCloudUploadAlt,
   faFilePowerpoint,
+  faHighlighter,
+  faCopy,
+  faCalendarCheck,
+  faListCheck,
+  faGamepad,
+  faPlus,
   faGithub,
   faGitlab,
   faBitbucket,

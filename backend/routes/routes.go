@@ -18,6 +18,7 @@ func SetupRouter() *gin.Engine {
 	// 创建控制器实例
 	weatherController := controllers.NewWeatherController(config.DB)
 	presentationController := controllers.NewPresentationController(config.DB)
+	plannerController := controllers.NewPlannerController(config.DB)
 
 	// 自定义 CORS 配置
 	r.Use(cors.New(cors.Config{
@@ -110,6 +111,30 @@ func SetupRouter() *gin.Engine {
 		api.POST("/presentations", middlewares.Auth(1), presentationController.CreatePresentation)        // 创建讲演需要用户权限
 		api.PUT("/presentations/:id", middlewares.Auth(1), presentationController.UpdatePresentation)     // 更新讲演需要用户权限
 		api.DELETE("/presentations/:id", middlewares.Auth(1), presentationController.DeletePresentation)  // 删除讲演需要用户权限
+
+		// 计划管理相关路由（需要管理员权限）
+		// 任务相关
+		api.GET("/planner/tasks", middlewares.Auth(3), plannerController.GetTasks)          // 获取任务列表
+		api.POST("/planner/tasks", middlewares.Auth(3), plannerController.CreateTask)       // 创建任务
+		api.PUT("/planner/tasks/:id", middlewares.Auth(3), plannerController.UpdateTask)    // 更新任务
+		api.DELETE("/planner/tasks/:id", middlewares.Auth(3), plannerController.DeleteTask) // 删除任务
+
+		// 娱乐活动相关
+		api.GET("/planner/entertainments", middlewares.Auth(3), plannerController.GetEntertainments)          // 获取娱乐活动列表
+		api.POST("/planner/entertainments", middlewares.Auth(3), plannerController.CreateEntertainment)       // 创建娱乐活动
+		api.PUT("/planner/entertainments/:id", middlewares.Auth(3), plannerController.UpdateEntertainment)    // 更新娱乐活动
+		api.DELETE("/planner/entertainments/:id", middlewares.Auth(3), plannerController.DeleteEntertainment) // 删除娱乐活动
+
+		// 每日反思相关
+		api.GET("/planner/reflection", middlewares.Auth(3), plannerController.GetReflection)             // 获取每日反思
+		api.POST("/planner/reflection", middlewares.Auth(3), plannerController.CreateOrUpdateReflection) // 创建或更新每日反思
+		api.GET("/planner/reflections", middlewares.Auth(3), plannerController.GetReflections)           // 获取反思列表
+
+		// 截止日期相关
+		api.GET("/planner/deadlines", middlewares.Auth(3), plannerController.GetDeadlines)          // 获取截止日期列表
+		api.POST("/planner/deadlines", middlewares.Auth(3), plannerController.CreateDeadline)       // 创建截止日期
+		api.PUT("/planner/deadlines/:id", middlewares.Auth(3), plannerController.UpdateDeadline)    // 更新截止日期
+		api.DELETE("/planner/deadlines/:id", middlewares.Auth(3), plannerController.DeleteDeadline) // 删除截止日期
 	}
 
 	// 静态文件服务（提供上传的图片访问）

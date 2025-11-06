@@ -27,44 +27,48 @@
       <div class="content-section">
         <div class="content-container">
           <!-- 加载状态 -->
-          <div v-if="loading" class="loading-container">
-            <div class="loading-spinner"></div>
-            <p>加载中...</p>
-          </div>
+          <Transition name="fade">
+            <div v-if="loading" key="loading" class="loading-container">
+              <div class="loading-spinner"></div>
+              <p>加载中...</p>
+            </div>
+          </Transition>
 
-          <!-- 卡片网格 -->
-          <div v-else class="cards-grid">
-            <div
-              v-for="presentation in currentPagePresentations"
-              :key="presentation.id"
-              class="presentation-card"
-              @click="openPresentation(presentation)"
-            >
-              <div class="card-image">
-                <img
-                  :src="getThumbnailUrl(presentation.thumbnail)"
-                  :alt="presentation.title"
-                  @error="handleImageError"
-                  @load="handleImageLoad"
-                />
-              </div>
-              <div class="card-content">
-                <h3 class="card-title">
-                  <font-awesome-icon icon="file-powerpoint" class="title-icon" />
-                  {{ presentation.title }}
-                </h3>
-                <div class="card-tags">
-                  <span
-                    v-for="tag in (presentation.tags && presentation.tags.length > 0 ? presentation.tags : ['讲演', '演示'])"
-                    :key="tag"
-                    class="tag"
-                  >
-                    {{ tag }}
-                  </span>
+          <!-- 卡片网格（带过渡动画） -->
+          <Transition name="fade-slide">
+            <div v-if="!loading" key="content" class="cards-grid content-fade-in">
+              <div
+                v-for="presentation in currentPagePresentations"
+                :key="presentation.id"
+                class="presentation-card"
+                @click="openPresentation(presentation)"
+              >
+                <div class="card-image">
+                  <img
+                    :src="getThumbnailUrl(presentation.thumbnail)"
+                    :alt="presentation.title"
+                    @error="handleImageError"
+                    @load="handleImageLoad"
+                  />
+                </div>
+                <div class="card-content">
+                  <h3 class="card-title">
+                    <font-awesome-icon icon="file-powerpoint" class="title-icon" />
+                    {{ presentation.title }}
+                  </h3>
+                  <div class="card-tags">
+                    <span
+                      v-for="tag in (presentation.tags && presentation.tags.length > 0 ? presentation.tags : ['讲演', '演示'])"
+                      :key="tag"
+                      class="tag"
+                    >
+                      {{ tag }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </Transition>
 
           <!-- 分页控件 -->
           <div v-if="totalPages > 1" class="pagination">
@@ -897,6 +901,57 @@ const loadPdfJs = () => {
   justify-content: center;
   padding: 80px 0;
   color: #666;
+}
+
+/* 过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.fade-slide-enter-active {
+  transition: all 0.5s ease-out;
+}
+
+.fade-slide-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.fade-slide-enter-to,
+.fade-slide-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 内容淡入动画 */
+.content-fade-in {
+  animation: contentFadeIn 0.6s ease-out;
+}
+
+@keyframes contentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .loading-spinner {

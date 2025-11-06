@@ -1,271 +1,280 @@
 <template>
-  <ModernLoading
-    v-if="!isComponentReady"
-    :progress="loadingProgress"
-    :title="'山角函兽的小窝'"
-    :subtitle="'Loading……'"
-  />
-  <div v-else class="home-view">
-    <NavBar />
-    <div class="hero-section">
-      <div class="hero-content">
-        <div class="avatar-container">
-          <img src="@/assets/my_headportrait.jpg" alt="Avatar" class="hero-avatar" loading="lazy" decoding="async" @error="onImgError($event)" />
-          <div class="avatar-ring"></div>
+  <div>
+    <!-- 加载界面 -->
+    <Transition name="fade">
+      <ModernLoading
+        v-if="!isComponentReady"
+        key="loading"
+        :progress="loadingProgress"
+        :title="'山角函兽的小窝'"
+        :subtitle="'Loading……'"
+      />
+    </Transition>
+    <!-- 内容界面（带过渡动画） -->
+    <Transition name="fade-slide">
+      <div v-if="isComponentReady" key="content" class="home-view content-fade-in">
+        <NavBar />
+        <div class="hero-section">
+          <div class="hero-content">
+            <div class="avatar-container">
+              <img src="@/assets/my_headportrait.jpg" alt="Avatar" class="hero-avatar" loading="lazy" decoding="async" @error="onImgError($event)" />
+              <div class="avatar-ring"></div>
+            </div>
+            <h1 class="hero-title">{{ displayedText }}<span class="cursor">|</span></h1>
+            <p class="hero-subtitle">记录生活 · 分享技术 · 探索未知</p>
+            <div class="hero-stats">
+              <div class="stat-item">
+                <span class="stat-number">{{ blogCount }}</span>
+                <span class="stat-label">博客文章</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number">{{ momentCount }}</span>
+                <span class="stat-label">随笔</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number">{{ projectCount }}</span>
+                <span class="stat-label">项目</span>
+              </div>
+            </div>
+          </div>
+          <div class="scroll-indicator">
+            <span>向下滚动</span>
+            <div class="scroll-arrow">↓</div>
+          </div>
         </div>
-        <h1 class="hero-title">{{ displayedText }}<span class="cursor">|</span></h1>
-        <p class="hero-subtitle">记录生活 · 分享技术 · 探索未知</p>
-        <div class="hero-stats">
-          <div class="stat-item">
-            <span class="stat-number">{{ blogCount }}</span>
-            <span class="stat-label">博客文章</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-number">{{ momentCount }}</span>
-            <span class="stat-label">随笔</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-number">{{ projectCount }}</span>
-            <span class="stat-label">项目</span>
+        <!-- 现代化内容区域 - 模仿kirigaya.cn布局 -->
+        <div class="modern-content">
+          <div class="main-layout">
+            <!-- 主内容区域 -->
+            <div class="main-content">
+              <!-- 最新博客 -->
+              <div class="content-section">
+                <div class="section-header">
+                  <h3 class="section-title">
+                    <span class="section-icon">📝</span>
+                    <span class="section-text">博客</span>
+                  </h3>
+                  <div class="section-count">{{ blogCount }} 篇文章</div>
+                </div>
+                <div class="blog-cards">
+                  <article
+                    v-for="blog in latestBlogs"
+                    :key="blog.ID"
+                    class="blog-card"
+                    @click="$router.push(`/blog/${blog.ID}`)"
+                  >
+                    <div class="card-content">
+                      <div class="card-text">
+                        <div class="card-header">
+                          <h4 class="card-title">
+                            <font-awesome-icon icon="blog" class="card-icon" />
+                            {{ blog.title }}
+                          </h4>
+                        </div>
+                        <p class="card-excerpt">{{ getPlainText(blog.content) || '记录成长路上的点点滴滴...' }}</p>
+                      </div>
+                      <div class="card-thumbnail">
+                        <img :src="blog.image" :alt="blog.title" loading="lazy" decoding="async" @error="onImgError($event)" />
+                      </div>
+                      <div class="card-meta">
+                        <div class="card-date">
+                          <i class="date-icon">🕐</i>
+                          <span>{{ formatDateTime(blog.CreatedAt) }}</span>
+                        </div>
+                        <div class="card-tags">
+                          <i class="tag-icon">🔖</i>
+                          <template v-if="blog.tags && blog.tags.length > 0">
+                            <span v-for="tag in blog.tags" :key="tag" class="tag">{{ tag }}</span>
+                          </template>
+                          <span v-else class="tag">山角函兽懒得加标签了</span>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              </div>
+
+              <!-- 最新随笔 -->
+              <div class="content-section">
+                <div class="section-header">
+                  <h3 class="section-title">
+                    <span class="section-icon">✍️</span>
+                    <span class="section-text">随笔</span>
+                  </h3>
+                  <div class="section-count">{{ momentCount }} 篇随笔</div>
+                </div>
+                <div class="blog-cards">
+                  <article
+                    v-for="moment in latestMoments"
+                    :key="moment.ID"
+                    class="blog-card"
+                    @click="$router.push(`/moments/${moment.ID}`)"
+                  >
+                    <div class="card-content">
+                      <div class="card-text">
+                        <div class="card-header">
+                          <h4 class="card-title">
+                            <font-awesome-icon icon="pen-to-square" class="card-icon" />
+                            {{ moment.title }}
+                          </h4>
+                        </div>
+                        <p class="card-excerpt">{{ getPlainText(moment.content) || '记录生活的点点滴滴...' }}</p>
+                      </div>
+                      <div class="card-thumbnail">
+                        <img :src="moment.image" :alt="moment.title" loading="lazy" decoding="async" @error="onImgError($event)" />
+                      </div>
+                      <div class="card-meta">
+                        <div class="card-date">
+                          <i class="date-icon">🕐</i>
+                          <span>{{ formatDateTime(moment.CreatedAt) }}</span>
+                        </div>
+                        <div class="card-tags">
+                          <i class="tag-icon">🔖</i>
+                          <template v-if="moment.tags && moment.tags.length > 0">
+                            <span v-for="tag in moment.tags" :key="tag" class="tag">{{ tag }}</span>
+                          </template>
+                          <span v-else class="tag">山角函兽懒得加标签了</span>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              </div>
+
+              <!-- 最新项目 -->
+              <div class="content-section">
+                <div class="section-header">
+                  <h3 class="section-title">
+                    <span class="section-icon">💼</span>
+                    <span class="section-text">项目</span>
+                  </h3>
+                  <div class="section-count">{{ projectCount }} 个项目</div>
+                </div>
+                <div class="blog-cards">
+                  <article
+                    v-for="project in latestProjects"
+                    :key="project.ID"
+                    class="blog-card"
+                    @click="$router.push(`/blog/${project.ID}`)"
+                  >
+                    <div class="card-content">
+                      <div class="card-text">
+                        <div class="card-header">
+                          <h4 class="card-title">
+                            <font-awesome-icon icon="diagram-project" class="card-icon" />
+                            {{ project.title }}
+                          </h4>
+                        </div>
+                        <p class="card-excerpt">{{ getPlainText(project.content) || '展示我的项目作品...' }}</p>
+                      </div>
+                      <div class="card-thumbnail">
+                        <img :src="project.image" :alt="project.title" loading="lazy" decoding="async" @error="onImgError($event)" />
+                      </div>
+                      <div class="card-meta">
+                        <div class="card-date">
+                          <i class="date-icon">🕐</i>
+                          <span>{{ formatDateTime(project.CreatedAt) }}</span>
+                        </div>
+                        <div class="card-tags">
+                          <i class="tag-icon">🔖</i>
+                          <template v-if="project.tags && project.tags.length > 0">
+                            <span v-for="tag in project.tags" :key="tag" class="tag">{{ tag }}</span>
+                          </template>
+                          <span v-else class="tag">山角函兽懒得加标签了</span>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              </div>
+            </div>
+
+            <!-- 侧边栏 -->
+            <div class="sidebar">
+              <!-- 天气卡片 -->
+              <div class="weather-card">
+                <div class="weather-header">
+                  <div class="location-info">
+                    <i class="location-icon">📍</i>
+                    <span class="location">{{ weatherInfo.location }}</span>
+                  </div>
+                  <div class="weather-icon">{{ getWeatherIcon(weatherInfo.weather || '') }}</div>
+                </div>
+
+                <div class="weather-main">
+                  <div class="temperature-section">
+                    <div class="temperature">{{ weatherInfo.temperature }}</div>
+                    <div class="weather-desc">{{ weatherInfo.weather }}</div>
+                  </div>
+                </div>
+
+                <div class="weather-details">
+                  <div v-if="weatherInfo.tomorrow" class="detail-row">
+                    <div class="detail-item">
+                      <i class="detail-icon">🌅</i>
+                      <div class="detail-content">
+                        <span class="detail-label">明天</span>
+                        <span class="detail-value">{{ weatherInfo.tomorrow }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-if="weatherInfo.lifeIndex" class="detail-row">
+                    <div class="detail-item">
+                      <i class="detail-icon">💡</i>
+                      <div class="detail-content">
+                        <span class="detail-label">生活指数</span>
+                        <span class="detail-value">{{ weatherInfo.lifeIndex }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="weather-footer">
+                  <div class="update-time">实时更新</div>
+                </div>
+              </div>
+
+              <!-- 置顶博客 -->
+              <div class="sidebar-section">
+                <h4 class="section-title">置顶博客</h4>
+                <div class="top-blogs">
+                  <div
+                    v-for="article in topArticles"
+                    :key="article.ID"
+                    class="top-blog-item"
+                    @click="$router.push(`/${article.type}/${article.ID}`)"
+                  >
+                    <div class="blog-title">
+                      <font-awesome-icon :icon="getTypeIcon(article.type)" class="type-icon" />
+                      {{ article.title }}
+                    </div>
+                    <div class="blog-date">{{ new Date(article.CreatedAt).toLocaleDateString('zh-CN') }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 常用链接 -->
+              <div class="sidebar-section">
+                <h4 class="section-title">常用链接</h4>
+                <div class="useful-links">
+                  <div class="nav-link-item" @click="openExternal('https://github.com/Keranthos')">
+                    <div class="nav-link-icon" style="background: rgba(0,0,0,0.08);">
+                      <font-awesome-icon :icon="['fab','github']" />
+                    </div>
+                    <div class="nav-link-content">
+                      <h5>Keranthos 的 GitHub</h5>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 浮动按钮已删除 -->
+            </div>
           </div>
         </div>
       </div>
-      <div class="scroll-indicator">
-        <span>向下滚动</span>
-        <div class="scroll-arrow">↓</div>
-      </div>
-    </div>
-    <!-- 现代化内容区域 - 模仿kirigaya.cn布局 -->
-    <div class="modern-content">
-      <div class="main-layout">
-        <!-- 主内容区域 -->
-        <div class="main-content">
-          <!-- 最新博客 -->
-          <div class="content-section">
-            <div class="section-header">
-              <h3 class="section-title">
-                <span class="section-icon">📝</span>
-                <span class="section-text">博客</span>
-              </h3>
-              <div class="section-count">{{ blogCount }} 篇文章</div>
-            </div>
-            <div class="blog-cards">
-              <article
-                v-for="blog in latestBlogs"
-                :key="blog.ID"
-                class="blog-card"
-                @click="$router.push(`/blog/${blog.ID}`)"
-              >
-                <div class="card-content">
-                  <div class="card-text">
-                    <div class="card-header">
-                      <h4 class="card-title">
-                        <font-awesome-icon icon="blog" class="card-icon" />
-                        {{ blog.title }}
-                      </h4>
-                    </div>
-                    <p class="card-excerpt">{{ getPlainText(blog.content) || '记录成长路上的点点滴滴...' }}</p>
-                  </div>
-                  <div class="card-thumbnail">
-                    <img :src="blog.image" :alt="blog.title" loading="lazy" decoding="async" @error="onImgError($event)" />
-                  </div>
-                  <div class="card-meta">
-                    <div class="card-date">
-                      <i class="date-icon">🕐</i>
-                      <span>{{ formatDateTime(blog.CreatedAt) }}</span>
-                    </div>
-                    <div class="card-tags">
-                      <i class="tag-icon">🔖</i>
-                      <template v-if="blog.tags && blog.tags.length > 0">
-                        <span v-for="tag in blog.tags" :key="tag" class="tag">{{ tag }}</span>
-                      </template>
-                      <span v-else class="tag">山角函兽懒得加标签了</span>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            </div>
-          </div>
-
-          <!-- 最新随笔 -->
-          <div class="content-section">
-            <div class="section-header">
-              <h3 class="section-title">
-                <span class="section-icon">✍️</span>
-                <span class="section-text">随笔</span>
-              </h3>
-              <div class="section-count">{{ momentCount }} 篇随笔</div>
-            </div>
-            <div class="blog-cards">
-              <article
-                v-for="moment in latestMoments"
-                :key="moment.ID"
-                class="blog-card"
-                @click="$router.push(`/moments/${moment.ID}`)"
-              >
-                <div class="card-content">
-                  <div class="card-text">
-                    <div class="card-header">
-                      <h4 class="card-title">
-                        <font-awesome-icon icon="pen-to-square" class="card-icon" />
-                        {{ moment.title }}
-                      </h4>
-                    </div>
-                    <p class="card-excerpt">{{ getPlainText(moment.content) || '记录生活的点点滴滴...' }}</p>
-                  </div>
-                  <div class="card-thumbnail">
-                    <img :src="moment.image" :alt="moment.title" loading="lazy" decoding="async" @error="onImgError($event)" />
-                  </div>
-                  <div class="card-meta">
-                    <div class="card-date">
-                      <i class="date-icon">🕐</i>
-                      <span>{{ formatDateTime(moment.CreatedAt) }}</span>
-                    </div>
-                    <div class="card-tags">
-                      <i class="tag-icon">🔖</i>
-                      <template v-if="moment.tags && moment.tags.length > 0">
-                        <span v-for="tag in moment.tags" :key="tag" class="tag">{{ tag }}</span>
-                      </template>
-                      <span v-else class="tag">山角函兽懒得加标签了</span>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            </div>
-          </div>
-
-          <!-- 最新项目 -->
-          <div class="content-section">
-            <div class="section-header">
-              <h3 class="section-title">
-                <span class="section-icon">💼</span>
-                <span class="section-text">项目</span>
-              </h3>
-              <div class="section-count">{{ projectCount }} 个项目</div>
-            </div>
-            <div class="blog-cards">
-              <article
-                v-for="project in latestProjects"
-                :key="project.ID"
-                class="blog-card"
-                @click="$router.push(`/blog/${project.ID}`)"
-              >
-                <div class="card-content">
-                  <div class="card-text">
-                    <div class="card-header">
-                      <h4 class="card-title">
-                        <font-awesome-icon icon="diagram-project" class="card-icon" />
-                        {{ project.title }}
-                      </h4>
-                    </div>
-                    <p class="card-excerpt">{{ getPlainText(project.content) || '展示我的项目作品...' }}</p>
-                  </div>
-                  <div class="card-thumbnail">
-                    <img :src="project.image" :alt="project.title" loading="lazy" decoding="async" @error="onImgError($event)" />
-                  </div>
-                  <div class="card-meta">
-                    <div class="card-date">
-                      <i class="date-icon">🕐</i>
-                      <span>{{ formatDateTime(project.CreatedAt) }}</span>
-                    </div>
-                    <div class="card-tags">
-                      <i class="tag-icon">🔖</i>
-                      <template v-if="project.tags && project.tags.length > 0">
-                        <span v-for="tag in project.tags" :key="tag" class="tag">{{ tag }}</span>
-                      </template>
-                      <span v-else class="tag">山角函兽懒得加标签了</span>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            </div>
-          </div>
-        </div>
-
-        <!-- 侧边栏 -->
-        <div class="sidebar">
-          <!-- 天气卡片 -->
-          <div class="weather-card">
-            <div class="weather-header">
-              <div class="location-info">
-                <i class="location-icon">📍</i>
-                <span class="location">{{ weatherInfo.location }}</span>
-              </div>
-              <div class="weather-icon">{{ getWeatherIcon(weatherInfo.weather || '') }}</div>
-            </div>
-
-            <div class="weather-main">
-              <div class="temperature-section">
-                <div class="temperature">{{ weatherInfo.temperature }}</div>
-                <div class="weather-desc">{{ weatherInfo.weather }}</div>
-              </div>
-            </div>
-
-            <div class="weather-details">
-              <div v-if="weatherInfo.tomorrow" class="detail-row">
-                <div class="detail-item">
-                  <i class="detail-icon">🌅</i>
-                  <div class="detail-content">
-                    <span class="detail-label">明天</span>
-                    <span class="detail-value">{{ weatherInfo.tomorrow }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div v-if="weatherInfo.lifeIndex" class="detail-row">
-                <div class="detail-item">
-                  <i class="detail-icon">💡</i>
-                  <div class="detail-content">
-                    <span class="detail-label">生活指数</span>
-                    <span class="detail-value">{{ weatherInfo.lifeIndex }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="weather-footer">
-              <div class="update-time">实时更新</div>
-            </div>
-          </div>
-
-          <!-- 置顶博客 -->
-          <div class="sidebar-section">
-            <h4 class="section-title">置顶博客</h4>
-            <div class="top-blogs">
-              <div
-                v-for="article in topArticles"
-                :key="article.ID"
-                class="top-blog-item"
-                @click="$router.push(`/${article.type}/${article.ID}`)"
-              >
-                <div class="blog-title">
-                  <font-awesome-icon :icon="getTypeIcon(article.type)" class="type-icon" />
-                  {{ article.title }}
-                </div>
-                <div class="blog-date">{{ new Date(article.CreatedAt).toLocaleDateString('zh-CN') }}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 常用链接 -->
-          <div class="sidebar-section">
-            <h4 class="section-title">常用链接</h4>
-            <div class="useful-links">
-              <div class="nav-link-item" @click="openExternal('https://github.com/Keranthos')">
-                <div class="nav-link-icon" style="background: rgba(0,0,0,0.08);">
-                  <font-awesome-icon :icon="['fab','github']" />
-                </div>
-                <div class="nav-link-content">
-                  <h5>Keranthos 的 GitHub</h5>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 浮动按钮已删除 -->
-        </div>
-      </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
@@ -563,6 +572,57 @@ onMounted(async () => {
 
 <style scoped>
 /* 旧的加载样式已移除，现在使用 ModernLoading 组件 */
+
+/* 过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.fade-slide-enter-active {
+  transition: all 0.5s ease-out;
+}
+
+.fade-slide-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.fade-slide-enter-to,
+.fade-slide-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 内容淡入动画 */
+.content-fade-in {
+  animation: contentFadeIn 0.6s ease-out;
+}
+
+@keyframes contentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 .home-view {
   min-height: 100vh;

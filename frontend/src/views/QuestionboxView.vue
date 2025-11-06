@@ -1,64 +1,81 @@
 <template>
   <div class="question-box-view">
     <NavBar />
-    <div class="header">
-      <img
-        :src="questionBoxBackground"
-        alt="Background Image" class="header-image"
-        loading="lazy"
-        decoding="async"
-        @error="onImgError($event)"
-      />
-    </div>
-    <div class="content">
-      <div class="question-list">
-        <div v-for="question in questions" :key="question.ID" class="question-item">
-          <div class="question">
-            <p class="author">
-              {{ question.Author || '匿名用户' }}
-            </p>
-            <p class="question-content">{{ question.Content }}</p>
-          </div>
-          <div class="answer">
-            <p v-if="question.Answer" class="answered">
-              <span class="label">回答:</span>
-              <span class="text">{{ question.Answer }}</span>
-            </p>
-            <p v-else class="unanswered">
-              待回答
-            </p>
-            <div v-if="user.isLogged && user.level >= 3 && !question.Answer" class="submit-question">
-              <div class="admin-answer-header">
-                <span class="admin-icon">👨‍💼</span>
-                <span class="admin-title">管理员回答</span>
+    <!-- 加载界面 -->
+    <Transition name="fade">
+      <div v-if="isInitialLoading" key="loading" class="loading-wrapper">
+        <ModernLoading
+          :progress="loadingProgress"
+          :title="'提问箱'"
+          :subtitle="'Loading……'"
+        />
+      </div>
+    </Transition>
+    <!-- 内容界面（带过渡动画） -->
+    <Transition name="fade-slide">
+      <div v-if="!isInitialLoading" key="content" class="content-fade-in">
+        <div class="header">
+          <img
+            :src="questionBoxBackground"
+            alt="Background Image" class="header-image"
+            loading="lazy"
+            decoding="async"
+            @error="onImgError($event)"
+          />
+        </div>
+        <div class="content">
+          <div class="question-list">
+            <div v-for="question in questions" :key="question.ID" class="question-item">
+              <div class="question">
+                <p class="author">
+                  {{ question.Author || '匿名用户' }}
+                </p>
+                <p class="question-content">{{ question.Content }}</p>
               </div>
-              <textarea v-model="answers[question.ID]" placeholder="输入你的回答..."></textarea>
-              <button @click="handleSubmitAnswer(question.ID)">提交回答</button>
+              <div class="answer">
+                <p v-if="question.Answer" class="answered">
+                  <span class="label">回答:</span>
+                  <span class="text">{{ question.Answer }}</span>
+                </p>
+                <p v-else class="unanswered">
+                  待回答
+                </p>
+                <div v-if="user.isLogged && user.level >= 3 && !question.Answer" class="submit-question">
+                  <div class="admin-answer-header">
+                    <span class="admin-icon">👨‍💼</span>
+                    <span class="admin-title">管理员回答</span>
+                  </div>
+                  <textarea v-model="answers[question.ID]" placeholder="输入你的回答..."></textarea>
+                  <button @click="handleSubmitAnswer(question.ID)">提交回答</button>
+                </div>
+              </div>
             </div>
           </div>
+
+          <!-- 移除翻页，改为一次性展示全部问题，可一直向下滚动到底部 -->
+        </div>
+        <div v-if="!user.isLogged || user.level < 3" class="ask-question">
+          <textarea v-model="newQuestion" placeholder="输入你的问题..."></textarea>
+          <button @click="handleSubmitQuestion">提交问题</button>
+        </div>
+        <div v-if="isLoading" class="loading">
+          <i class="fas fa-spinner fa-spin"></i> 正在加载更多问题...
         </div>
       </div>
-
-      <!-- 移除翻页，改为一次性展示全部问题，可一直向下滚动到底部 -->
-    </div>
-    <div v-if="!user.isLogged || user.level < 3" class="ask-question">
-      <textarea v-model="newQuestion" placeholder="输入你的问题..."></textarea>
-      <button @click="handleSubmitQuestion">提交问题</button>
-    </div>
-    <div v-if="isLoading" class="loading">
-      <i class="fas fa-spinner fa-spin"></i> 正在加载更多问题...
-    </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { useStore } from 'vuex'
 import { getQuestions } from '@/api/questionBox/browse'
 import { submitQuestion, submitAnswer } from '@/api/questionBox/edit'
 import { showErrorMessage } from '@/utils/waifuMessage'
 import NavBar from '@/components/NavBar'
 import questionBoxBackgroundImg from '@/assets/questionbox_background.jpg'
+
+const ModernLoading = defineAsyncComponent(() => import('@/components/ModernLoading.vue'))
 
 const store = useStore()
 const user = store.state.user
@@ -77,19 +94,53 @@ const onImgError = (e) => {
 const questions = ref([])
 const newQuestion = ref('')
 const answers = ref({})
-const isLoading = ref(false)
+const isLoading = ref(false) // 用于"加载更多"的加载状态
+const isInitialLoading = ref(true) // 初始加载状态
+const loadingProgress = ref(0)
 
-const loadQuestions = async () => {
-  if (isLoading.value) return
-  isLoading.value = true
-  try {
-    // 一次性加载所有问题
-    const response = await getQuestions(1)
-    questions.value = response.questions || []
-  } catch (error) {
-    console.error('Failed to load questions:', error)
-  } finally {
-    isLoading.value = false
+const loadQuestions = async (isInitial = false) => {
+  // 如果是初始加载，允许执行；如果是后续加载且正在加载中，则阻止
+  if (!isInitial && isLoading.value) return
+  if (isInitial) {
+    isInitialLoading.value = true
+    loadingProgress.value = 0
+
+    // 模拟加载进度
+    const progressInterval = setInterval(() => {
+      if (loadingProgress.value < 90) {
+        loadingProgress.value += Math.random() * 20
+      }
+    }, 100)
+
+    try {
+      // 一次性加载所有问题
+      const response = await getQuestions(1)
+      questions.value = response.questions || []
+
+      // 完成加载
+      loadingProgress.value = 100
+      clearInterval(progressInterval)
+
+      // 延迟一点时间让用户看到100%的进度
+      setTimeout(() => {
+        isInitialLoading.value = false
+      }, 300)
+    } catch (error) {
+      console.error('Failed to load questions:', error)
+      clearInterval(progressInterval)
+      isInitialLoading.value = false
+    }
+  } else {
+    // 后续加载（如果有的话）
+    isLoading.value = true
+    try {
+      const response = await getQuestions(1)
+      questions.value = response.questions || []
+    } catch (error) {
+      console.error('Failed to load questions:', error)
+    } finally {
+      isLoading.value = false
+    }
   }
 }
 
@@ -118,13 +169,77 @@ const handleSubmitAnswer = async (questionId) => {
 }
 
 onMounted(() => {
-  loadQuestions()
+  loadQuestions(true) // 初始加载
 })
 </script>
 
 <style scoped>
 .question-box-view {
   min-height: 100vh;
+}
+
+/* 加载包装器样式 */
+.loading-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+}
+
+/* 过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.fade-slide-enter-active {
+  transition: all 0.5s ease-out;
+}
+
+.fade-slide-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.fade-slide-enter-to,
+.fade-slide-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 内容淡入动画 */
+.content-fade-in {
+  animation: contentFadeIn 0.6s ease-out;
+}
+
+@keyframes contentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.question-box-view {
   padding-top: 40px;
   padding-bottom: 200px;
   overflow-x: hidden; /* 防止横向滚动 */

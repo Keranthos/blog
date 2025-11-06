@@ -26,39 +26,47 @@
     <div class="content-section">
       <!-- 主要内容（博客/项目/科研） -->
       <div v-if="activeTab === 'main'">
-        <div v-if="loading" class="loading-wrapper">
-          <ModernLoading
-            :progress="loadingProgress"
-            :title="getTypeName(type)"
-            :subtitle="'Loading……'"
-          />
-        </div>
-        <div v-else-if="articles.length > 0" class="article-grid">
-          <ArticleCard
-            v-for="article in articles"
-            :id="article.ID" :key="article.ID" :image="article.image"
-            :title="article.title" :tags="article.tags" :time="article.CreatedAt"
-            :type="type" :reading-time="article.readingTime" :article-type="article.articleType"
-          />
-        </div>
+        <!-- 加载界面 -->
+        <Transition name="fade">
+          <div v-if="loading" key="loading" class="loading-wrapper">
+            <ModernLoading
+              :progress="loadingProgress"
+              :title="getTypeName(type)"
+              :subtitle="'Loading……'"
+            />
+          </div>
+        </Transition>
+        <!-- 内容界面（带过渡动画） -->
+        <Transition name="fade-slide">
+          <div v-if="!loading && articles.length > 0" key="content" class="article-grid content-fade-in">
+            <ArticleCard
+              v-for="article in articles"
+              :id="article.ID" :key="article.ID" :image="article.image"
+              :title="article.title" :tags="article.tags" :time="article.CreatedAt"
+              :type="type" :reading-time="article.readingTime" :article-type="article.articleType"
+            />
+          </div>
+        </Transition>
         <!-- 无限滚动哨兵（仅手机端且未到最后一页时显示） -->
         <div v-if="isMobile && currentPage < totalPage" ref="infiniteSentinel" class="infinite-sentinel"></div>
-        <div v-if="!isMobile && currentPage === 1 && (!articles || articles.length === 0)" class="no-content">
+        <div v-if="!loading && !isMobile && currentPage === 1 && (!articles || articles.length === 0)" class="no-content">
           <p>暂无内容</p>
         </div>
       </div>
 
-      <!-- 所思所想内容 -->
-      <div v-if="activeTab === 'thoughts'" class="thoughts-content">
-        <div class="thoughts-container">
-          <h2 class="thoughts-title">{{ thoughtsContent.title }}</h2>
-          <div class="thoughts-text">
-            <p v-for="(paragraph, index) in thoughtsContent.paragraphs" :key="index" class="thoughts-paragraph">
-              {{ paragraph }}
-            </p>
+      <!-- 所思所想内容（带过渡动画） -->
+      <Transition name="fade-slide">
+        <div v-if="activeTab === 'thoughts'" key="thoughts" class="thoughts-content content-fade-in">
+          <div class="thoughts-container">
+            <h2 class="thoughts-title">{{ thoughtsContent.title }}</h2>
+            <div class="thoughts-text">
+              <p v-for="(paragraph, index) in thoughtsContent.paragraphs" :key="index" class="thoughts-paragraph">
+                {{ paragraph }}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      </Transition>
     </div>
 
     <!-- 分页区域 -->
@@ -105,7 +113,7 @@ const limit = 9
 const articles = ref([])
 const articleCache = ref({})// 用于缓存数据
 const displayedText = ref('')
-const loading = ref(false)
+const loading = ref(true) // 初始加载状态为 true，确保先显示加载界面
 const loadingProgress = ref(0)
 const activeTab = ref('main') // 当前激活的标签页
 const totalArticles = ref(0) // 实际文章总数
@@ -813,6 +821,57 @@ onBeforeUnmount(() => {
   width: 100vw;
   height: 100vh;
   z-index: 1000;
+}
+
+/* 过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.fade-slide-enter-active {
+  transition: all 0.5s ease-out;
+}
+
+.fade-slide-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.fade-slide-enter-to,
+.fade-slide-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 内容淡入动画 */
+.content-fade-in {
+  animation: contentFadeIn 0.6s ease-out;
+}
+
+@keyframes contentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 768px) {
