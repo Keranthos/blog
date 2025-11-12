@@ -3,7 +3,9 @@ package controllers
 import (
 	"backend/config"
 	"backend/models"
+	"backend/services/imageref"
 	"backend/utils"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -83,6 +85,10 @@ func CreateMoment(c *gin.Context) {
 		return
 	}
 
+	if err := imageref.SyncImageReferences(config.DB, "moment", moment.ID, moment.Image, moment.Content); err != nil {
+		log.Printf("同步碎碎念图片引用失败 (ID:%d): %v", moment.ID, err)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Moment created", "data": moment})
 }
 
@@ -95,6 +101,13 @@ func UpdateMoment(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Moment not found"})
 		return
 	}
+
+	uintID, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid moment id"})
+		return
+	}
+	refID := uint(uintID)
 
 	var updateData models.Moment
 	if err := c.ShouldBindJSON(&updateData); err != nil {
@@ -109,6 +122,14 @@ func UpdateMoment(c *gin.Context) {
 	if err := config.DB.Model(&moment).Updates(updateData).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update moment"})
 		return
+	}
+
+	if err := config.DB.First(&moment, id).Error; err != nil {
+		log.Printf("更新后读取碎碎念失败 (ID:%s): %v", id, err)
+	} else {
+		if err := imageref.SyncImageReferences(config.DB, "moment", refID, moment.Image, moment.Content); err != nil {
+			log.Printf("同步碎碎念图片引用失败 (ID:%d): %v", refID, err)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Moment updated", "data": moment})
@@ -138,10 +159,21 @@ func DeleteMoment(c *gin.Context) {
 		}
 	}
 
+	uintID, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid moment id"})
+		return
+	}
+	refID := uint(uintID)
+
 	// 删除碎碎念记录
 	if err := config.DB.Delete(&models.Moment{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete moment"})
 		return
+	}
+
+	if err := imageref.RemoveImageReferences(config.DB, "moment", refID); err != nil {
+		log.Printf("删除碎碎念图片引用失败 (ID:%d): %v", refID, err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Moment deleted"})

@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"backend/services/imageref"
+
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/mysql"
@@ -102,8 +104,21 @@ func InitDB() error { // 初始化全局连接池DB
 		&models.Entertainment{},
 		&models.DailyReflection{},
 		&models.Deadline{},
+		&models.ImageReference{},
 	); err != nil {
 		return fmt.Errorf("error migrating database: %v", err)
+	}
+
+	// 删除已废弃列（科研摘要、项目状态）
+	if DB.Migrator().HasColumn(&models.ResearchArticle{}, "abstract") {
+		if err := DB.Migrator().DropColumn(&models.ResearchArticle{}, "abstract"); err != nil {
+			log.Printf("警告: 删除 research_articles.abstract 列失败: %v", err)
+		}
+	}
+	if DB.Migrator().HasColumn(&models.ProjectArticle{}, "status") {
+		if err := DB.Migrator().DropColumn(&models.ProjectArticle{}, "status"); err != nil {
+			log.Printf("警告: 删除 project_articles.status 列失败: %v", err)
+		}
 	}
 
 	// 创建必要的索引以优化查询性能
@@ -116,6 +131,11 @@ func InitDB() error { // 初始化全局连接池DB
 	if err := createDefaultAdmin(); err != nil {
 		log.Printf("警告: 创建默认管理员账户时出现错误: %v", err)
 		// 管理员创建失败不影响程序运行，仅记录警告
+	}
+
+	// 当引用表为空时，回填历史图片引用数据
+	if err := imageref.EnsureBackfillIfEmpty(DB); err != nil {
+		log.Printf("警告: 回填图片引用数据失败: %v", err)
 	}
 
 	// 注意：慢查询监控在 main.go 中初始化，避免循环依赖

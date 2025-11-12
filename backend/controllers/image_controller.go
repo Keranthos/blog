@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"backend/config"
 	"backend/models"
+	"backend/services/imageref"
 
 	"github.com/gin-gonic/gin"
 )
@@ -82,75 +84,70 @@ type ImageUsage struct {
 
 // checkImageInUse 检查图片是否正在被使用（返回简单描述）
 func checkImageInUse(imagePath string) ([]string, error) {
+	refs, _, err := imageref.ListReferencesByImagePath(config.DB, imagePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(refs) == 0 {
+		// 尝试使用标准化后的路径再次查询
+		alt := imageref.NormalizeImagePath("/" + strings.ReplaceAll(imagePath, "\\", "/"))
+		if alt != "" && alt != imagePath {
+			refs, _, err = imageref.ListReferencesByImagePath(config.DB, alt)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if len(refs) == 0 {
+		return nil, nil
+	}
+
+	typeLabels := map[string]string{
+		"blog":     "博客文章",
+		"research": "科研文章",
+		"project":  "项目文章",
+		"moment":   "碎碎念",
+		"media":    "书影集",
+	}
+	unitLabels := map[string]string{
+		"media":   "个",
+		"default": "篇",
+	}
+	usageLabels := map[string]string{
+		"cover":   "封面",
+		"content": "正文",
+	}
+
+	counts := make(map[string]map[string]int)
+	for _, ref := range refs {
+		if _, ok := counts[ref.RefType]; !ok {
+			counts[ref.RefType] = make(map[string]int)
+		}
+		counts[ref.RefType][ref.UsageType]++
+	}
+
 	var usageList []string
-
-	// 转换为Web路径格式（统一使用正斜杠）
-	webPath := "/" + strings.ReplaceAll(imagePath, "\\", "/")
-
-	// 检查博客文章封面
-	var blogCount int64
-	config.DB.Model(&models.BlogArticle{}).Where("image = ?", webPath).Count(&blogCount)
-	if blogCount > 0 {
-		usageList = append(usageList, fmt.Sprintf("博客文章封面 (%d篇)", blogCount))
+	for refType, usageMap := range counts {
+		label := typeLabels[refType]
+		if label == "" {
+			label = refType
+		}
+		unit := unitLabels["default"]
+		if u, ok := unitLabels[refType]; ok {
+			unit = u
+		}
+		for usageType, count := range usageMap {
+			usageLabel := usageLabels[usageType]
+			if usageLabel == "" {
+				usageLabel = usageType
+			}
+			usageList = append(usageList, fmt.Sprintf("%s%s (%d%s)", label, usageLabel, count, unit))
+		}
 	}
 
-	// 检查博客文章正文内容
-	var blogContentCount int64
-	config.DB.Model(&models.BlogArticle{}).Where("content LIKE ?", "%"+webPath+"%").Count(&blogContentCount)
-	if blogContentCount > 0 {
-		usageList = append(usageList, fmt.Sprintf("博客文章正文 (%d篇)", blogContentCount))
-	}
-
-	// 检查科研文章封面
-	var researchCount int64
-	config.DB.Model(&models.ResearchArticle{}).Where("image = ?", webPath).Count(&researchCount)
-	if researchCount > 0 {
-		usageList = append(usageList, fmt.Sprintf("科研文章封面 (%d篇)", researchCount))
-	}
-
-	// 检查科研文章正文（如果有内容字段）
-	// 注意：ResearchArticle可能没有Content字段，这里先检查Abstract
-	var researchAbstractCount int64
-	config.DB.Model(&models.ResearchArticle{}).Where("abstract LIKE ?", "%"+webPath+"%").Count(&researchAbstractCount)
-	if researchAbstractCount > 0 {
-		usageList = append(usageList, fmt.Sprintf("科研文章摘要 (%d篇)", researchAbstractCount))
-	}
-
-	// 检查项目文章封面
-	var projectCount int64
-	config.DB.Model(&models.ProjectArticle{}).Where("image = ?", webPath).Count(&projectCount)
-	if projectCount > 0 {
-		usageList = append(usageList, fmt.Sprintf("项目文章封面 (%d篇)", projectCount))
-	}
-
-	// 检查媒体（书影集）封面
-	var mediaCount int64
-	config.DB.Model(&models.Media{}).Where("poster = ?", webPath).Count(&mediaCount)
-	if mediaCount > 0 {
-		usageList = append(usageList, fmt.Sprintf("书影集封面 (%d个)", mediaCount))
-	}
-
-	// 检查媒体（书影集）正文内容
-	var mediaReviewCount int64
-	config.DB.Model(&models.Media{}).Where("review LIKE ?", "%"+webPath+"%").Count(&mediaReviewCount)
-	if mediaReviewCount > 0 {
-		usageList = append(usageList, fmt.Sprintf("书影集正文 (%d个)", mediaReviewCount))
-	}
-
-	// 检查随笔封面
-	var momentCount int64
-	config.DB.Model(&models.Moment{}).Where("image = ?", webPath).Count(&momentCount)
-	if momentCount > 0 {
-		usageList = append(usageList, fmt.Sprintf("随笔封面 (%d篇)", momentCount))
-	}
-
-	// 检查随笔内容
-	var momentContentCount int64
-	config.DB.Model(&models.Moment{}).Where("content LIKE ?", "%"+webPath+"%").Count(&momentContentCount)
-	if momentContentCount > 0 {
-		usageList = append(usageList, fmt.Sprintf("随笔正文 (%d篇)", momentContentCount))
-	}
-
+	sort.Strings(usageList)
 	return usageList, nil
 }
 
@@ -162,265 +159,170 @@ func GetImageUsages(c *gin.Context) {
 		return
 	}
 
-	// 转换为Web路径格式（统一使用正斜杠）
-	// 先去掉反斜杠，然后确保以 / 开头
-	webPath := strings.ReplaceAll(imagePath, "\\", "/")
-	if !strings.HasPrefix(webPath, "/") {
-		webPath = "/" + webPath
+	references, normalized, err := imageref.ListReferencesByImagePath(config.DB, imagePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
-	var usages []ImageUsage
-
-	// 调试日志：打印查询的路径
-	fmt.Printf("查询图片路径: %s\n", webPath)
-
-	// 调试：查询一个博客文章的image字段示例，查看实际存储格式
-	var sampleBlog models.BlogArticle
-	if err := config.DB.First(&sampleBlog).Error; err == nil {
-		fmt.Printf("数据库中博客文章image字段示例: %s\n", sampleBlog.Image)
-	}
-
-	// 检查博客文章封面
-	var blogArticles []models.BlogArticle
-	// 尝试多种路径格式进行匹配
-	pathVariations := []string{
-		webPath,
-		strings.TrimPrefix(webPath, "/"),
-		strings.TrimSuffix(webPath, "/"),
-		strings.Trim(strings.TrimPrefix(webPath, "/"), "/"),
-	}
-
-	// 构建查询条件：尝试精确匹配多种路径格式
-	query := config.DB
-	for i, path := range pathVariations {
-		if i == 0 {
-			query = query.Where("image = ?", path)
-		} else {
-			query = query.Or("image = ?", path)
+	if len(references) == 0 {
+		alt := normalized
+		if alt == "" {
+			alt = "/" + strings.ReplaceAll(imagePath, "\\", "/")
 		}
-	}
-	query.Find(&blogArticles)
-
-	// 如果还是找不到，尝试LIKE模糊匹配
-	if len(blogArticles) == 0 {
-		// 提取文件名（路径的最后一部分）
-		fileName := filepath.Base(webPath)
-		config.DB.Where("image LIKE ?", "%"+fileName+"%").Find(&blogArticles)
-	}
-
-	fmt.Printf("找到博客文章: %d 篇\n", len(blogArticles))
-	for _, article := range blogArticles {
-		usages = append(usages, ImageUsage{
-			Type:      "blog",
-			ID:        article.ID,
-			Title:     article.Title,
-			UsageType: "cover",
-		})
-	}
-
-	// 检查博客文章正文
-	var blogContentArticles []models.BlogArticle
-	config.DB.Where("content LIKE ?", "%"+webPath+"%").Find(&blogContentArticles)
-	for _, article := range blogContentArticles {
-		// 避免重复（如果封面和正文都是同一图片）
-		exists := false
-		for _, u := range usages {
-			if u.Type == "blog" && u.ID == article.ID {
-				exists = true
-				break
+		if alt != "" && alt != imagePath {
+			references, _, err = imageref.ListReferencesByImagePath(config.DB, alt)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
 			}
 		}
-		if !exists {
-			usages = append(usages, ImageUsage{
-				Type:      "blog",
-				ID:        article.ID,
-				Title:     article.Title,
-				UsageType: "content",
-			})
-		}
 	}
 
-	// 检查科研文章封面
-	var researchArticles []models.ResearchArticle
-	pathVariations = []string{
-		webPath,
-		strings.TrimPrefix(webPath, "/"),
-		strings.TrimSuffix(webPath, "/"),
-		strings.Trim(strings.TrimPrefix(webPath, "/"), "/"),
-	}
-	query = config.DB
-	for i, path := range pathVariations {
-		if i == 0 {
-			query = query.Where("image = ?", path)
-		} else {
-			query = query.Or("image = ?", path)
-		}
-	}
-	query.Find(&researchArticles)
-	if len(researchArticles) == 0 {
-		fileName := filepath.Base(webPath)
-		config.DB.Where("image LIKE ?", "%"+fileName+"%").Find(&researchArticles)
-	}
-	for _, article := range researchArticles {
-		usages = append(usages, ImageUsage{
-			Type:      "research",
-			ID:        article.ID,
-			Title:     article.Title,
-			UsageType: "cover",
+	if len(references) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"usages": []ImageUsage{},
+			"count":  0,
 		})
+		return
 	}
 
-	// 检查科研文章摘要
-	config.DB.Where("abstract LIKE ?", "%"+webPath+"%").Find(&researchArticles)
-	for _, article := range researchArticles {
-		exists := false
-		for _, u := range usages {
-			if u.Type == "research" && u.ID == article.ID {
-				exists = true
-				break
+	type idSet map[uint]struct{}
+	groupIDs := make(map[string]idSet)
+	for _, ref := range references {
+		set, ok := groupIDs[ref.RefType]
+		if !ok {
+			set = make(idSet)
+			groupIDs[ref.RefType] = set
+		}
+		set[ref.RefID] = struct{}{}
+	}
+
+	toSlice := func(set idSet) []uint {
+		ids := make([]uint, 0, len(set))
+		for id := range set {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+
+	blogMap := make(map[uint]models.BlogArticle)
+	if set, ok := groupIDs["blog"]; ok && len(set) > 0 {
+		var items []models.BlogArticle
+		if err := config.DB.Where("id IN ?", toSlice(set)).Find(&items).Error; err == nil {
+			for _, item := range items {
+				blogMap[item.ID] = item
 			}
 		}
-		if !exists {
-			usages = append(usages, ImageUsage{
-				Type:      "research",
-				ID:        article.ID,
-				Title:     article.Title,
-				UsageType: "content",
-			})
-		}
 	}
 
-	// 检查项目文章封面
-	var projectArticles []models.ProjectArticle
-	pathVariations = []string{
-		webPath,
-		strings.TrimPrefix(webPath, "/"),
-		strings.TrimSuffix(webPath, "/"),
-		strings.Trim(strings.TrimPrefix(webPath, "/"), "/"),
-	}
-	query = config.DB
-	for i, path := range pathVariations {
-		if i == 0 {
-			query = query.Where("image = ?", path)
-		} else {
-			query = query.Or("image = ?", path)
-		}
-	}
-	query.Find(&projectArticles)
-	if len(projectArticles) == 0 {
-		fileName := filepath.Base(webPath)
-		config.DB.Where("image LIKE ?", "%"+fileName+"%").Find(&projectArticles)
-	}
-	for _, article := range projectArticles {
-		usages = append(usages, ImageUsage{
-			Type:      "project",
-			ID:        article.ID,
-			Title:     article.Title,
-			UsageType: "cover",
-		})
-	}
-
-	// 检查媒体（书影集）封面
-	var mediaItems []models.Media
-	pathVariations = []string{
-		webPath,
-		strings.TrimPrefix(webPath, "/"),
-		strings.TrimSuffix(webPath, "/"),
-		strings.Trim(strings.TrimPrefix(webPath, "/"), "/"),
-	}
-	query = config.DB
-	for i, path := range pathVariations {
-		if i == 0 {
-			query = query.Where("poster = ?", path)
-		} else {
-			query = query.Or("poster = ?", path)
-		}
-	}
-	query.Find(&mediaItems)
-	if len(mediaItems) == 0 {
-		fileName := filepath.Base(webPath)
-		config.DB.Where("poster LIKE ?", "%"+fileName+"%").Find(&mediaItems)
-	}
-	for _, media := range mediaItems {
-		usages = append(usages, ImageUsage{
-			Type:      "media",
-			ID:        media.ID,
-			Title:     media.Name,
-			UsageType: "cover",
-			MediaType: media.Type, // "novels"/"books"/"movies"
-		})
-	}
-
-	// 检查媒体（书影集）正文内容
-	config.DB.Where("review LIKE ?", "%"+webPath+"%").Find(&mediaItems)
-	for _, media := range mediaItems {
-		exists := false
-		for _, u := range usages {
-			if u.Type == "media" && u.ID == media.ID {
-				exists = true
-				break
+	researchMap := make(map[uint]models.ResearchArticle)
+	if set, ok := groupIDs["research"]; ok && len(set) > 0 {
+		var items []models.ResearchArticle
+		if err := config.DB.Where("id IN ?", toSlice(set)).Find(&items).Error; err == nil {
+			for _, item := range items {
+				researchMap[item.ID] = item
 			}
 		}
-		if !exists {
-			usages = append(usages, ImageUsage{
-				Type:      "media",
-				ID:        media.ID,
-				Title:     media.Name,
-				UsageType: "content",
-				MediaType: media.Type, // "novels"/"books"/"movies"
-			})
-		}
 	}
 
-	// 检查随笔封面
-	var moments []models.Moment
-	pathVariations = []string{
-		webPath,
-		strings.TrimPrefix(webPath, "/"),
-		strings.TrimSuffix(webPath, "/"),
-		strings.Trim(strings.TrimPrefix(webPath, "/"), "/"),
-	}
-	query = config.DB
-	for i, path := range pathVariations {
-		if i == 0 {
-			query = query.Where("image = ?", path)
-		} else {
-			query = query.Or("image = ?", path)
-		}
-	}
-	query.Find(&moments)
-	if len(moments) == 0 {
-		fileName := filepath.Base(webPath)
-		config.DB.Where("image LIKE ?", "%"+fileName+"%").Find(&moments)
-	}
-	for _, moment := range moments {
-		usages = append(usages, ImageUsage{
-			Type:      "moment",
-			ID:        moment.ID,
-			Title:     moment.Title,
-			UsageType: "cover",
-		})
-	}
-
-	// 检查随笔内容
-	config.DB.Where("content LIKE ?", "%"+webPath+"%").Find(&moments)
-	for _, moment := range moments {
-		exists := false
-		for _, u := range usages {
-			if u.Type == "moment" && u.ID == moment.ID {
-				exists = true
-				break
+	projectMap := make(map[uint]models.ProjectArticle)
+	if set, ok := groupIDs["project"]; ok && len(set) > 0 {
+		var items []models.ProjectArticle
+		if err := config.DB.Where("id IN ?", toSlice(set)).Find(&items).Error; err == nil {
+			for _, item := range items {
+				projectMap[item.ID] = item
 			}
 		}
-		if !exists {
-			usages = append(usages, ImageUsage{
-				Type:      "moment",
-				ID:        moment.ID,
-				Title:     moment.Title,
-				UsageType: "content",
-			})
+	}
+
+	momentMap := make(map[uint]models.Moment)
+	if set, ok := groupIDs["moment"]; ok && len(set) > 0 {
+		var items []models.Moment
+		if err := config.DB.Where("id IN ?", toSlice(set)).Find(&items).Error; err == nil {
+			for _, item := range items {
+				momentMap[item.ID] = item
+			}
 		}
 	}
+
+	mediaMap := make(map[uint]models.Media)
+	if set, ok := groupIDs["media"]; ok && len(set) > 0 {
+		var items []models.Media
+		if err := config.DB.Where("id IN ?", toSlice(set)).Find(&items).Error; err == nil {
+			for _, item := range items {
+				mediaMap[item.ID] = item
+			}
+		}
+	}
+
+	usages := make([]ImageUsage, 0, len(references))
+	for _, ref := range references {
+		usage := ImageUsage{
+			Type:      ref.RefType,
+			ID:        ref.RefID,
+			UsageType: ref.UsageType,
+		}
+
+		switch ref.RefType {
+		case "blog":
+			if article, ok := blogMap[ref.RefID]; ok {
+				usage.Title = article.Title
+			} else {
+				continue
+			}
+		case "research":
+			if article, ok := researchMap[ref.RefID]; ok {
+				usage.Title = article.Title
+			} else {
+				continue
+			}
+		case "project":
+			if article, ok := projectMap[ref.RefID]; ok {
+				usage.Title = article.Title
+			} else {
+				continue
+			}
+		case "moment":
+			if moment, ok := momentMap[ref.RefID]; ok {
+				usage.Title = moment.Title
+			} else {
+				continue
+			}
+		case "media":
+			if mediaItem, ok := mediaMap[ref.RefID]; ok {
+				usage.Title = mediaItem.Name
+				usage.MediaType = mediaItem.Type
+			} else {
+				continue
+			}
+		default:
+			continue
+		}
+
+		usages = append(usages, usage)
+	}
+
+	order := map[string]int{
+		"blog":     1,
+		"research": 2,
+		"project":  3,
+		"moment":   4,
+		"media":    5,
+	}
+
+	sort.Slice(usages, func(i, j int) bool {
+		if order[usages[i].Type] != order[usages[j].Type] {
+			return order[usages[i].Type] < order[usages[j].Type]
+		}
+		if usages[i].ID != usages[j].ID {
+			return usages[i].ID < usages[j].ID
+		}
+		if usages[i].UsageType != usages[j].UsageType {
+			return usages[i].UsageType < usages[j].UsageType
+		}
+		return usages[i].Title < usages[j].Title
+	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"usages": usages,

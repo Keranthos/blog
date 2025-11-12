@@ -3,8 +3,10 @@ package controllers
 import (
 	"backend/config"
 	"backend/models"
+	"backend/services/imageref"
 	"backend/utils"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -92,6 +94,10 @@ func CreateMedia(c *gin.Context) {
 		return
 	}
 
+	if err := imageref.SyncImageReferences(config.DB, "media", media.ID, media.Poster, media.Review); err != nil {
+		log.Printf("同步媒体图片引用失败 (ID:%d): %v", media.ID, err)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Media created"})
 }
 
@@ -115,6 +121,20 @@ func UpdateMedia(c *gin.Context) {
 	if err := config.DB.Model(&models.Media{}).Where("id = ?", mediaID).Updates(media).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update media"})
 		return
+	}
+
+	idNum, err := strconv.ParseUint(mediaID, 10, 64)
+	if err != nil {
+		log.Printf("无效的媒体ID: %s, err: %v", mediaID, err)
+	} else {
+		var current models.Media
+		if err := config.DB.First(&current, mediaID).Error; err != nil {
+			log.Printf("更新后读取媒体失败 (ID:%s): %v", mediaID, err)
+		} else {
+			if err := imageref.SyncImageReferences(config.DB, "media", uint(idNum), current.Poster, current.Review); err != nil {
+				log.Printf("同步媒体图片引用失败 (ID:%d): %v", idNum, err)
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Media updated"})
@@ -143,10 +163,21 @@ func DeleteMedia(c *gin.Context) {
 		}
 	}
 
+	idNum, err := strconv.ParseUint(mediaID, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid media id"})
+		return
+	}
+	refID := uint(idNum)
+
 	// 删除媒体记录
 	if err := config.DB.Where("id = ?", mediaID).Delete(&models.Media{}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete media"})
 		return
+	}
+
+	if err := imageref.RemoveImageReferences(config.DB, "media", refID); err != nil {
+		log.Printf("删除媒体图片引用失败 (ID:%d): %v", refID, err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Media deleted"})

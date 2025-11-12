@@ -202,7 +202,6 @@ const getImageUrl = (path) => {
 // 查看引用
 const viewReferences = async (image) => {
   try {
-    loading.value = true
     const response = await requestFunc(`/images/usages?path=${encodeURIComponent(image.path)}`, {
       method: 'GET',
       headers: {
@@ -233,23 +232,21 @@ const viewReferences = async (image) => {
     if (usage.type === 'blog') {
       router.push(`/blog/${usage.id}`)
     } else if (usage.type === 'research') {
-      router.push(`/research/${usage.id}`)
+      router.push(`/blog/${usage.id}`)
     } else if (usage.type === 'project') {
-      router.push(`/project/${usage.id}`)
+      router.push(`/blog/${usage.id}`)
     } else if (usage.type === 'moment') {
       router.push(`/moments/${usage.id}`)
     } else if (usage.type === 'media') {
-      // 书影集：统一跳转到书影集界面（/fragments/novels），并传递mediaId以便打开详情框
+      const mediaType = usage.mediaType || 'novels'
       router.push({
         path: '/fragments/novels',
-        query: { mediaId: usage.id }
+        query: { mediaId: usage.id, mediaType }
       })
     }
   } catch (error) {
     console.error('获取图片引用失败:', error)
     showErrorMessage('获取图片引用失败')
-  } finally {
-    loading.value = false
   }
 }
 

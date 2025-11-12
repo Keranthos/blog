@@ -49,7 +49,7 @@
 <script setup>
 import { ref, onMounted, watch, nextTick, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getMediaList } from '@/api/media/browse'
+import { getMediaList, getMediaByID } from '@/api/media/browse'
 import MediaCard from '@/components/MediaCard.vue'
 import novelsBackgroundImg from '@/assets/novels_background.jpg'
 
@@ -69,6 +69,22 @@ const introTitle = ref('')
 const introBody = ref('')
 const fallbackImg = '/images/sunset-mountains.jpg'
 const mediaCardRefs = ref({}) // 存储MediaCard组件的引用
+
+const waitForInitialLoad = () => new Promise((resolve) => {
+  if (!isLoading.value) {
+    resolve()
+    return
+  }
+  const stop = watch(
+    () => isLoading.value,
+    (val) => {
+      if (!val) {
+        stop()
+        resolve()
+      }
+    }
+  )
+})
 
 // 解析介绍文本，提取第一句话作为标题
 const parseIntroText = (text) => {
@@ -116,7 +132,7 @@ const loadMedia = async (isInitialLoad = false) => {
   // 模拟加载进度
   const progressInterval = setInterval(() => {
     if (loadingProgress.value < 90) {
-      loadingProgress.value += Math.random() * 20
+      loadingProgress.value = Math.min(90, loadingProgress.value + Math.random() * 20)
     }
   }, 100)
 
@@ -181,36 +197,76 @@ const removeMedia = (mediaId) => {
 }
 
 // 打开指定媒体的详情框
-const openMediaById = async (mediaId) => {
-  // 确保媒体列表已加载
-  if (mediaList.value.length === 0) {
-    await loadMedia()
+const openMediaById = async (mediaId, mediaType = null) => {
+  const targetId = parseInt(mediaId, 10)
+  if (Number.isNaN(targetId)) {
+    return
   }
 
-  // 查找对应的媒体卡片
-  const targetMedia = mediaList.value.find(m => m.ID === parseInt(mediaId))
-  if (targetMedia && mediaCardRefs.value[targetMedia.ID]) {
-    // 调用MediaCard的打开方法（如果MediaCard暴露了openMediaModal方法）
+  if (mediaList.value.length === 0) {
+    if (isLoading.value) {
+      await waitForInitialLoad()
+    } else {
+      await loadMedia(true)
+    }
+  }
+
+  let targetMedia = mediaList.value.find(m => m.ID === targetId)
+
+  if (!targetMedia && mediaType) {
+    try {
+      const res = await getMediaByID(targetId, mediaType)
+      const data = res?.data || res
+      if (data) {
+        const normalized = {
+          ...data,
+          __type: data.__type || mediaType
+        }
+        if (normalized.ID == null && data.id != null) {
+          normalized.ID = data.id
+        }
+        if (!mediaList.value.some(m => m.ID === normalized.ID)) {
+          mediaList.value.unshift(normalized)
+        }
+        await nextTick()
+        targetMedia = mediaList.value.find(m => m.ID === normalized.ID)
+      }
+    } catch (error) {
+      console.error('Failed to load media by id:', error)
+    }
+  }
+
+  if (!targetMedia) {
+    console.warn('Media item not found for id:', mediaId)
+    return
+  }
+
+  await nextTick()
+  requestAnimationFrame(() => {
     const cardComponent = mediaCardRefs.value[targetMedia.ID]
     if (cardComponent && typeof cardComponent.openMediaModal === 'function') {
       cardComponent.openMediaModal()
     }
-  }
+  })
 }
 
 // 监听路由query变化，打开指定的媒体详情框
-watch(() => route.query.mediaId, async (mediaId) => {
-  if (mediaId) {
-    // 等待DOM更新
-    await nextTick()
-    // 延迟一点确保MediaCard组件已完全渲染
-    setTimeout(() => {
-      openMediaById(mediaId)
-      // 清除query参数，避免刷新时重复打开
-      router.replace({ query: {} })
-    }, 300)
-  }
-}, { immediate: true })
+watch(
+  () => ({ mediaId: route.query.mediaId, mediaType: route.query.mediaType }),
+  async ({ mediaId, mediaType }) => {
+    if (mediaId) {
+      await nextTick()
+      setTimeout(() => {
+        openMediaById(mediaId, mediaType || 'novels')
+        const newQuery = { ...route.query }
+        delete newQuery.mediaId
+        delete newQuery.mediaType
+        router.replace({ query: newQuery })
+      }, 300)
+    }
+  },
+  { immediate: true }
+)
 
 onMounted(() => {
   loadMedia(true) // 初始加载

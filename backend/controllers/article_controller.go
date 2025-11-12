@@ -3,6 +3,7 @@ package controllers
 import (
 	"backend/config"
 	"backend/models"
+	"backend/services/imageref"
 	"backend/utils"
 	"fmt"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -53,14 +55,14 @@ func GetArticles(c *gin.Context) {
 		articles = blogArticles
 	case "research":
 		var researchArticles []models.ResearchArticle
-		if err := config.DB.Select("id", "title", "abstract", "tags", "image", "view_count", "created_at").Order("created_at DESC").Offset(offset).Limit(limit).Find(&researchArticles).Error; err != nil {
+		if err := config.DB.Select("id", "title", "content", "tags", "image", "view_count", "created_at").Order("created_at DESC").Offset(offset).Limit(limit).Find(&researchArticles).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get articles"})
 			return
 		}
 		articles = researchArticles
 	case "project":
 		var projectArticles []models.ProjectArticle
-		if err := config.DB.Select("id", "title", "status", "tags", "image", "view_count", "created_at").Order("created_at DESC").Offset(offset).Limit(limit).Find(&projectArticles).Error; err != nil {
+		if err := config.DB.Select("id", "title", "content", "tags", "image", "view_count", "created_at").Order("created_at DESC").Offset(offset).Limit(limit).Find(&projectArticles).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get articles"})
 			return
 		}
@@ -71,7 +73,28 @@ func GetArticles(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get articles"})
 			return
 		}
-		articles = momentArticles
+		formattedMoments := make([]map[string]interface{}, 0, len(momentArticles))
+		for _, moment := range momentArticles {
+			var tags []string
+			if strings.TrimSpace(moment.Tags) != "" {
+				for _, tag := range strings.Split(moment.Tags, ",") {
+					trimmed := strings.TrimSpace(tag)
+					if trimmed != "" {
+						tags = append(tags, trimmed)
+					}
+				}
+			}
+			formattedMoments = append(formattedMoments, map[string]interface{}{
+				"ID":        moment.ID,
+				"title":     moment.Title,
+				"content":   moment.Content,
+				"tags":      tags,
+				"image":     moment.Image,
+				"viewCount": moment.ViewCount,
+				"CreatedAt": moment.CreatedAt,
+			})
+		}
+		articles = formattedMoments
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})
 		return
@@ -222,6 +245,10 @@ func CreateArticle(c *gin.Context) {
 			return
 		}
 
+		if err := imageref.SyncImageReferences(config.DB, "blog", blogArticle.ID, blogArticle.Image, blogArticle.Content); err != nil {
+			log.Printf("同步博客文章图片引用失败 (ID:%d): %v", blogArticle.ID, err)
+		}
+
 		c.JSON(http.StatusOK, gin.H{"message": "Article created"})
 	case "research":
 		var researchArticle models.ResearchArticle
@@ -235,7 +262,7 @@ func CreateArticle(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if err := utils.ValidateArticleContent(researchArticle.Abstract); err != nil {
+		if err := utils.ValidateArticleContent(researchArticle.Content); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -257,6 +284,10 @@ func CreateArticle(c *gin.Context) {
 			return
 		}
 
+		if err := imageref.SyncImageReferences(config.DB, "research", researchArticle.ID, researchArticle.Image, researchArticle.Content); err != nil {
+			log.Printf("同步科研文章图片引用失败 (ID:%d): %v", researchArticle.ID, err)
+		}
+
 		c.JSON(http.StatusOK, gin.H{"message": "Article created"})
 	case "project":
 		var projectArticle models.ProjectArticle
@@ -270,7 +301,7 @@ func CreateArticle(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if err := utils.ValidateArticleContent(projectArticle.Status); err != nil {
+		if err := utils.ValidateArticleContent(projectArticle.Content); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -292,6 +323,10 @@ func CreateArticle(c *gin.Context) {
 			return
 		}
 
+		if err := imageref.SyncImageReferences(config.DB, "project", projectArticle.ID, projectArticle.Image, projectArticle.Content); err != nil {
+			log.Printf("同步项目文章图片引用失败 (ID:%d): %v", projectArticle.ID, err)
+		}
+
 		c.JSON(http.StatusOK, gin.H{"message": "Article created"})
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})
@@ -306,6 +341,13 @@ func UpdateArticle(c *gin.Context) {
 
 	// 添加调试日志
 	fmt.Printf("更新文章请求 - ID: %s, Type: %s\n", id, articleType)
+
+	uintID, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid article id"})
+		return
+	}
+	refID := uint(uintID)
 
 	switch articleType {
 	case "blog":
@@ -324,6 +366,9 @@ func UpdateArticle(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update article"})
 			return
 		}
+		if err := imageref.SyncImageReferences(config.DB, "blog", refID, blogArticle.Image, blogArticle.Content); err != nil {
+			log.Printf("同步博客文章图片引用失败 (ID:%d): %v", refID, err)
+		}
 	case "research":
 		var researchArticle models.ResearchArticle
 		if err := c.ShouldBindJSON(&researchArticle); err != nil {
@@ -339,6 +384,9 @@ func UpdateArticle(c *gin.Context) {
 			fmt.Printf("研究文章数据库更新错误: %v\n", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update article"})
 			return
+		}
+		if err := imageref.SyncImageReferences(config.DB, "research", refID, researchArticle.Image, researchArticle.Content); err != nil {
+			log.Printf("同步科研文章图片引用失败 (ID:%d): %v", refID, err)
 		}
 	case "project":
 		var projectArticle models.ProjectArticle
@@ -356,6 +404,9 @@ func UpdateArticle(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update article"})
 			return
 		}
+		if err := imageref.SyncImageReferences(config.DB, "project", refID, projectArticle.Image, projectArticle.Content); err != nil {
+			log.Printf("同步项目文章图片引用失败 (ID:%d): %v", refID, err)
+		}
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})
 		return
@@ -368,6 +419,13 @@ func UpdateArticle(c *gin.Context) {
 func DeleteArticle(c *gin.Context) {
 	id := c.Param("id")
 	articleType := c.Query("type")
+
+	uintID, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid article id"})
+		return
+	}
+	refID := uint(uintID)
 
 	var imageField string
 	var contentField string
@@ -389,7 +447,7 @@ func DeleteArticle(c *gin.Context) {
 			return
 		}
 		imageField = research.Image
-		contentField = research.Abstract // 科研文章可能没有Content字段
+		contentField = research.Content
 	case "project":
 		var project models.ProjectArticle
 		if err := config.DB.Where("id = ?", id).First(&project).Error; err != nil {
@@ -397,7 +455,7 @@ func DeleteArticle(c *gin.Context) {
 			return
 		}
 		imageField = project.Image
-		contentField = "" // 项目文章可能没有Content字段
+		contentField = project.Content
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid type parameter"})
 		return
@@ -423,15 +481,24 @@ func DeleteArticle(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete article"})
 			return
 		}
+		if err := imageref.RemoveImageReferences(config.DB, "blog", refID); err != nil {
+			log.Printf("删除博客文章图片引用失败 (ID:%d): %v", refID, err)
+		}
 	case "research":
 		if err := config.DB.Delete(&models.ResearchArticle{}, id).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete article"})
 			return
 		}
+		if err := imageref.RemoveImageReferences(config.DB, "research", refID); err != nil {
+			log.Printf("删除科研文章图片引用失败 (ID:%d): %v", refID, err)
+		}
 	case "project":
 		if err := config.DB.Delete(&models.ProjectArticle{}, id).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete article"})
 			return
+		}
+		if err := imageref.RemoveImageReferences(config.DB, "project", refID); err != nil {
+			log.Printf("删除项目文章图片引用失败 (ID:%d): %v", refID, err)
 		}
 	}
 
@@ -514,7 +581,7 @@ func GetTopArticles(c *gin.Context) {
 
 	// 获取置顶科研文章
 	var researchArticles []models.ResearchArticle
-	if err := config.DB.Select("id", "title", "abstract", "tags", "image", "view_count", "created_at", "is_top").Where("is_top = ?", true).Order("created_at DESC").Find(&researchArticles).Error; err != nil {
+	if err := config.DB.Select("id", "title", "content", "tags", "image", "view_count", "created_at", "is_top").Where("is_top = ?", true).Order("created_at DESC").Find(&researchArticles).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get top research articles"})
 		return
 	}
@@ -522,7 +589,7 @@ func GetTopArticles(c *gin.Context) {
 		topArticles = append(topArticles, map[string]interface{}{
 			"ID":        article.ID,
 			"title":     article.Title,
-			"content":   article.Abstract,
+			"content":   article.Content,
 			"tags":      article.Tags,
 			"image":     article.Image,
 			"viewCount": article.ViewCount,
@@ -533,7 +600,7 @@ func GetTopArticles(c *gin.Context) {
 
 	// 获取置顶项目文章
 	var projectArticles []models.ProjectArticle
-	if err := config.DB.Select("id", "title", "status", "tags", "image", "view_count", "created_at", "is_top").Where("is_top = ?", true).Order("created_at DESC").Find(&projectArticles).Error; err != nil {
+	if err := config.DB.Select("id", "title", "content", "tags", "image", "view_count", "created_at", "is_top").Where("is_top = ?", true).Order("created_at DESC").Find(&projectArticles).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get top project articles"})
 		return
 	}
@@ -541,7 +608,7 @@ func GetTopArticles(c *gin.Context) {
 		topArticles = append(topArticles, map[string]interface{}{
 			"ID":        article.ID,
 			"title":     article.Title,
-			"content":   article.Status,
+			"content":   article.Content,
 			"tags":      article.Tags,
 			"image":     article.Image,
 			"viewCount": article.ViewCount,
