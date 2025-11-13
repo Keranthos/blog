@@ -49,7 +49,7 @@ type BlogArticle struct {
 type ResearchArticle struct {
 	gorm.Model             // 自动包含 ID, CreatedAt, UpdatedAt, DeletedAt
 	Title      string      `json:"title" gorm:"type:varchar(255);index:idx_research_title"`
-	Abstract   string      `json:"abstract"`
+	Content    string      `json:"content" gorm:"type:mediumtext"`
 	Tags       StringArray `json:"tags" gorm:"type:json"`
 	Image      string      `json:"image"`
 	ViewCount  int         `json:"viewCount" gorm:"default:0;index:idx_research_view_count"` // 阅读量
@@ -60,7 +60,7 @@ type ResearchArticle struct {
 type ProjectArticle struct {
 	gorm.Model             // 自动包含 ID, CreatedAt, UpdatedAt, DeletedAt
 	Title      string      `json:"title" gorm:"type:varchar(255);index:idx_project_title"`
-	Status     string      `json:"status" gorm:"index:idx_project_status"`
+	Content    string      `json:"content" gorm:"type:mediumtext"`
 	Tags       StringArray `json:"tags" gorm:"type:json"`
 	Image      string      `json:"image"`
 	ViewCount  int         `json:"viewCount" gorm:"default:0;index:idx_project_view_count"` // 阅读量

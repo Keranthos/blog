@@ -1134,11 +1134,13 @@ const saveArticle = async () => {
     // 碎碎念使用不同的 API
     if (articleData.value.type === 'moment') {
       const { createMoment, updateMoment } = await import('@/api/Moments/edit')
+      // 将标签数组转换为逗号分隔的字符串
+      const tagsString = tagsArray.join(',')
       if (isEditing.value) {
-        await updateMoment(user, route.params.id, articleData.value.title, markdownContent.value, articleData.value.image)
+        await updateMoment(user, route.params.id, articleData.value.title, markdownContent.value, articleData.value.image, tagsString)
         showSuccessMessage('update')
       } else {
-        await createMoment(user, articleData.value.title, markdownContent.value, articleData.value.image, user.username)
+        await createMoment(user, articleData.value.title, markdownContent.value, articleData.value.image, user.username, tagsString)
         showSuccessMessage('submit')
       }
       router.push('/moments')
@@ -1165,8 +1167,12 @@ const saveArticle = async () => {
       showSuccessMessage('submit')
     }
 
-    // 跳转到对应页面
-    router.push(`/${articleData.value.type}`)
+    // 跳转到对应页面（项目/科研文章统一跳转到博客界面）
+    if (articleData.value.type === 'project' || articleData.value.type === 'research') {
+      router.push('/blog')
+    } else {
+      router.push(`/${articleData.value.type}`)
+    }
   } catch (error) {
     showErrorMessage(error)
   }
@@ -1905,7 +1911,14 @@ const loadExistingArticle = async () => {
 
       // 填充内容
       markdownContent.value = data.Content || ''
-      tagsInput.value = ''
+      // 解析标签（Tags可能是逗号分隔的字符串）
+      if (data.Tags && typeof data.Tags === 'string') {
+        tagsInput.value = data.Tags
+      } else if (Array.isArray(data.Tags)) {
+        tagsInput.value = data.Tags.join(',')
+      } else {
+        tagsInput.value = ''
+      }
 
       // 保存原始数据用于检测更改
       originalArticleData.value = JSON.parse(JSON.stringify(articleData.value))
@@ -2368,6 +2381,8 @@ defineExpose({
     transition: all 0.3s ease;
     background: #fff;
     text-align: left;
+    tab-size: 4;
+    -moz-tab-size: 4;
   }
 
   .form-group input:focus,
@@ -2920,6 +2935,8 @@ defineExpose({
     /* 自定义滚动条样式 - 灰色 */
     scrollbar-width: thin;
     scrollbar-color: #ccc #f5f5f5;
+    tab-size: 4;
+    -moz-tab-size: 4;
   }
 
   /* Webkit浏览器滚动条样式 */
@@ -3310,6 +3327,8 @@ defineExpose({
     line-height: 1.6;
     background: transparent;
     resize: none;
+    tab-size: 4;
+    -moz-tab-size: 4;
   }
 
   .editor-footer {
@@ -3399,6 +3418,8 @@ defineExpose({
     line-height: 1.6;
     background: transparent;
     resize: none;
+    tab-size: 4;
+    -moz-tab-size: 4;
   }
 
   .media-preview-panel {

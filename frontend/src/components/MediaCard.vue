@@ -146,7 +146,13 @@ const starArray = computed(() => {
 // 渲染 Markdown
 const renderedReview = computed(() => {
   if (!props.media.Review) return ''
-  let html = marked(props.media.Review)
+  let html = marked(props.media.Review, {
+    breaks: true, // 将换行符转换为 <br>
+    gfm: true, // 启用 GitHub Flavored Markdown
+    headerIds: false,
+    mangle: false,
+    sanitize: false
+  })
 
   // 为图片添加内联样式，确保在渲染时就有宽度和高度限制，避免闪烁
   html = html.replace(
@@ -639,7 +645,16 @@ defineExpose({
   cursor: default;
 }
 
-.media-modal-header { position: relative; min-height: 28px; display: grid; grid-template-columns: auto 1fr auto; align-items: stretch; gap: 10px; }
+.media-modal-header {
+  position: relative;
+  min-height: 28px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: stretch;
+  gap: 10px;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
 
 .modal-thumb { width: auto; max-width: none; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,0.08); background: #fff; display: flex; align-items: center; justify-content: center; }
 .modal-thumb img { width: auto; max-width: none; height: 60px; max-height: 60px; object-fit: contain; display: block; }
@@ -653,15 +668,32 @@ defineExpose({
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  margin-top: 1rem;
+  flex: 1;
   min-height: 0;
+  overflow: hidden;
+  margin-top: 2.5rem;
 }
 
-.media-modal-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.media-modal-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
 
 .media-modal-rating { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
 
-.media-modal-review { flex: 1; overflow-y: auto; min-height: 0; text-align: left; }
+.media-modal-review {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  text-align: left;
+  padding-right: 8px;
+}
 .media-modal-review.markdown-body { background: transparent !important; padding: 0; }
 .media-modal-review.markdown-body h1,
 .media-modal-review.markdown-body h2,
@@ -689,8 +721,32 @@ defineExpose({
 @media (max-width: 768px) {
   .media-modal-container { width: 90%; max-width: 90%; }
 }
-.media-modal-review { scrollbar-width: none; -ms-overflow-style: none; }
-.media-modal-review::-webkit-scrollbar { display: none; }
+
+/* 美化滚动条样式 */
+.media-modal-review {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168, 85, 247, 0.3) transparent;
+  -ms-overflow-style: -ms-autohiding-scrollbar;
+}
+
+.media-modal-review::-webkit-scrollbar {
+  width: 6px;
+}
+
+.media-modal-review::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.media-modal-review::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.3);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.media-modal-review::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.5);
+}
 
 .media-modal-actions { display: flex; gap: 10px; margin-top: 12px; }
 

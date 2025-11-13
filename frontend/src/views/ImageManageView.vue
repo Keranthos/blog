@@ -230,11 +230,9 @@ const viewReferences = async (image) => {
 
     // 根据类型跳转
     if (usage.type === 'blog') {
-      router.push(`/blog/${usage.id}`)
-    } else if (usage.type === 'research') {
-      router.push(`/blog/${usage.id}`)
-    } else if (usage.type === 'project') {
-      router.push(`/blog/${usage.id}`)
+      router.push({ name: 'BlogDetail', params: { id: usage.id } })
+    } else if (usage.type === 'research' || usage.type === 'project') {
+      router.push({ name: 'BlogDetail', params: { id: usage.id }, query: { type: usage.type } })
     } else if (usage.type === 'moment') {
       router.push(`/moments/${usage.id}`)
     } else if (usage.type === 'media') {

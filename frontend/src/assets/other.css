@@ -2692,7 +2692,9 @@ pre>code {
     margin: 0 .25em;
     transition: all .3s linear;
     -moz-transition: all .3s linear;
-    -webkit-transition: all .3s linear
+    -webkit-transition: all .3s linear;
+    tab-size: 4;
+    -moz-tab-size: 4
 }
 
 pre>code:before {

@@ -25,19 +25,13 @@
               <input v-model="form.dueTime" type="time" />
             </div>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>优先级</label>
-              <select v-model="form.priority">
-                <option :value="1">低</option>
-                <option :value="2">中</option>
-                <option :value="3">高</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>分类</label>
-              <input v-model="form.category" type="text" placeholder="工作、学习、生活等" />
-            </div>
+          <div class="form-group">
+            <label>优先级</label>
+            <select v-model="form.priority">
+              <option :value="1">低</option>
+              <option :value="2">中</option>
+              <option :value="3">高</option>
+            </select>
           </div>
         </div>
         <div class="modal-footer">
@@ -67,8 +61,7 @@ const form = ref({
   description: '',
   dueDate: new Date().toISOString().split('T')[0],
   dueTime: '',
-  priority: 2,
-  category: ''
+  priority: 2
 })
 
 onMounted(() => {
@@ -78,8 +71,7 @@ onMounted(() => {
       description: props.deadline.description || '',
       dueDate: props.deadline.dueDate ? new Date(props.deadline.dueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       dueTime: props.deadline.dueTime || '',
-      priority: props.deadline.priority || 2,
-      category: props.deadline.category || ''
+      priority: props.deadline.priority || 2
     }
   }
 })

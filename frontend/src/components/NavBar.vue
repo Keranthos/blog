@@ -22,7 +22,7 @@
               <span class="menu-text">博客</span>
             </div>
             <div class="menu-item" :class="{ active: route.path === '/moments' }" @click="navigateToMoments">
-              <font-awesome-icon icon="pen-to-square" class="menu-icon" />
+              <font-awesome-icon icon="comment-dots" class="menu-icon" />
               <span class="menu-text">随笔</span>
             </div>
 
@@ -92,7 +92,7 @@
         <!-- 右侧功能区 -->
         <div ref="navbarActions" class="navbar-actions">
           <!-- 搜索键（按钮样式） -->
-          <div class="search-box" :class="{ expanded: searchExpanded }" @click="openSearchModal">
+          <div class="search-box" :class="{ expanded: searchExpanded }" @click="openSearchModal()">
             <font-awesome-icon icon="magnifying-glass" class="search-icon" />
             <span class="search-placeholder">找点什么？</span>
             <input
@@ -225,7 +225,7 @@
               <!-- 加载中 - 使用 Skeleton -->
               <div v-if="searchModalLoading" class="search-loading-skeleton">
                 <div
-                  v-for="n in 3"
+                  v-for="n in 1"
                   :key="n"
                   class="skeleton-result-item"
                 >
@@ -251,8 +251,13 @@
                 </button>
               </div>
 
+              <!-- 标签搜索提示 -->
+              <div v-if="isTagSearch && searchTag && searchModalResults.length > 0" class="tag-search-hint">
+                具有<span class="tag-in-hint">{{ searchTag }}</span>标签文章的搜索结果：共{{ searchModalResults.length }}篇
+              </div>
+
               <!-- 搜索结果列表 -->
-              <div v-else-if="searchModalResults.length > 0" class="search-results-list">
+              <div v-if="searchModalResults.length > 0" class="search-results-list">
                 <div
                   v-for="result in searchModalResults"
                   :key="`${result.type}-${result.id}`"
@@ -315,7 +320,7 @@
                 <font-awesome-icon icon="blog" /> 博客
               </button>
               <button class="nav-more-item" @click="goAndClose('/moments')">
-                <font-awesome-icon icon="pen-to-square" /> 随笔
+                <font-awesome-icon icon="comment-dots" /> 随笔
               </button>
 
               <!-- 书影集：直接进入统一页面，无子菜单 -->
@@ -397,6 +402,8 @@ const hasSearched = ref(false)
 const searchError = ref(null) // 搜索错误信息
 const searchRetryCount = ref(0) // 重试次数
 const maxSearchRetries = 3 // 最大重试次数
+const isTagSearch = ref(false) // 是否为标签搜索
+const searchTag = ref('') // 当前搜索的标签
 const recentComments = ref([])
 const commentsLoading = ref(false)
 let timeout = null
@@ -775,7 +782,7 @@ const getArticleTypeIcon = (type) => {
     blog: 'blog',
     project: 'code',
     research: 'flask',
-    moment: 'pen-to-square'
+    moment: 'comment-dots'
   }
   return iconMap[type] || 'file'
 }
@@ -790,9 +797,9 @@ const goToCommentArticle = (comment) => {
   } else if (comment.articleType === 'blog') {
     path = `/blog/${comment.blogID}`
   } else if (comment.articleType === 'research') {
-    path = `/research/${comment.blogID}`
+    path = `/blog/${comment.blogID}`
   } else if (comment.articleType === 'project') {
-    path = `/project/${comment.blogID}`
+    path = `/blog/${comment.blogID}`
   }
 
   router.push(path)
@@ -804,14 +811,46 @@ const goToCommentArticle = (comment) => {
 // 已改为点击按钮打开模态搜索，不再监听输入框回车
 
 // 打开搜索模态框
-const openSearchModal = () => {
+const openSearchModal = (tag = null) => {
+  // 如果传入的是事件对象，忽略它
+  if (tag && typeof tag === 'object' && tag.constructor && tag.constructor.name === 'PointerEvent') {
+    tag = null
+  }
+
   showSearchModal.value = true
-  searchModalQuery.value = ''
+  if (tag && typeof tag === 'string') {
+    // 如果是通过标签打开，设置标签搜索模式
+    isTagSearch.value = true
+    searchTag.value = tag
+    // 先清空，避免触发 watch
+    searchModalQuery.value = ''
+    // 使用 nextTick 确保 watch 不会在设置 tag 时触发
+    nextTick(() => {
+      searchModalQuery.value = tag
+      // 立即执行搜索，不等待 watch 的延迟
+      handleModalSearch(0)
+    })
+  } else {
+    // 普通搜索
+    isTagSearch.value = false
+    searchTag.value = ''
+    searchModalQuery.value = ''
+  }
+  searchModalResults.value = []
+  hasSearched.value = false
+  searchError.value = null
   nextTick(() => {
     if (searchModalInput.value) {
       searchModalInput.value.focus()
     }
   })
+}
+
+// 暴露给全局的方法，供其他组件调用
+if (typeof window !== 'undefined') {
+  window.openTagSearch = (tag) => {
+    openSearchModal(tag)
+  }
 }
 
 // 关闭搜索模态框
@@ -820,6 +859,9 @@ const closeSearchModal = () => {
   searchModalQuery.value = ''
   searchModalResults.value = []
   hasSearched.value = false
+  searchError.value = null
+  isTagSearch.value = false
+  searchTag.value = ''
   // 清除搜索定时器
   if (searchTimeout.value) {
     clearTimeout(searchTimeout.value)
@@ -831,7 +873,7 @@ const closeSearchModal = () => {
 const getResultTypeIcon = (type) => {
   const iconMap = {
     blog: 'blog',
-    moment: 'pen-to-square',
+    moment: 'comment-dots',
     research: 'flask',
     project: 'code'
   }
@@ -866,30 +908,45 @@ const goToSearchResult = (result) => {
   if (result.type === 'moment') {
     router.push(`/moments/${result.id}`)
   } else if (result.type === 'blog') {
-    router.push(`/blog/${result.id}`)
-  } else if (result.type === 'research') {
-    router.push(`/research/${result.id}`)
-  } else if (result.type === 'project') {
-    router.push(`/project/${result.id}`)
+    router.push({ name: 'BlogDetail', params: { id: result.id } })
+  } else if (result.type === 'research' || result.type === 'project') {
+    router.push({ name: 'BlogDetail', params: { id: result.id }, query: { type: result.type } })
   }
   closeSearchModal()
 }
 
 // 检查文章是否匹配关键词（支持空格分隔的多个关键词）
-const matchesKeywords = (item, keywords) => {
+const matchesKeywords = (item, keywords, tagOnly = false) => {
   const title = (item.title || '').toLowerCase()
-  const tags = (item.tags || []).join(' ').toLowerCase()
+  // 确保 tags 是数组
+  let tagsArray = item.tags || []
+  if (typeof tagsArray === 'string') {
+    tagsArray = tagsArray.split(',').map(t => t.trim()).filter(t => t.length > 0)
+  }
+  // 将标签数组转换为小写字符串数组，用于精确匹配
+  const tagsLower = tagsArray.map(tag => String(tag).toLowerCase().trim())
 
-  // 只要任意一个关键词匹配标题或标签即可
-  return keywords.some(keyword =>
-    title.includes(keyword.toLowerCase()) ||
-    tags.includes(keyword.toLowerCase())
-  )
+  if (tagOnly) {
+    // 只搜索标签 - 检查标签数组中是否包含任一关键词
+    return keywords.some(keyword => {
+      const keywordLower = keyword.toLowerCase().trim()
+      // 精确匹配：检查标签数组中是否有完全匹配的标签
+      return tagsLower.some(tag => tag === keywordLower || tag.includes(keywordLower))
+    })
+  } else {
+    // 搜索标题和标签
+    return keywords.some(keyword => {
+      const keywordLower = keyword.toLowerCase().trim()
+      return title.includes(keywordLower) ||
+        tagsLower.some(tag => tag === keywordLower || tag.includes(keywordLower))
+    })
+  }
 }
 
 // 模态框搜索（带重试机制）
 const handleModalSearch = async (retry = 0) => {
-  const query = searchModalQuery.value.trim()
+  // 确保 searchModalQuery.value 是字符串
+  const query = String(searchModalQuery.value || '').trim()
   if (!query) {
     searchModalResults.value = []
     hasSearched.value = false
@@ -921,21 +978,47 @@ const handleModalSearch = async (retry = 0) => {
       try {
         if (type === 'moment') {
           const response = await getMomentsList(1, 100)
-          const articles = (response.data || []).filter(item =>
-            matchesKeywords(item, keywords)
-          ).map(item => ({
-            id: item.ID,
-            type: 'moment',
-            title: item.title,
-            image: item.image,
-            tags: item.tags || [],
-            time: item.CreatedAt
-          }))
+          // 检查数据结构：getMomentsList 返回的是 res.data，后端返回的是 {data: moments}
+          const momentsData = response?.data || response || []
+          console.log('🔍 [NavBar] moment 搜索 - response:', response)
+          console.log('🔍 [NavBar] moment 搜索 - momentsData:', momentsData)
+          console.log('🔍 [NavBar] moment 搜索 - keywords:', keywords)
+          console.log('🔍 [NavBar] moment 搜索 - isTagSearch:', isTagSearch.value)
+
+          const articles = momentsData.filter(item => {
+            // 确保 tags 是数组格式，后端返回的字段名是大写 Tags
+            let tags = item.Tags || item.tags || []
+            if (typeof tags === 'string') {
+              tags = tags.split(',').map(t => t.trim()).filter(t => t.length > 0)
+            }
+
+            // 创建临时对象用于匹配
+            const itemForMatch = {
+              ...item,
+              tags
+            }
+            return matchesKeywords(itemForMatch, keywords, isTagSearch.value)
+          }).map(item => {
+            // 确保 tags 正确解析，后端返回的字段名是大写
+            let tags = item.Tags || item.tags || []
+            if (typeof tags === 'string') {
+              tags = tags.split(',').map(t => t.trim()).filter(t => t.length > 0)
+            }
+            return {
+              id: item.ID,
+              type: 'moment',
+              title: item.Title || item.title,
+              image: item.Image || item.image,
+              tags: Array.isArray(tags) ? tags : [],
+              time: item.CreatedAt
+            }
+          })
+          console.log('🔍 [NavBar] moment 搜索 - filtered articles:', articles)
           allResults.push(...articles)
         } else {
           const response = await getArticlesList(type, 1, 100)
           const articles = (response.data || []).filter(item =>
-            matchesKeywords(item, keywords)
+            matchesKeywords(item, keywords, isTagSearch.value)
           ).map(item => ({
             id: item.ID,
             type,
@@ -988,17 +1071,36 @@ const retrySearch = () => {
 }
 
 // 监听搜索输入，1秒后自动搜索
-watch(searchModalQuery, (newQuery) => {
+watch(searchModalQuery, (newQuery, oldQuery) => {
   // 清除之前的定时器
   if (searchTimeout.value) {
     clearTimeout(searchTimeout.value)
     searchTimeout.value = null
   }
 
+  // 确保 newQuery 是字符串
+  const query = String(newQuery || '').trim()
+
+  // 如果是标签搜索模式，且输入改变，退出标签搜索模式
+  if (isTagSearch.value && query !== searchTag.value) {
+    isTagSearch.value = false
+    searchTag.value = ''
+  }
+
   // 如果输入为空，清空结果和搜索状态
-  if (!newQuery.trim()) {
+  if (!query) {
     searchModalResults.value = []
     hasSearched.value = false
+    // 只有在不是标签搜索初始化时才重置标签搜索状态
+    if (!isTagSearch.value || oldQuery !== '') {
+      isTagSearch.value = false
+      searchTag.value = ''
+    }
+    return
+  }
+
+  // 如果是标签搜索初始化（从空字符串变为标签值），跳过自动搜索，因为 openSearchModal 已经处理了
+  if (isTagSearch.value && oldQuery === '' && query === searchTag.value) {
     return
   }
 
@@ -1906,16 +2008,37 @@ onBeforeUnmount(() => {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  min-height: 0;
-  max-height: calc(85vh - 150px);
+  max-height: calc(85vh - 200px);
   margin-top: 1rem;
-}
-
-/* 隐藏滚动条但保持滚动功能 */
-.search-modal-results {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE 10+ */
 }
+
+/* 标签搜索提示 */
+.tag-search-hint {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(168, 85, 247, 0.05);
+  border-left: 3px solid #a855f7;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #666;
+  line-height: 1.6;
+}
+
+.tag-in-hint {
+  display: inline-block;
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  margin: 0 2px;
+}
+
+/* 隐藏滚动条但保持滚动功能 */
 
 .search-modal-results::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
@@ -1939,8 +2062,8 @@ onBeforeUnmount(() => {
 }
 
 .skeleton-result-image {
-  width: 80px;
-  height: 60px;
+  width: 120px;
+  height: 80px;
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200% 100%;
   animation: loading 1.5s infinite;

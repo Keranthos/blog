@@ -26,9 +26,9 @@
     <div class="content-section">
       <!-- 主要内容（博客/项目/科研） -->
       <div v-if="activeTab === 'main'">
-        <!-- 加载界面 -->
+        <!-- 加载界面（仅初始加载时显示） -->
         <Transition name="fade">
-          <div v-if="loading" key="loading" class="loading-wrapper">
+          <div v-if="loading && !isPageChanging" key="loading" class="loading-wrapper">
             <ModernLoading
               :progress="loadingProgress"
               :title="getTypeName(type)"
@@ -36,9 +36,9 @@
             />
           </div>
         </Transition>
-        <!-- 内容界面（带过渡动画） -->
-        <Transition name="fade-slide">
-          <div v-if="!loading && articles.length > 0" key="content" class="article-grid content-fade-in">
+        <!-- 内容界面（带过渡动画，仅卡片部分） -->
+        <Transition name="page-transition" mode="out-in">
+          <div v-if="!loading && articles.length > 0" :key="`page-${currentPage}`" class="article-grid">
             <ArticleCard
               v-for="article in articles"
               :id="article.ID" :key="article.ID" :image="article.image"
@@ -118,6 +118,7 @@ const loadingProgress = ref(0)
 const activeTab = ref('main') // 当前激活的标签页
 const totalArticles = ref(0) // 实际文章总数
 const fallbackImg = '/images/sunset-mountains.jpg'
+const isPageChanging = ref(false) // 是否正在换页（用于区分初始加载和换页）
 
 // 图片错误回退
 const onImgError = (e) => {
@@ -178,9 +179,11 @@ const fetchArticlesNum = async () => {
     if (props.type === 'moment') {
       const { getMomentsNum } = await import('@/api/Moments/browse')
       const response = await getMomentsNum()
-      // console.log('Moments response:', response)
-      totalArticles.value = response.num
-      return response.num
+      console.log('🔍 [ArticleList] getMomentsNum 返回:', response)
+      // 检查返回格式：getMomentsNum 返回 res.data，后端返回 {num: count}
+      const num = response?.num ?? response ?? 0
+      totalArticles.value = num
+      return num
     } else if (props.type === 'all') {
       // 获取所有类型文章的总数
       // console.log('Fetching all article types...')
@@ -286,10 +289,34 @@ const teardownInfiniteScroll = () => {
   }
 }
 
+// 滚动到顶部（滚动到内容区域顶部，确保能看到完整的顶部图片）
+const scrollToTop = () => {
+  if (typeof window !== 'undefined') {
+    // 使用 requestAnimationFrame 确保在 DOM 更新后滚动
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      })
+    })
+  }
+}
+
 const loadPage = async (page, append = false) => {
   if (page < 1 || page > totalPage.value) {
     return Promise.resolve() // 确保总是返回 Promise
   }
+
+  // 判断是否为换页（不是无限滚动追加）
+  const isChangingPage = !append && page !== currentPage.value
+
+  // 如果是换页，设置换页状态，但不显示加载界面
+  if (isChangingPage) {
+    isPageChanging.value = true
+    // 换页时立即滚动到顶部
+    scrollToTop()
+  }
+
   currentPage.value = page
 
   // 检查缓存中是否已有该页的数据
@@ -300,15 +327,24 @@ const loadPage = async (page, append = false) => {
     } else {
       articles.value = articleCache.value[cacheKey]
     }
+    loading.value = false
+    // 如果是换页，等待过渡动画完成
+    if (isPageChanging.value) {
+      await new Promise(resolve => setTimeout(resolve, 300))
+    }
+    isPageChanging.value = false
     return Promise.resolve() // 从缓存读取成功，返回 resolved Promise
   } else {
-    loading.value = true
-    loadingProgress.value = 0
+    // 只有在初始加载时才显示加载界面
+    if (!isPageChanging.value) {
+      loading.value = true
+      loadingProgress.value = 0
+    }
 
     // 模拟加载进度
-    const progressInterval = setInterval(() => {
+    let progressInterval = setInterval(() => {
       if (loadingProgress.value < 90) {
-        loadingProgress.value += Math.random() * 20
+        loadingProgress.value = Math.min(90, loadingProgress.value + Math.random() * 20)
       }
     }, 100)
 
@@ -316,14 +352,28 @@ const loadPage = async (page, append = false) => {
       if (props.type === 'moment') {
         const { getMomentsList } = await import('@/api/Moments/browse')
         const response = await getMomentsList(page, limit)
+
+        // 调试：检查返回的数据结构
+        console.log('🔍 [ArticleList] getMomentsList 返回:', response)
+
+        // 检查数据结构：getMomentsList 返回的是 res.data，后端返回的是 {data: moments}
+        // 所以 response 应该是 {data: [...]}，需要访问 response.data
+        const momentsData = response?.data || response || []
+
+        if (!Array.isArray(momentsData)) {
+          console.error('🔍 [ArticleList] moments 数据格式错误:', momentsData)
+          throw new Error('Moments 数据格式错误')
+        }
+
         // 映射字段以匹配 ArticleCard 组件
-        const momentArticles = response.data.map(item => ({
+        const momentArticles = momentsData.map(item => ({
           ID: item.ID,
           image: item.Image || 'https://picsum.photos/id/201/800/600',
           title: item.Title,
           content: item.Content,
           tags: [],
-          CreatedAt: item.CreatedAt
+          CreatedAt: item.CreatedAt,
+          articleType: 'moment'
         }))
 
         // 批量计算阅读时间
@@ -336,9 +386,18 @@ const loadPage = async (page, append = false) => {
         articleCache.value[cacheKey] = computedList
       } else if (props.type === 'all') {
         // 获取所有类型的文章（博客、项目、科研）
-        const blogResponse = await getArticlesList('blog', page, limit)
-        const projectResponse = await getArticlesList('project', page, limit)
-        const researchResponse = await getArticlesList('research', page, limit)
+        // 策略：根据当前页计算需要获取的数据范围
+        // 为了确保有足够的数据排序后取当前页的数据，需要获取到当前页结束位置的数据
+        const offset = (page - 1) * limit
+        const endIndex = offset + limit
+        // 获取足够多的数据以确保能覆盖到当前页的结束位置
+        // 多获取一些缓冲数据，避免边界情况
+        const fetchLimit = Math.max(endIndex + limit, limit * 2)
+
+        // 获取所有类型的文章
+        const blogResponse = await getArticlesList('blog', 1, fetchLimit)
+        const projectResponse = await getArticlesList('project', 1, fetchLimit)
+        const researchResponse = await getArticlesList('research', 1, fetchLimit)
 
         // 合并所有文章并添加类型标识
         const allArticles = [
@@ -350,8 +409,11 @@ const loadPage = async (page, append = false) => {
         // 按创建时间排序
         allArticles.sort((a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt))
 
+        // 分页：取当前页的数据
+        const pageArticles = allArticles.slice(offset, endIndex)
+
         // 批量计算阅读时间
-        const computedList = batchEstimateReadingTime(allArticles)
+        const computedList = batchEstimateReadingTime(pageArticles)
         if (append) {
           articles.value = [...articles.value, ...computedList]
         } else {
@@ -373,16 +435,30 @@ const loadPage = async (page, append = false) => {
 
       // 完成加载
       loadingProgress.value = 100
-      clearInterval(progressInterval)
+      if (progressInterval) {
+        clearInterval(progressInterval)
+        progressInterval = null
+      }
 
-      // 延迟一点时间让用户看到100%的进度
-      setTimeout(() => {
-        loading.value = false
-      }, 300)
+      // 延迟一点时间让用户看到100%的进度（仅初始加载时）
+      if (!isPageChanging.value) {
+        setTimeout(() => {
+          loading.value = false
+        }, 300)
+      } else {
+        // 换页时，等待一小段时间让过渡动画完成
+        await new Promise(resolve => setTimeout(resolve, 300))
+        isPageChanging.value = false
+      }
     } catch (error) {
       console.error('加载页面失败:', error)
-      clearInterval(progressInterval)
+      if (progressInterval) {
+        clearInterval(progressInterval)
+        progressInterval = null
+      }
       loading.value = false
+      loadingProgress.value = 0
+      isPageChanging.value = false
       throw error // 抛出错误，让 loadPageWithRetry 捕获并重试
     }
   }
@@ -480,14 +556,27 @@ const updateTabBackground = async () => {
 watch([activeTab, () => props.type, totalArticles], updateTabBackground)
 
 onMounted(async () => {
-  displayedText.value = props.typingText
-  // 先设置初始估算值，避免显示时太小
-  tabBackgroundTransform.value = { transform: 'translateX(0)', width: getEstimatedWidth() }
+  try {
+    displayedText.value = props.typingText
+    // 先设置初始估算值，避免显示时太小
+    tabBackgroundTransform.value = { transform: 'translateX(0)', width: getEstimatedWidth() }
 
-  await loadThoughtsContent() // 加载所思所想内容
-  const articleNum = await fetchArticlesNum()
-  totalPage.value = Math.ceil(articleNum / limit)
-  await loadPage(1)
+    await loadThoughtsContent() // 加载所思所想内容
+    const articleNum = await fetchArticlesNum()
+    totalPage.value = Math.ceil(articleNum / limit) || 1 // 确保至少为1
+    if (totalPage.value > 0) {
+      await loadPage(1)
+    } else {
+      // 如果没有文章，也要关闭loading状态
+      loading.value = false
+      loadingProgress.value = 0
+    }
+  } catch (error) {
+    console.error('初始化失败:', error)
+    loading.value = false
+    loadingProgress.value = 0
+    totalPage.value = 1
+  }
 
   // 等待所有内容渲染完成后再精确计算标签高亮位置
   // 使用多层 nextTick 和 requestAnimationFrame 确保DOM完全准备好
@@ -872,6 +961,31 @@ onBeforeUnmount(() => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* 换页过渡动画（仅作用于卡片部分） */
+.page-transition-enter-active {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-transition-leave-active {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-transition-enter-from {
+  opacity: 0;
+  transform: translateX(-50px);
+}
+
+.page-transition-leave-to {
+  opacity: 0;
+  transform: translateX(50px);
+}
+
+.page-transition-enter-to,
+.page-transition-leave-from {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 @media (max-width: 768px) {

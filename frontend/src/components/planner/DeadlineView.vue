@@ -23,7 +23,7 @@
             v-for="deadline in group.deadlines"
             :key="deadline.ID"
             class="deadline-item"
-            :class="`priority-${deadline.priority}`"
+            :class="`category-${group.category}`"
           >
             <div class="deadline-checkbox">
               <input
@@ -84,7 +84,9 @@ const groupedDeadlines = computed(() => {
   // 计算本周的开始和结束
   const today = new Date(now)
   const startOfWeek = new Date(today)
-  startOfWeek.setDate(today.getDate() - today.getDay())
+  const dayOffset = (today.getDay() + 6) % 7
+  startOfWeek.setDate(today.getDate() - dayOffset)
+  startOfWeek.setHours(0, 0, 0, 0)
   const endOfWeek = new Date(startOfWeek)
   endOfWeek.setDate(startOfWeek.getDate() + 6)
   endOfWeek.setHours(23, 59, 59, 999)
@@ -196,7 +198,6 @@ const toggleDeadline = async (deadline) => {
       dueDate: formatDateForAPI(deadline.dueDate),
       dueTime: deadline.dueTime || '',
       priority: deadline.priority,
-      category: deadline.category || '',
       completed: deadline.completed
     }
     await updateDeadline(deadline.ID, deadlineData)
@@ -385,16 +386,16 @@ const getCountdown = (dueDate, dueTime) => {
   background: rgba(255, 255, 255, 0.3);
 }
 
-.deadline-item.priority-1 {
-  border-left-color: #4caf50;
+.deadline-item.category-today {
+  border-left-color: #f44336;
 }
 
-.deadline-item.priority-2 {
+.deadline-item.category-week {
   border-left-color: #ff9800;
 }
 
-.deadline-item.priority-3 {
-  border-left-color: #f44336;
+.deadline-item.category-future {
+  border-left-color: #4caf50;
 }
 
 .deadline-checkbox {

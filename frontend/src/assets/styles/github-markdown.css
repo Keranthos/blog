@@ -184,6 +184,21 @@
 
 .markdown-body figure {
   margin: 1em var(--base-size-40);
+  display: block;
+}
+
+.markdown-body figure img {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+}
+
+.markdown-body figcaption {
+  text-align: center;
+  margin-top: 0.5em;
+  font-size: 0.9em;
+  color: var(--fgColor-muted);
+  font-style: italic;
 }
 
 .markdown-body hr {
@@ -790,6 +805,8 @@
   white-space: pre;
   background: transparent;
   border: 0;
+  tab-size: 8;
+  -moz-tab-size: 8;
 }
 
 .markdown-body .highlight {
@@ -810,6 +827,8 @@
   color: var(--fgColor-default);
   background-color: var(--bgColor-muted);
   border-radius: 6px;
+  tab-size: 8;
+  -moz-tab-size: 8;
 }
 
 .markdown-body pre code,

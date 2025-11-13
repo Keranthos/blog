@@ -31,8 +31,8 @@
             <input
               type="checkbox"
               :checked="task.completed"
-              @click.stop="toggleTask(task)"
               class="task-checkbox"
+              @click.stop="toggleTask(task)"
             />
             <div class="task-title">{{ task.title }}</div>
           </div>
@@ -42,7 +42,6 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -56,13 +55,14 @@ const allTasks = ref([])
 const weekDays = computed(() => {
   const days = []
   const today = new Date()
+  const weekdayNames = ['一', '二', '三', '四', '五', '六', '日']
 
   for (let i = 0; i < 7; i++) {
     const date = new Date(weekStart.value)
     date.setDate(weekStart.value.getDate() + i)
     const dateStr = `${date.getMonth() + 1}/${date.getDate()}`
     const isToday = date.toDateString() === today.toDateString()
-    const dayName = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
+    const dayName = weekdayNames[i]
     const dateKey = date.toISOString().split('T')[0]
 
     const dayTasks = allTasks.value.filter(t => {
@@ -97,7 +97,7 @@ onMounted(() => {
 
 const initWeek = () => {
   const today = new Date()
-  const day = today.getDay()
+  const day = (today.getDay() + 6) % 7
   weekStart.value = new Date(today)
   weekStart.value.setDate(today.getDate() - day)
   weekStart.value.setHours(0, 0, 0, 0)
@@ -134,12 +134,14 @@ const loadWeekTasks = async () => {
 const prevWeek = () => {
   weekStart.value = new Date(weekStart.value)
   weekStart.value.setDate(weekStart.value.getDate() - 7)
+  weekStart.value.setHours(0, 0, 0, 0)
   loadWeekTasks()
 }
 
 const nextWeek = () => {
   weekStart.value = new Date(weekStart.value)
   weekStart.value.setDate(weekStart.value.getDate() + 7)
+  weekStart.value.setHours(0, 0, 0, 0)
   loadWeekTasks()
 }
 

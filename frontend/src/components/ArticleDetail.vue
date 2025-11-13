@@ -834,7 +834,14 @@ const loadDetail = async () => {
       // 碎碎念的字段映射
       image.value = response.Image || 'https://picsum.photos/id/180/1920/1080'
       title.value = response.Title
-      tags.value = []
+      // 解析标签（Tags可能是逗号分隔的字符串）
+      if (response.Tags && typeof response.Tags === 'string') {
+        tags.value = response.Tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+      } else if (Array.isArray(response.Tags)) {
+        tags.value = response.Tags
+      } else {
+        tags.value = []
+      }
       time.value = response.CreatedAt ? new Date(response.CreatedAt).toLocaleDateString('zh-CN') : '未知时间'
       content.value = response.Content
       viewCount.value = response.viewCount || 0
@@ -878,8 +885,22 @@ const loadDetail = async () => {
     return
   }
 
+  // 预处理：修复 **`code`** 格式（在 marked 渲染前处理）
+  // 使用临时标记避免与 marked 的解析冲突
+  let processedContent = content.value
+  const boldCodePlaceholders = new Map()
+  let placeholderIndex = 0
+
+  // 匹配 **`code`** 格式，使用临时占位符替换
+  processedContent = processedContent.replace(/\*\*`([^`]+)`\*\*/g, (match, codeContent) => {
+    const placeholder = `__BOLD_CODE_PLACEHOLDER_${placeholderIndex}__`
+    boldCodePlaceholders.set(placeholder, codeContent)
+    placeholderIndex++
+    return placeholder
+  })
+
   // 渲染 Markdown 内容
-  renderedContent.value = marked(content.value, {
+  renderedContent.value = marked(processedContent, {
     breaks: false, // 不将换行符转换为 <br>
     gfm: true, // 启用 GitHub Flavored Markdown
     headerIds: false,
@@ -888,6 +909,14 @@ const loadDetail = async () => {
     sanitize: false, // 不禁用HTML标签
     smartLists: true,
     smartypants: false
+  })
+
+  // 后处理：将临时占位符替换为正确的 HTML
+  boldCodePlaceholders.forEach((codeContent, placeholder) => {
+    renderedContent.value = renderedContent.value.replace(
+      new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+      `<strong><code>${codeContent}</code></strong>`
+    )
   })
 
   // 在博客/随笔文章详情页显示加载成功消息（1/5概率）
@@ -901,7 +930,7 @@ const loadDetail = async () => {
   }
 
   // 后处理：修复没有被正确渲染的粗体语法
-  // 将 **text:** 这样的模式手动转换为 <strong>text:</strong>
+  // 修复 **text:** 这样的模式手动转换为 <strong>text:</strong>
   renderedContent.value = renderedContent.value.replace(/\*\*([^*:]+:\**)\*\*/g, '<strong>$1</strong>')
 
   // 为图片添加内联样式，确保在渲染时就有宽度和高度限制，避免闪烁
@@ -1934,9 +1963,17 @@ const handleTextShare = (text) => {
   shareSelectedText.value = text
   // 生成文章 URL
   const id = props.articleId || route.params.id
-  const type = props.type || route.params.type
+  const type = props.type || route.params.type || route.query.type || 'blog'
   const baseUrl = window.location.origin
-  articleUrl.value = `${baseUrl}/${type}/${id}`
+  if (type === 'moment') {
+    articleUrl.value = `${baseUrl}/moments/${id}`
+  } else if (type === 'blog') {
+    articleUrl.value = `${baseUrl}/blog/${id}`
+  } else if (type === 'research' || type === 'project') {
+    articleUrl.value = `${baseUrl}/blog/${id}?type=${type}`
+  } else {
+    articleUrl.value = `${baseUrl}/blog/${id}`
+  }
   shareCardVisible.value = true
   // 只隐藏菜单，不清除高亮
   textSelectionMenuVisible.value = false
@@ -2396,7 +2433,14 @@ const fixResidualBoldInDOM = () => {
   box-sizing: border-box !important;
 }
 
-.markdown-body * {
+/* 先定义 figcaption 的样式，确保优先级 */
+.markdown-body figure figcaption,
+.markdown-body figcaption {
+  text-align: center !important;
+  display: block !important;
+}
+
+.markdown-body *:not(figcaption) {
   text-align: left !important;
 }
 

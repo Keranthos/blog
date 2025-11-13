@@ -36,9 +36,9 @@
       <!-- 进度条 -->
       <div v-if="showProgress" class="loading-progress">
         <div class="progress-bar">
-          <div class="progress-fill" :style="{ width: progress + '%' }"></div>
+          <div class="progress-fill" :style="{ width: Math.min(100, Math.max(0, progress)) + '%' }"></div>
         </div>
-        <div class="progress-text">{{ progress }}%</div>
+        <div class="progress-text">{{ Math.min(100, Math.max(0, Math.round(progress))) }}%</div>
       </div>
     </div>
 

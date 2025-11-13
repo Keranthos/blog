@@ -26,17 +26,17 @@
       <!-- 内容卡片区域 -->
       <div class="content-section">
         <div class="content-container">
-          <!-- 加载状态 -->
+          <!-- 加载状态（仅初始加载时显示） -->
           <Transition name="fade">
-            <div v-if="loading" key="loading" class="loading-container">
+            <div v-if="loading && !isPageChanging" key="loading" class="loading-container">
               <div class="loading-spinner"></div>
               <p>加载中...</p>
             </div>
           </Transition>
 
-          <!-- 卡片网格（带过渡动画） -->
-          <Transition name="fade-slide">
-            <div v-if="!loading" key="content" class="cards-grid content-fade-in">
+          <!-- 卡片网格（带换页过渡动画） -->
+          <Transition name="page-transition" mode="out-in">
+            <div v-if="!loading" :key="`page-${currentPage}`" class="cards-grid">
               <div
                 v-for="presentation in currentPagePresentations"
                 :key="presentation.id"
@@ -173,6 +173,7 @@ const showPreview = ref(false)
 const currentPresentation = ref(null)
 const totalPages = ref(1)
 const totalCount = ref(0)
+const isPageChanging = ref(false) // 是否正在换页（用于区分初始加载和换页）
 
 // 错误处理
 const hasError = ref(false)
@@ -244,7 +245,10 @@ const visiblePages = computed(() => {
 // 方法
 const loadPresentations = async () => {
   try {
-    loading.value = true
+    // 只有在初始加载时才显示加载界面
+    if (!isPageChanging.value) {
+      loading.value = true
+    }
     hasError.value = false
     errorMessage.value = ''
 
@@ -279,12 +283,40 @@ const loadPresentations = async () => {
     totalPages.value = 1
     totalCount.value = 0
   } finally {
+    // 延迟一点时间让过渡动画完成（仅换页时）
+    if (isPageChanging.value) {
+      await new Promise(resolve => setTimeout(resolve, 300))
+      isPageChanging.value = false
+    }
     loading.value = false
+  }
+}
+
+// 滚动到顶部（滚动到内容区域顶部，确保能看到完整的顶部图片）
+const scrollToTop = () => {
+  if (typeof window !== 'undefined') {
+    // 使用 requestAnimationFrame 确保在 DOM 更新后滚动
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      })
+    })
   }
 }
 
 const goToPage = (page) => {
   if (page >= 1 && page <= totalPages.value) {
+    // 判断是否为换页
+    const isChangingPage = page !== currentPage.value
+
+    // 如果是换页，设置换页状态，但不显示加载界面
+    if (isChangingPage) {
+      isPageChanging.value = true
+      // 换页时立即滚动到顶部
+      scrollToTop()
+    }
+
     currentPage.value = page
     loadPresentations() // 重新加载数据
   }
@@ -938,20 +970,29 @@ const loadPdfJs = () => {
   transform: translateY(0);
 }
 
-/* 内容淡入动画 */
-.content-fade-in {
-  animation: contentFadeIn 0.6s ease-out;
+/* 换页过渡动画（仅作用于卡片部分） */
+.page-transition-enter-active {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@keyframes contentFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.page-transition-leave-active {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-transition-enter-from {
+  opacity: 0;
+  transform: translateX(-50px);
+}
+
+.page-transition-leave-to {
+  opacity: 0;
+  transform: translateX(50px);
+}
+
+.page-transition-enter-to,
+.page-transition-leave-from {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .loading-spinner {

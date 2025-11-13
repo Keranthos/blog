@@ -108,7 +108,7 @@ const loadQuestions = async (isInitial = false) => {
     // 模拟加载进度
     const progressInterval = setInterval(() => {
       if (loadingProgress.value < 90) {
-        loadingProgress.value += Math.random() * 20
+        loadingProgress.value = Math.min(90, loadingProgress.value + Math.random() * 20)
       }
     }, 100)
 

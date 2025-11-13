@@ -9,7 +9,12 @@
         {{ props.title }}
       </h2>
       <div v-if="props.tags && props.tags.length > 0" class="tags">
-        <span v-for="tag in props.tags" :key="tag" class="tag">{{ tag }}</span>
+        <span
+          v-for="tag in props.tags"
+          :key="tag"
+          class="tag"
+          @click.stop="handleTagClick(tag)"
+        >{{ tag }}</span>
       </div>
       <div class="meta-info">
         <p class="time">Modify {{ formattedTime }}</p>
@@ -57,22 +62,20 @@ const hideTooltip = (event) => {
 }
 
 const goToDetail = () => {
-  let routeName
   const articleType = props.articleType || props.type
-  switch (articleType) {
-    case 'blog':
-      routeName = 'BlogDetail'
-      break
-    case 'project':
-      routeName = 'ProjectDetail'
-      break
-    case 'research':
-      routeName = 'ResearchDetail'
-      break
-    default:
-      routeName = 'BlogDetail'
+  if (articleType === 'moment') {
+    router.push(`/moments/${props.id}`)
+  } else {
+    const query = articleType && articleType !== 'blog' ? { type: articleType } : undefined
+    router.push({ name: 'BlogDetail', params: { id: props.id }, query })
   }
-  router.push({ name: routeName, params: { id: props.id } })
+}
+
+// 处理标签点击
+const handleTagClick = (tag) => {
+  if (typeof window !== 'undefined' && window.openTagSearch) {
+    window.openTagSearch(tag)
+  }
 }
 
 // 图片错误回退
@@ -89,7 +92,8 @@ const getTypeIcon = () => {
   const iconMap = {
     blog: 'blog',
     project: 'diagram-project',
-    research: 'flask'
+    research: 'flask',
+    moment: 'comment-dots'
   }
   return iconMap[articleType] || 'blog'
 }
@@ -257,6 +261,7 @@ h2 {
   font-weight: 500;
   border: 1px solid rgba(168, 85, 247, 0.2);
   transition: all 0s;
+  cursor: pointer;
 }
 
 .tag:hover {

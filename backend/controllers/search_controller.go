@@ -54,7 +54,7 @@ func SearchContent(c *gin.Context) {
 	// 搜索科研文章
 	if contentType == "all" || contentType == "research" {
 		var research []models.ResearchArticle
-		config.DB.Where("title LIKE ? OR abstract LIKE ?", "%"+keyword+"%", "%"+keyword+"%").
+		config.DB.Where("title LIKE ? OR content LIKE ?", "%"+keyword+"%", "%"+keyword+"%").
 			Order("created_at DESC").Offset(offset).Limit(limit).Find(&research)
 
 		for _, article := range research {
@@ -62,7 +62,7 @@ func SearchContent(c *gin.Context) {
 				"id":         article.ID,
 				"type":       "research",
 				"title":      article.Title,
-				"content":    truncateContent(article.Abstract, 200),
+				"content":    truncateContent(article.Content, 200),
 				"created_at": article.CreatedAt,
 				"tags":       article.Tags,
 				"image":      article.Image,
@@ -74,7 +74,7 @@ func SearchContent(c *gin.Context) {
 	// 搜索项目文章
 	if contentType == "all" || contentType == "project" {
 		var projects []models.ProjectArticle
-		config.DB.Where("title LIKE ? OR status LIKE ?", "%"+keyword+"%", "%"+keyword+"%").
+		config.DB.Where("title LIKE ? OR content LIKE ?", "%"+keyword+"%", "%"+keyword+"%").
 			Order("created_at DESC").Offset(offset).Limit(limit).Find(&projects)
 
 		for _, project := range projects {
@@ -82,7 +82,7 @@ func SearchContent(c *gin.Context) {
 				"id":         project.ID,
 				"type":       "project",
 				"title":      project.Title,
-				"content":    truncateContent(project.Status, 200),
+				"content":    truncateContent(project.Content, 200),
 				"created_at": project.CreatedAt,
 				"tags":       project.Tags,
 				"image":      project.Image,

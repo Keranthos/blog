@@ -307,7 +307,13 @@ const performSearch = async () => {
 
 // 跳转到文章详情
 const goToArticle = (result) => {
-  router.push(`/${result.type}/${result.id}`)
+  if (result.type === 'moment') {
+    router.push(`/moments/${result.id}`)
+  } else if (result.type === 'blog') {
+    router.push({ name: 'BlogDetail', params: { id: result.id } })
+  } else if (result.type === 'research' || result.type === 'project') {
+    router.push({ name: 'BlogDetail', params: { id: result.id }, query: { type: result.type } })
+  }
 }
 
 // 初始化

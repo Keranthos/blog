@@ -72,16 +72,18 @@ module.exports = defineConfig({
       }
     },
     // 生产环境优化
-    ...(process.env.NODE_ENV === 'production' ? {
-      performance: {
-        hints: 'warning',
-        maxEntrypointSize: 512000,  // 500KB
-        maxAssetSize: 512000
-      }
-    } : {})
+    ...(process.env.NODE_ENV === 'production'
+      ? {
+          performance: {
+            hints: 'warning',
+            maxEntrypointSize: 512000, // 500KB
+            maxAssetSize: 512000
+          }
+        }
+      : {})
   },
   // 生产环境优化
-  productionSourceMap: false,  // 禁用 source map 减小构建体积
+  productionSourceMap: false, // 禁用 source map 减小构建体积
   // 图片优化（使用 imagemin-webpack-plugin 需要额外安装）
   chainWebpack: config => {
     // 压缩图片（需要安装 imagemin-webpack-plugin）

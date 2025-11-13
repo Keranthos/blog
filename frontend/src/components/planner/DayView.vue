@@ -251,7 +251,7 @@ const selectedDate = ref(new Date())
 const calendarMonth = ref(new Date())
 const upcomingDeadlines = ref([])
 
-const weekDays = ['日', '一', '二', '三', '四', '五', '六']
+const weekDays = ['一', '二', '三', '四', '五', '六', '日']
 
 const completedCount = computed(() => {
   return tasks.value.filter(t => t.completed).length
@@ -271,7 +271,7 @@ const calendarDays = computed(() => {
   const month = calendarMonth.value.getMonth()
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
-  const firstDayWeek = firstDay.getDay()
+  const firstDayWeek = (firstDay.getDay() + 6) % 7
   const daysInMonth = lastDay.getDate()
 
   const days = []
@@ -326,7 +326,8 @@ const weekTasks = computed(() => {
   const week = []
   const today = new Date()
   const startOfWeek = new Date(today)
-  startOfWeek.setDate(today.getDate() - today.getDay())
+  const dayOffset = (today.getDay() + 6) % 7
+  startOfWeek.setDate(today.getDate() - dayOffset)
   startOfWeek.setHours(0, 0, 0, 0)
 
   for (let i = 0; i < 7; i++) {
@@ -459,10 +460,11 @@ const loadUpcomingDeadlines = async () => {
 
 const loadWeekTasks = async () => {
   try {
-    // 获取本周的开始日期（周日）
+    // 获取本周的开始日期（周一）
     const today = new Date()
     const startOfWeek = new Date(today)
-    startOfWeek.setDate(today.getDate() - today.getDay())
+    const dayOffset = (today.getDay() + 6) % 7
+    startOfWeek.setDate(today.getDate() - dayOffset)
     startOfWeek.setHours(0, 0, 0, 0)
 
     // 获取本周的所有任务（不传日期参数会返回所有任务，然后在前端过滤）

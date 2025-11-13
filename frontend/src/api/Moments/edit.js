@@ -1,18 +1,23 @@
-import { requestFunc } from '../req'
+import { requestFunc, getJWT } from '../req'
 
-async function createMoment (user, title, content, image, author) {
+async function createMoment (_user, title, content, image, author, tags = '') {
   try {
+    const token = getJWT()
+    if (!token) {
+      throw new Error('JWT is missing, please re-login')
+    }
     const res = await requestFunc('/moments', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${user.token}`
+        Authorization: `Bearer ${token}`
       },
       data: {
         Title: title,
         Content: content,
         Image: image,
-        Author: author
+        Author: author,
+        Tags: tags
       }
     }, true)
     return res.data
@@ -22,18 +27,23 @@ async function createMoment (user, title, content, image, author) {
   }
 }
 
-async function updateMoment (user, momentId, title, content, image) {
+async function updateMoment (_user, momentId, title, content, image, tags = '') {
   try {
+    const token = getJWT()
+    if (!token) {
+      throw new Error('JWT is missing, please re-login')
+    }
     const res = await requestFunc(`/moments/${momentId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${user.token}`
+        Authorization: `Bearer ${token}`
       },
       data: {
         Title: title,
         Content: content,
-        Image: image
+        Image: image,
+        Tags: tags
       }
     }, true)
     return res.data
@@ -43,13 +53,17 @@ async function updateMoment (user, momentId, title, content, image) {
   }
 }
 
-async function deleteMoment (user, momentId) {
+async function deleteMoment (_user, momentId) {
   try {
+    const token = getJWT()
+    if (!token) {
+      throw new Error('JWT is missing, please re-login')
+    }
     const res = await requestFunc(`/moments/${momentId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${user.token}`
+        Authorization: `Bearer ${token}`
       }
     }, true)
     return res.data

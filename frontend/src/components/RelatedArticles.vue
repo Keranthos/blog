@@ -87,7 +87,7 @@ const getTypeIcon = (type) => {
     blog: 'blog',
     project: 'code',
     research: 'flask',
-    moment: 'heart'
+    moment: 'comment-dots'
   }
   return iconMap[type] || 'file'
 }
@@ -114,8 +114,34 @@ const formatDate = (dateStr) => {
 const stripMarkdown = (text) => {
   if (!text) return ''
 
-  // 移除 Markdown 语法标记
-  return text
+  // 调试：记录原始文本
+  if (text.includes('paste_1761985840582.png') || text.includes('!paste')) {
+    console.log('🔍 [stripMarkdown] 原始文本:', text.substring(0, 200))
+  }
+
+  // 先移除图片相关内容（在其他Markdown处理之前，避免下划线被误删）
+  // 1. 完全移除图片语法 ![alt](url) -> 空
+  let cleaned = text.replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
+
+  // 2. 移除完整的HTTP/HTTPS图片URL
+  cleaned = cleaned.replace(/https?:\/\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+
+  // 3. 移除相对路径图片（/uploads/, /images/）
+  cleaned = cleaned.replace(/\/(uploads|images)\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+
+  // 4. 移除带 ! 前缀的图片文件名（如 !paste_1761985840582.png）
+  cleaned = cleaned.replace(/!\s*[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+
+  // 5. 移除纯图片文件名（使用单词边界，避免误删）
+  cleaned = cleaned.replace(/\b[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+
+  // 调试：检查图片移除后
+  if (text.includes('paste_1761985840582.png') || text.includes('!paste')) {
+    console.log('🔍 [stripMarkdown] 图片移除后:', cleaned.substring(0, 200))
+  }
+
+  // 现在处理其他 Markdown 语法标记
+  cleaned = cleaned
     // 移除标题标记 (##, ###等)
     .replace(/^#{1,6}\s+/gm, '')
     // 移除粗体 (**text** 或 __text__)
@@ -130,8 +156,6 @@ const stripMarkdown = (text) => {
     .replace(/`([^`]+)`/g, '$1')
     // 移除链接 [text](url) -> text
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // 移除图片 ![alt](url) -> alt
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
     // 移除引用 (> text)
     .replace(/^>\s+/gm, '')
     // 移除列表标记 (-, *, +, 数字.)
@@ -143,7 +167,29 @@ const stripMarkdown = (text) => {
     .replace(/^[-*]{3,}$/gm, '')
     // 移除多余的空行
     .replace(/\n{3,}/g, '\n\n')
-    .trim()
+
+  // 调试：测试正则表达式匹配
+  if (text.includes('paste_1761985840582.png') || text.includes('!paste') || text.includes('paste1761985840582')) {
+    console.log('🔍 [stripMarkdown] 处理前文本片段:', cleaned.substring(0, 300))
+    // 检查是否还有残留
+    const hasImageUrl = /(https?:\/\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico))|(\/(uploads|images)\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico))|(!\s*[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico))|(\b[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico))/gi.test(cleaned)
+    console.log('🔍 [stripMarkdown] 是否还包含图片URL:', hasImageUrl)
+    if (hasImageUrl) {
+      const remainingMatches = cleaned.match(/(https?:\/\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico))|(\/(uploads|images)\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico))|(!\s*[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico))|(\b[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico))/gi)
+      console.log('🔍 [stripMarkdown] 残留的图片URL:', remainingMatches)
+    }
+  }
+
+  // 调试：检查最终结果
+  if (text.includes('paste_1761985840582.png') || text.includes('!paste')) {
+    console.log('🔍 [stripMarkdown] 处理后文本片段:', cleaned.substring(0, 300))
+    console.log('🔍 [stripMarkdown] 是否还包含图片URL:', cleaned.includes('paste_1761985840582.png') || cleaned.includes('!paste'))
+  }
+
+  // 清理移除URL后可能出现的多余空格（保留换行）
+  cleaned = cleaned.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n')
+
+  return cleaned.trim()
 }
 
 // 计算文章相似度
@@ -212,13 +258,20 @@ const getRelatedArticles = async () => {
           const response = await getMomentsList(1, 50)
           articles = response.data.map(item => {
             const cleanContent = stripMarkdown(item.Content || '')
+            // 解析标签（Tags可能是逗号分隔的字符串）
+            let tags = []
+            if (item.Tags && typeof item.Tags === 'string') {
+              tags = item.Tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+            } else if (Array.isArray(item.Tags)) {
+              tags = item.Tags
+            }
             return {
-              id: item.ID,
+              id: String(item.ID),
               type: 'moment',
               title: item.Title,
               content: item.Content,
               image: item.Image,
-              tags: [],
+              tags: tags,
               time: item.CreatedAt,
               viewCount: item.ViewCount || 0,
               excerpt: cleanContent ? cleanContent.substring(0, 100) + (cleanContent.length > 100 ? '...' : '') : ''
@@ -229,8 +282,29 @@ const getRelatedArticles = async () => {
           articles = response.data.map(item => {
             const rawContent = item.content || item.abstract || ''
             const cleanContent = stripMarkdown(rawContent)
+            let excerpt = cleanContent ? cleanContent.substring(0, 100) + (cleanContent.length > 100 ? '...' : '') : ''
+
+            // 再次清理excerpt，确保移除任何残留的图片URL
+            excerpt = excerpt
+              .replace(/!\s*[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+              .replace(/https?:\/\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+              .replace(/\/(uploads|images)\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+              .replace(/\b[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+              .replace(/\s+/g, ' ')
+              .trim()
+
+            // 调试：检查生成的excerpt
+            if (rawContent.includes('paste_1761985840582.png') || rawContent.includes('!paste') || excerpt.includes('paste') || excerpt.includes('.png')) {
+              console.log('🔍 [getRelatedArticles] 文章ID:', item.ID)
+              console.log('🔍 [getRelatedArticles] 原始内容片段:', rawContent.substring(0, 150))
+              console.log('🔍 [getRelatedArticles] 清理后内容片段:', cleanContent.substring(0, 150))
+              console.log('🔍 [getRelatedArticles] 截取后的excerpt:', cleanContent ? cleanContent.substring(0, 100) + (cleanContent.length > 100 ? '...' : '') : '')
+              console.log('🔍 [getRelatedArticles] 最终excerpt:', excerpt)
+              console.log('🔍 [getRelatedArticles] excerpt是否包含图片URL:', excerpt.includes('paste') || excerpt.includes('.png'))
+            }
+
             return {
-              id: item.ID,
+              id: String(item.ID),
               type,
               title: item.title,
               content: rawContent,
@@ -238,7 +312,7 @@ const getRelatedArticles = async () => {
               tags: item.tags || [],
               time: item.CreatedAt,
               viewCount: item.viewCount || 0,
-              excerpt: cleanContent ? cleanContent.substring(0, 100) + (cleanContent.length > 100 ? '...' : '') : ''
+              excerpt
             }
           })
         }
@@ -275,7 +349,13 @@ const getRelatedArticles = async () => {
 
 // 跳转到文章
 const goToArticle = (article) => {
-  router.push(`/${article.type}/${article.id}`)
+  if (article.type === 'moment') {
+    router.push(`/moments/${article.id}`)
+  } else if (article.type === 'blog') {
+    router.push({ name: 'BlogDetail', params: { id: article.id } })
+  } else if (article.type === 'research' || article.type === 'project') {
+    router.push({ name: 'BlogDetail', params: { id: article.id }, query: { type: article.type } })
+  }
 }
 
 onMounted(() => {

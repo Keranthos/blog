@@ -61,7 +61,7 @@
                     v-for="blog in latestBlogs"
                     :key="blog.ID"
                     class="blog-card"
-                    @click="$router.push(`/blog/${blog.ID}`)"
+                    @click="$router.push({ name: 'BlogDetail', params: { id: blog.ID } })"
                   >
                     <div class="card-content">
                       <div class="card-text">
@@ -84,7 +84,12 @@
                         <div class="card-tags">
                           <i class="tag-icon">🔖</i>
                           <template v-if="blog.tags && blog.tags.length > 0">
-                            <span v-for="tag in blog.tags" :key="tag" class="tag">{{ tag }}</span>
+                            <span
+                              v-for="tag in blog.tags"
+                              :key="tag"
+                              class="tag"
+                              @click.stop="handleTagClick(tag)"
+                            >{{ tag }}</span>
                           </template>
                           <span v-else class="tag">山角函兽懒得加标签了</span>
                         </div>
@@ -114,7 +119,7 @@
                       <div class="card-text">
                         <div class="card-header">
                           <h4 class="card-title">
-                            <font-awesome-icon icon="pen-to-square" class="card-icon" />
+                            <font-awesome-icon icon="comment-dots" class="card-icon" />
                             {{ moment.title }}
                           </h4>
                         </div>
@@ -131,7 +136,12 @@
                         <div class="card-tags">
                           <i class="tag-icon">🔖</i>
                           <template v-if="moment.tags && moment.tags.length > 0">
-                            <span v-for="tag in moment.tags" :key="tag" class="tag">{{ tag }}</span>
+                            <span
+                              v-for="tag in moment.tags"
+                              :key="tag"
+                              class="tag"
+                              @click.stop="handleTagClick(tag)"
+                            >{{ tag }}</span>
                           </template>
                           <span v-else class="tag">山角函兽懒得加标签了</span>
                         </div>
@@ -155,7 +165,7 @@
                     v-for="project in latestProjects"
                     :key="project.ID"
                     class="blog-card"
-                    @click="$router.push(`/blog/${project.ID}`)"
+                    @click="$router.push({ name: 'BlogDetail', params: { id: project.ID }, query: { type: 'project' } })"
                   >
                     <div class="card-content">
                       <div class="card-text">
@@ -178,7 +188,12 @@
                         <div class="card-tags">
                           <i class="tag-icon">🔖</i>
                           <template v-if="project.tags && project.tags.length > 0">
-                            <span v-for="tag in project.tags" :key="tag" class="tag">{{ tag }}</span>
+                            <span
+                              v-for="tag in project.tags"
+                              :key="tag"
+                              class="tag"
+                              @click.stop="handleTagClick(tag)"
+                            >{{ tag }}</span>
                           </template>
                           <span v-else class="tag">山角函兽懒得加标签了</span>
                         </div>
@@ -243,7 +258,7 @@
                     v-for="article in topArticles"
                     :key="article.ID"
                     class="top-blog-item"
-                    @click="$router.push(`/${article.type}/${article.ID}`)"
+                    @click="goToTopArticle(article)"
                   >
                     <div class="blog-title">
                       <font-awesome-icon :icon="getTypeIcon(article.type)" class="type-icon" />
@@ -280,10 +295,13 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import NavBar from '@/components/NavBar'
 import ModernLoading from '@/components/ModernLoading.vue'
 import { getArticlesList, getTopArticles, getArticlesNum } from '@/api/Articles/browse'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+
+const router = useRouter()
 
 const typingText = '欢迎来到山角函兽的小窝'
 const displayedText = ref('')
@@ -373,20 +391,44 @@ const getWeatherIcon = (weather) => {
 const getPlainText = (content) => {
   if (!content) return ''
 
-  // 移除Markdown格式符号
-  const plainText = content
+  // 先移除图片相关内容（在其他Markdown处理之前，避免下划线被误删）
+  // 1. 完全移除图片语法 ![alt](url) -> 空
+  let plainText = content.replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
+
+  // 2. 移除完整的HTTP/HTTPS图片URL
+  plainText = plainText.replace(/https?:\/\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+
+  // 3. 移除相对路径图片（/uploads/, /images/）
+  plainText = plainText.replace(/\/(uploads|images)\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+
+  // 4. 移除带 ! 前缀的图片文件名（如 !paste_1761985840582.png）
+  plainText = plainText.replace(/!\s*[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+
+  // 5. 移除纯图片文件名（使用单词边界，避免误删）
+  plainText = plainText.replace(/\b[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+
+  // 现在处理其他 Markdown 格式符号
+  plainText = plainText
     .replace(/#{1,6}\s+/g, '') // 移除标题符号
     .replace(/\*\*(.*?)\*\*/g, '$1') // 移除粗体
     .replace(/\*(.*?)\*/g, '$1') // 移除斜体
     .replace(/`(.*?)`/g, '$1') // 移除行内代码
     .replace(/```[\s\S]*?```/g, '') // 移除代码块
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // 移除链接，保留文本
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '') // 移除图片
     .replace(/^\s*[-*+]\s+/gm, '') // 移除列表符号
     .replace(/^\s*\d+\.\s+/gm, '') // 移除有序列表
     .replace(/>\s*/g, '') // 移除引用符号
     .replace(/\n+/g, ' ') // 将换行符替换为空格
     .replace(/\s+/g, ' ') // 合并多个空格
+    .trim()
+
+  // 再次清理，确保移除任何残留的图片URL
+  plainText = plainText
+    .replace(/!\s*[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+    .replace(/https?:\/\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+    .replace(/\/(uploads|images)\/[^\s)]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+    .replace(/\b[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s)]*)?/gi, '')
+    .replace(/\s+/g, ' ')
     .trim()
 
   // 截取前100个字符
@@ -416,6 +458,24 @@ const getTypeIcon = (type) => {
     moment: 'comment-dots'
   }
   return iconMap[type] || 'file'
+}
+
+// 处理标签点击
+const handleTagClick = (tag) => {
+  if (typeof window !== 'undefined' && window.openTagSearch) {
+    window.openTagSearch(tag)
+  }
+}
+
+// 跳转到置顶文章
+const goToTopArticle = (article) => {
+  if (article.type === 'moment') {
+    router.push(`/moments/${article.ID}`)
+  } else if (article.type === 'blog') {
+    router.push({ name: 'BlogDetail', params: { id: article.ID } })
+  } else if (article.type === 'research' || article.type === 'project') {
+    router.push({ name: 'BlogDetail', params: { id: article.ID }, query: { type: article.type } })
+  }
 }
 
 const loadTopArticles = async () => {
@@ -540,7 +600,7 @@ onMounted(async () => {
     // 模拟加载进度
     const progressInterval = setInterval(() => {
       if (loadingProgress.value < 90) {
-        loadingProgress.value += Math.random() * 15
+        loadingProgress.value = Math.min(90, loadingProgress.value + Math.random() * 15)
       }
     }, 200)
 
@@ -1054,6 +1114,7 @@ onMounted(async () => {
   font-weight: 500;
   border: 1px solid rgba(168, 85, 247, 0.2);
   transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 .tag:hover {

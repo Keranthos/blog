@@ -131,7 +131,16 @@ export function generateArticleSEO (article, type) {
   }
 
   // 生成文章URL
-  const url = `${window.location.origin}/${type}/${article.ID}`
+  let url
+  if (type === 'moment') {
+    url = `${window.location.origin}/moments/${article.ID}`
+  } else if (type === 'blog') {
+    url = `${window.location.origin}/blog/${article.ID}`
+  } else if (type === 'research' || type === 'project') {
+    url = `${window.location.origin}/blog/${article.ID}?type=${type}`
+  } else {
+    url = `${window.location.origin}/blog/${article.ID}`
+  }
 
   // 格式化时间
   const publishedTime = new Date(article.CreatedAt).toISOString()
