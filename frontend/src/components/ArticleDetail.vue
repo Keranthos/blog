@@ -250,6 +250,7 @@ import RelatedArticles from '@/components/RelatedArticles.vue'
 import { estimateReadingTime } from '@/utils/readingTime'
 import TextSelectionMenu from '@/components/TextSelectionMenu.vue'
 import ShareCard from '@/components/ShareCard.vue'
+import { protectLatex, restoreAndRenderLatex } from '@/utils/latex'
 
 // 防抖函数
 let scrollTimeout = null
@@ -885,9 +886,12 @@ const loadDetail = async () => {
     return
   }
 
+  // 预处理：保护 LaTeX 公式（在 marked 渲染前处理）
+  const { protected: protectedContent, placeholders: latexPlaceholders } = protectLatex(content.value)
+
   // 预处理：修复 **`code`** 格式（在 marked 渲染前处理）
   // 使用临时标记避免与 marked 的解析冲突
-  let processedContent = content.value
+  let processedContent = protectedContent
   const boldCodePlaceholders = new Map()
   let placeholderIndex = 0
 
@@ -948,7 +952,10 @@ const loadDetail = async () => {
     }
   )
 
-  // 在渲染后通过 nextTick 为正文中的图片添加错误处理
+  // 恢复并渲染 LaTeX 公式
+  renderedContent.value = restoreAndRenderLatex(renderedContent.value, latexPlaceholders)
+
+  // 在渲染后通过 nextTick 为正文中的图片添加错误处理，并确保 LaTeX 公式居中
   // 这样即使封面图片和正文图片URL相同，也不会互相影响
   nextTick(() => {
     // 延迟执行，确保 DOM 完全渲染
@@ -971,6 +978,36 @@ const loadDetail = async () => {
             img.style.setProperty('display', 'block', 'important')
             img.style.setProperty('margin', '20px auto', 'important')
             img.style.setProperty('box-sizing', 'border-box', 'important')
+          }
+        })
+
+        // 确保 LaTeX 公式块居中（在 DOM 更新后再次设置，确保不被覆盖）
+        const katexBlocks = markdownBody.querySelectorAll('.katex-block')
+        katexBlocks.forEach(block => {
+          block.style.setProperty('text-align', 'center', 'important')
+          block.style.setProperty('display', 'block', 'important')
+          block.style.setProperty('width', '100%', 'important')
+          block.style.setProperty('margin', '24px 0', 'important')
+          block.style.setProperty('max-width', '100%', 'important')
+          // 确保内部的 katex 也居中
+          const katex = block.querySelector('.katex')
+          if (katex) {
+            katex.style.setProperty('text-align', 'center', 'important')
+            katex.style.setProperty('display', 'inline-block', 'important')
+            katex.style.setProperty('margin', '0 auto', 'important')
+          }
+          // 确保 katex-block 内部的所有元素都居中
+          const allChildren = block.querySelectorAll('*')
+          allChildren.forEach(child => {
+            child.style.setProperty('text-align', 'center', 'important')
+          })
+        })
+
+        // 确保包裹 katex-block 的父元素不影响居中
+        const parentElements = markdownBody.querySelectorAll('p, div')
+        parentElements.forEach(parent => {
+          if (parent.querySelector('.katex-block') && !parent.classList.contains('katex-block')) {
+            parent.style.setProperty('text-align', 'center', 'important')
           }
         })
       }
@@ -2416,6 +2453,23 @@ const fixResidualBoldInDOM = () => {
   background: transparent !important; /* 覆盖github-markdown.css中的白色背景 */
 }
 
+/* 确保 markdown-body 中的 katex-block 不受父元素影响 */
+.markdown-body .katex-block,
+.markdown-body p .katex-block,
+.markdown-body div .katex-block {
+  text-align: center !important;
+  display: block !important;
+  width: 100% !important;
+  margin: 24px 0 !important;
+  max-width: 100% !important;
+}
+
+/* 确保包裹 katex-block 的父元素不影响居中 */
+.markdown-body p:has(.katex-block),
+.markdown-body div:has(.katex-block) {
+  text-align: center !important;
+}
+
 /* 文章内容中的图片样式 - 宽度不超过容器80%，高度不超过750px，居中显示 */
 .article-content .markdown-body img,
 .content-container .markdown-body img,
@@ -2433,14 +2487,14 @@ const fixResidualBoldInDOM = () => {
   box-sizing: border-box !important;
 }
 
-/* 先定义 figcaption 的样式，确保优先级 */
+/* 先定义 figcaption 和 LaTeX 公式的样式，确保优先级 */
 .markdown-body figure figcaption,
 .markdown-body figcaption {
   text-align: center !important;
   display: block !important;
 }
 
-.markdown-body *:not(figcaption) {
+.markdown-body *:not(figcaption):not(.katex-block):not(.katex) {
   text-align: left !important;
 }
 
@@ -2454,8 +2508,8 @@ const fixResidualBoldInDOM = () => {
 }
 
 .markdown-body p,
-.markdown-body div,
-.markdown-body span {
+.markdown-body div:not(.katex-block),
+.markdown-body span:not(.katex) {
   text-align: left !important;
 }
 
@@ -2471,6 +2525,75 @@ const fixResidualBoldInDOM = () => {
   font-weight: bold !important;
   font-weight: 700 !important;
   font-family: 'Inter', 'Noto Sans SC', sans-serif !important;
+}
+
+/* LaTeX 公式样式 - 必须在通用样式之后，确保优先级 */
+.markdown-body .katex-block,
+.markdown-body p .katex-block,
+.markdown-body div .katex-block {
+  margin: 24px 0 !important;
+  text-align: center !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.markdown-body .katex-block .katex,
+.markdown-body p .katex-block .katex,
+.markdown-body div .katex-block .katex {
+  font-size: 1.2em;
+  display: inline-block !important;
+  text-align: center !important;
+  margin: 0 auto !important;
+}
+
+/* 确保 katex 元素本身也居中 */
+.markdown-body .katex {
+  text-align: center !important;
+}
+
+.markdown-body .katex {
+  font-size: 1.05em;
+  line-height: 1.8;
+}
+
+/* 优化上标和下标间距 - 增加上标与基线的距离 */
+.markdown-body .katex .msup {
+  margin-left: 0.15em;
+}
+
+.markdown-body .katex .msub {
+  margin-left: 0.15em;
+}
+
+/* 优化上标内部间距 */
+.markdown-body .katex .msup > .vlist-t {
+  margin-top: 0.1em;
+}
+
+/* 优化运算符间距 */
+.markdown-body .katex .mop {
+  margin-left: 0.16667em;
+  margin-right: 0.16667em;
+}
+
+.markdown-body .katex .mord + .mop {
+  margin-left: 0.16667em;
+}
+
+.markdown-body .katex .mop + .mord {
+  margin-left: 0.16667em;
+}
+
+.markdown-body .katex-error {
+  color: #d1242f;
+  background-color: #fff5f5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
 }
 
 /* 调试样式已移除 */

@@ -103,6 +103,7 @@ import { useStore } from 'vuex'
 import { getCommentsByID } from '@/api/Comments/browse'
 import { createComment, deleteComment as deleteCommentAPI } from '@/api/Comments/edit'
 import { showErrorMessage, showSuccessMessage } from '@/utils/waifuMessage'
+import { protectLatex, restoreAndRenderLatex } from '@/utils/latex'
 
 const props = defineProps({
   type: String, // 'blog', 'project', 'research', 'moment'
@@ -197,11 +198,14 @@ const togglePreview = () => {
 const renderedPreview = computed(() => {
   if (!newComment.value) return ''
 
-  // 先处理换行符，将 \n 转换为 <br>
-  const content = newComment.value.replace(/\n/g, '<br>')
+  // 预处理：保护 LaTeX 公式（在 marked 渲染前处理，避免公式中的特殊字符被 Markdown 解析）
+  const { protected: protectedContent, placeholders: latexPlaceholders } = protectLatex(newComment.value)
+
+  // 处理换行符，将 \n 转换为 <br>（在保护 LaTeX 之后，避免影响公式）
+  const content = protectedContent.replace(/\n/g, '<br>')
 
   // 然后使用 marked 渲染 Markdown
-  return marked(content, {
+  let html = marked(content, {
     breaks: false, // 我们已经手动处理了换行
     gfm: true,
     headerIds: false,
@@ -211,6 +215,11 @@ const renderedPreview = computed(() => {
     smartLists: true,
     smartypants: false
   })
+
+  // 恢复并渲染 LaTeX 公式
+  html = restoreAndRenderLatex(html, latexPlaceholders)
+
+  return html
 })
 
 // 获取所有评论按正确顺序排列（回复紧跟父评论）

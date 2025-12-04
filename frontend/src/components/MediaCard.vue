@@ -96,6 +96,7 @@ import { useRouter } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { showCustomMessage } from '@/utils/waifuMessage'
+import { protectLatex, restoreAndRenderLatex } from '@/utils/latex'
 
 const props = defineProps({
   media: Object,
@@ -146,7 +147,9 @@ const starArray = computed(() => {
 // 渲染 Markdown
 const renderedReview = computed(() => {
   if (!props.media.Review) return ''
-  let html = marked(props.media.Review, {
+  // 预处理：保护 LaTeX 公式（在 marked 渲染前处理）
+  const { protected: protectedContent, placeholders: latexPlaceholders } = protectLatex(props.media.Review)
+  let html = marked(protectedContent, {
     breaks: true, // 将换行符转换为 <br>
     gfm: true, // 启用 GitHub Flavored Markdown
     headerIds: false,
@@ -169,10 +172,13 @@ const renderedReview = computed(() => {
     }
   )
 
-  // 配置DOMPurify允许style属性，确保内联样式不被过滤
+  // 恢复并渲染 LaTeX 公式
+  html = restoreAndRenderLatex(html, latexPlaceholders)
+
+  // 配置DOMPurify允许style属性，确保内联样式不被过滤，支持 LaTeX 公式
   return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img'],
-    ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'title', 'width', 'height'],
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'math', 'annotation', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'mfrac', 'msup', 'msub', 'munderover', 'munder', 'mover', 'mtable', 'mtr', 'mtd', 'mtext'],
+    ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'title', 'width', 'height', 'data-*', 'aria-*', 'role', 'dir', 'colspan', 'rowspan'],
     ALLOW_DATA_ATTR: true
   })
 })

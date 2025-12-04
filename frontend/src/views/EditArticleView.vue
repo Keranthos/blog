@@ -545,6 +545,7 @@ import { getMediaByID } from '@/api/media/browse'
 // import { imageConfig } from '@/config/images'
 import apiConfig from '@/config/api'
 import { showErrorMessage, showSuccessMessage, showWarningMessage, showCustomMessage } from '@/utils/waifuMessage'
+import { protectLatex, restoreAndRenderLatex } from '@/utils/latex'
 
 const route = useRoute()
 const router = useRouter()
@@ -669,8 +670,11 @@ const mediaLineCount = computed(() => {
 const sanitizedMediaContent = computed(() => {
   if (!mediaData.value.description) return ''
 
+  // 预处理：保护 LaTeX 公式（在 marked 渲染前处理）
+  const { protected: protectedContent, placeholders: latexPlaceholders } = protectLatex(mediaData.value.description)
+
   // 使用 marked 渲染 Markdown，确保代码块结构正确
-  const rendered = marked(mediaData.value.description, {
+  const rendered = marked(protectedContent, {
     breaks: true, // 将换行符转换为 <br>
     gfm: true, // 启用 GitHub Flavored Markdown
     headerIds: false,
@@ -695,10 +699,13 @@ const sanitizedMediaContent = computed(() => {
     </div>`
   })
 
-  // 使用与文章编辑器相同的 DOMPurify 配置
+  // 恢复并渲染 LaTeX 公式
+  processedContent = restoreAndRenderLatex(processedContent, latexPlaceholders)
+
+  // 使用与文章编辑器相同的 DOMPurify 配置，支持 LaTeX 公式
   const sanitized = DOMPurify.sanitize(processedContent, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img'],
-    ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'title', 'width', 'height'],
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'math', 'annotation', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'mfrac', 'msup', 'msub', 'munderover', 'munder', 'mover', 'mtable', 'mtr', 'mtd', 'mtext'],
+    ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'title', 'width', 'height', 'data-*', 'aria-*', 'role', 'dir', 'colspan', 'rowspan'],
     ALLOW_DATA_ATTR: true,
     ALLOW_UNKNOWN_PROTOCOLS: true
   })
@@ -743,8 +750,11 @@ const currentImageError = computed(() => {
 
 // 更新预览并进行高亮代码块
 const updatePreview = () => {
+  // 预处理：保护 LaTeX 公式（在 marked 渲染前处理）
+  const { protected: protectedContent, placeholders: latexPlaceholders } = protectLatex(markdownContent.value)
+
   // 使用 marked 渲染 Markdown，确保代码块结构正确
-  renderedContent.value = marked(markdownContent.value, {
+  renderedContent.value = marked(protectedContent, {
     breaks: true, // 将换行符转换为 <br>
     gfm: true, // 启用 GitHub Flavored Markdown
     headerIds: false,
@@ -756,11 +766,24 @@ const updatePreview = () => {
   const tempDiv = document.createElement('div')
   tempDiv.innerHTML = renderedContent.value
 
-  // 为所有块级元素添加text-align: left，但排除标题
+  // 为所有块级元素添加text-align: left，但排除标题和 LaTeX 公式块
   const blockElements = tempDiv.querySelectorAll('p, div, ul, ol, li, blockquote, pre')
   blockElements.forEach(el => {
-    el.style.textAlign = 'left'
-    el.style.textAlignLast = 'left'
+    // 排除 LaTeX 公式块及其父元素
+    const hasKatexBlock = el.classList.contains('katex-block') || el.querySelector('.katex-block')
+    if (!hasKatexBlock) {
+      el.style.textAlign = 'left'
+      el.style.textAlignLast = 'left'
+    } else if (el.classList.contains('katex-block')) {
+      // 确保 katex-block 居中
+      el.style.setProperty('text-align', 'center', 'important')
+      el.style.setProperty('display', 'block', 'important')
+      el.style.setProperty('width', '100%', 'important')
+      el.style.setProperty('margin', '24px 0', 'important')
+    } else {
+      // 如果元素包含 katex-block（比如 p 标签包裹了 katex-block），不设置左对齐
+      // 这样 katex-block 可以自己控制对齐
+    }
   })
 
   // 只对标题设置左对齐，不设置其他样式
@@ -789,6 +812,24 @@ const updatePreview = () => {
 
   renderedContent.value = tempDiv.innerHTML
 
+  // 后处理：修复没有被正确渲染的粗体语法
+  // marked 可能无法正确解析某些格式的 **text**，特别是包含中文标点符号的情况
+  // 先修复包含冒号的情况（如 **text:** 或 **（文字）：**）
+  renderedContent.value = renderedContent.value.replace(/\*\*([^*]+?[：:])\*\*/g, '<strong>$1</strong>')
+
+  // 然后修复所有剩余的 **text** 模式（但排除已经被处理过的，即已经包含 <strong> 标签的）
+  renderedContent.value = renderedContent.value.replace(/\*\*([^*\n<]+?)\*\*/g, (match, content) => {
+    // 如果内容中已经包含 HTML 标签，说明已经被处理过了，跳过
+    if (content.includes('<') || content.includes('>')) {
+      return match
+    }
+    // 确保内容不为空
+    if (content.trim().length === 0) {
+      return match
+    }
+    return `<strong>${content}</strong>`
+  })
+
   // 处理blob URL，尝试显示实际图片，失败时显示占位符
   let processedContent = renderedContent.value
 
@@ -811,15 +852,55 @@ const updatePreview = () => {
     </div>`
   })
 
-  // 使用更宽松的 DOMPurify 配置，确保代码块、br标签和图片不被过滤
+  // 恢复并渲染 LaTeX 公式
+  processedContent = restoreAndRenderLatex(processedContent, latexPlaceholders)
+
+  // 在恢复 LaTeX 公式后，再次确保 katex-block 居中（使用 setProperty 确保 !important 优先级）
+  const finalDiv = document.createElement('div')
+  finalDiv.innerHTML = processedContent
+
+  // 先处理可能包裹 katex-block 的 p 标签
+  const parentElements = finalDiv.querySelectorAll('p, div')
+  parentElements.forEach(parent => {
+    if (parent.querySelector('.katex-block') && !parent.classList.contains('katex-block')) {
+      // 如果父元素包含 katex-block，移除父元素的 text-align 样式，让子元素自己控制
+      parent.style.removeProperty('text-align')
+      parent.style.removeProperty('text-align-last')
+    }
+  })
+
+  // 然后确保所有 katex-block 居中
+  const katexBlocks = finalDiv.querySelectorAll('.katex-block')
+  katexBlocks.forEach(block => {
+    block.style.setProperty('text-align', 'center', 'important')
+    block.style.setProperty('display', 'block', 'important')
+    block.style.setProperty('width', '100%', 'important')
+    block.style.setProperty('margin', '24px 0', 'important')
+    block.style.setProperty('max-width', '100%', 'important')
+    // 确保内部的 katex 也居中
+    const katex = block.querySelector('.katex')
+    if (katex) {
+      katex.style.setProperty('text-align', 'center', 'important')
+      katex.style.setProperty('display', 'inline-block', 'important')
+      katex.style.setProperty('margin', '0 auto', 'important')
+    }
+    // 确保 katex-block 内部的所有元素都居中
+    const allChildren = block.querySelectorAll('*')
+    allChildren.forEach(child => {
+      child.style.setProperty('text-align', 'center', 'important')
+    })
+  })
+  processedContent = finalDiv.innerHTML
+
+  // 使用更宽松的 DOMPurify 配置，确保代码块、br标签、图片和 LaTeX 公式不被过滤
   sanitizedContent.value = DOMPurify.sanitize(processedContent, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img'],
-    ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'title', 'width', 'height'],
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'math', 'annotation', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'mfrac', 'msup', 'msub', 'munderover', 'munder', 'mover', 'mtable', 'mtr', 'mtd', 'mtext'],
+    ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'title', 'width', 'height', 'data-*', 'aria-*', 'role', 'dir', 'colspan', 'rowspan'],
     ALLOW_DATA_ATTR: true,
     ALLOW_UNKNOWN_PROTOCOLS: true
   })
 
-  // 确保DOM 更新后高亮代码块（不添加复制按钮）
+  // 确保DOM 更新后高亮代码块并确保 LaTeX 公式居中（不添加复制按钮）
   nextTick(() => {
     // 延迟执行，确保代码块完全渲染
     setTimeout(() => {
@@ -833,6 +914,28 @@ const updatePreview = () => {
         if (block.textContent && block.textContent.trim()) {
           hljs.highlightElement(block)
         }
+      })
+
+      // 确保 LaTeX 公式块居中（在 DOM 更新后再次设置，确保不被覆盖）
+      const katexBlocks = document.querySelectorAll('.preview-content.markdown-body .katex-block, .markdown-body .katex-block')
+      katexBlocks.forEach(block => {
+        block.style.setProperty('text-align', 'center', 'important')
+        block.style.setProperty('display', 'block', 'important')
+        block.style.setProperty('width', '100%', 'important')
+        block.style.setProperty('margin', '24px 0', 'important')
+        block.style.setProperty('max-width', '100%', 'important')
+        // 确保内部的 katex 也居中
+        const katex = block.querySelector('.katex')
+        if (katex) {
+          katex.style.setProperty('text-align', 'center', 'important')
+          katex.style.setProperty('display', 'inline-block', 'important')
+          katex.style.setProperty('margin', '0 auto', 'important')
+        }
+        // 确保 katex-block 内部的所有元素都居中
+        const allChildren = block.querySelectorAll('*')
+        allChildren.forEach(child => {
+          child.style.setProperty('text-align', 'center', 'important')
+        })
       })
     }, 100) // 延迟100ms确保渲染完成
   })
@@ -3052,6 +3155,80 @@ defineExpose({
   }
 
   /* 确保表格单元格内容正确换行 */
+  /* LaTeX 公式样式 - 必须在通用样式之后，确保优先级最高 */
+  .right-panel .preview-content.markdown-body .katex-block,
+  .preview-content.markdown-body .katex-block {
+    margin: 24px 0 !important;
+    text-align: center !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .right-panel .preview-content.markdown-body .katex-block .katex,
+  .preview-content.markdown-body .katex-block .katex {
+    font-size: 1.2em;
+    display: inline-block !important;
+    text-align: center !important;
+    margin: 0 auto !important;
+  }
+
+  /* 确保 katex 元素本身也居中 */
+  .right-panel .preview-content.markdown-body .katex,
+  .preview-content.markdown-body .katex {
+    text-align: center !important;
+  }
+
+  /* 确保 katex-block 内部的所有元素都居中 */
+  .right-panel .preview-content.markdown-body .katex-block *,
+  .preview-content.markdown-body .katex-block * {
+    text-align: center !important;
+  }
+
+  .preview-content.markdown-body .katex {
+    font-size: 1.05em;
+    line-height: 1.8;
+  }
+
+  /* 优化上标和下标间距 - 增加上标与基线的距离 */
+  .preview-content.markdown-body .katex .msup {
+    margin-left: 0.15em;
+  }
+
+  .preview-content.markdown-body .katex .msub {
+    margin-left: 0.15em;
+  }
+
+  /* 优化上标内部间距 */
+  .preview-content.markdown-body .katex .msup > .vlist-t {
+    margin-top: 0.1em;
+  }
+
+  /* 优化运算符间距 */
+  .preview-content.markdown-body .katex .mop {
+    margin-left: 0.16667em;
+    margin-right: 0.16667em;
+  }
+
+  .preview-content.markdown-body .katex .mord + .mop {
+    margin-left: 0.16667em;
+  }
+
+  .preview-content.markdown-body .katex .mop + .mord {
+    margin-left: 0.16667em;
+  }
+
+  .preview-content.markdown-body .katex-error {
+    color: #d1242f;
+    background-color: #fff5f5;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9em;
+  }
+
   .right-panel .preview-content.markdown-body td,
   .right-panel .preview-content.markdown-body th {
     white-space: normal !important;
@@ -3122,16 +3299,22 @@ defineExpose({
     display: none;
   }
 
-  /* 媒体预览区域文本左对齐 */
+  /* 媒体预览区域文本左对齐 - 但排除 LaTeX 公式 */
   .right-panel .preview-content.markdown-body {
     text-align: left !important;
   }
-  .right-panel .preview-content.markdown-body * {
+  /* 排除 katex-block 和 katex 元素 */
+  .right-panel .preview-content.markdown-body *:not(.katex-block):not(.katex) {
     text-align: left !important;
   }
-  .right-panel .preview-content.markdown-body p,
-  .right-panel .preview-content.markdown-body div,
-  .right-panel .preview-content.markdown-body span {
+  /* 但确保 katex-block 及其所有子元素都居中（优先级更高） */
+  .right-panel .preview-content.markdown-body .katex-block,
+  .right-panel .preview-content.markdown-body .katex-block * {
+    text-align: center !important;
+  }
+  .right-panel .preview-content.markdown-body p:not(:has(.katex-block)),
+  .right-panel .preview-content.markdown-body div:not(.katex-block):not(:has(.katex-block)),
+  .right-panel .preview-content.markdown-body span:not(.katex):not(:has(.katex)) {
     text-align: left !important;
   }
   /* 确保图片居中但其他内容左对齐 */
