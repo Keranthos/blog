@@ -86,9 +86,9 @@ func (p *Presentation) ToResponse() PresentationResponse {
 		if strings.HasPrefix(p.Thumbnail, "http") {
 			thumbnailURL = p.Thumbnail
 		} else {
-			// 如果是本地文件路径，构建完整的URL
+			// 如果是本地文件路径，构建相对 URL，避免硬编码 localhost
 			filename := filepath.Base(p.Thumbnail)
-			thumbnailURL = fmt.Sprintf("http://localhost:3000/uploads/presentations/%s", filename)
+			thumbnailURL = fmt.Sprintf("/uploads/presentations/%s", filename)
 		}
 	}
 
