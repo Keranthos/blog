@@ -10,6 +10,8 @@ import (
 
 // 验证用户名
 func ValidateUsername(username string) error {
+	// 先去除首尾空格
+	username = strings.TrimSpace(username)
 	if username == "" {
 		return errors.New("用户名不能为空")
 	}
@@ -23,8 +25,10 @@ func ValidateUsername(username string) error {
 	}
 
 	// 检查是否包含非法字符
-	matched, _ := regexp.MatchString(`^[a-zA-Z0-9_\u4e00-\u9fa5]+$`, username)
-	if !matched {
+	// 使用编译好的正则表达式提高性能
+	// 使用 \p{Han} 匹配中文字符（CJK统一汉字），这是Go正则表达式推荐的方式
+	usernameRegex := regexp.MustCompile(`^[a-zA-Z0-9_\p{Han}]+$`)
+	if !usernameRegex.MatchString(username) {
 		return errors.New("用户名只能包含字母、数字、下划线和中文")
 	}
 
@@ -43,30 +47,6 @@ func ValidatePassword(password string) error {
 
 	if len(password) > 50 {
 		return errors.New("密码最多50位")
-	}
-
-	// 检查密码强度
-	hasLower := regexp.MustCompile(`[a-z]`).MatchString(password)
-	hasUpper := regexp.MustCompile(`[A-Z]`).MatchString(password)
-	hasDigit := regexp.MustCompile(`[0-9]`).MatchString(password)
-	hasSpecial := regexp.MustCompile(`[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]`).MatchString(password)
-
-	strength := 0
-	if hasLower {
-		strength++
-	}
-	if hasUpper {
-		strength++
-	}
-	if hasDigit {
-		strength++
-	}
-	if hasSpecial {
-		strength++
-	}
-
-	if strength < 2 {
-		return errors.New("密码强度不够，建议包含大小写字母、数字和特殊字符")
 	}
 
 	return nil

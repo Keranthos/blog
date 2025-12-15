@@ -278,7 +278,9 @@ const loadPresentations = async () => {
   } catch (error) {
     console.error('加载讲演数据失败:', error)
     hasError.value = true
-    errorMessage.value = error.message || '加载数据失败，请稍后重试'
+    // 优先提取后端返回的具体错误信息
+    const backendError = error.response?.data?.error || error.response?.data?.message
+    errorMessage.value = backendError || error.message || '加载数据失败，请稍后重试'
     presentations.value = []
     totalPages.value = 1
     totalCount.value = 0

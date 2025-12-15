@@ -62,6 +62,7 @@
 import { ref, computed } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
+import { validateRegisterForm } from '@/utils/validation'
 
 const store = useStore()
 const router = useRouter()
@@ -93,34 +94,41 @@ const handleLogin = async () => {
     loginErrorMessage.value = '登录成功'
     router.push('/')
   } catch (error) {
-    loginErrorMessage.value = '登录失败'
+    // 提取后端返回的具体错误信息
+    const errorMessage = error.response?.data?.error || error.message || '登录失败'
+    loginErrorMessage.value = errorMessage
+    console.error('Login failed:', error)
   } finally {
     loading.value = false
   }
 }
 
 const handleRegister = async () => {
-  if (registerPassword.value.length < 6) {
-    registerErrorMessage.value = '密码至少六位'
+  registerErrorMessage.value = ''
+
+  // 前端验证（提供即时反馈）
+  const validation = validateRegisterForm(
+    registerUsername.value,
+    registerPassword.value,
+    registerPasswordConfirm.value
+  )
+
+  if (!validation.valid) {
+    registerErrorMessage.value = validation.error
     return
   }
-  if (registerPassword.value !== registerPasswordConfirm.value) {
-    registerErrorMessage.value = '两次密码不一致'
-    return
-  }
+
   try {
     await store.dispatch('register', {
-      username: registerUsername.value,
+      username: registerUsername.value.trim(), // 去除首尾空格
       password: registerPassword.value,
       avatar: registerAvatar.value || ''
     })
     router.push('/')
   } catch (error) {
-    if (error.message === 'Username already exists') {
-      registerErrorMessage.value = '用户名已存在'
-    } else {
-      registerErrorMessage.value = '注册失败'
-    }
+    // 提取后端返回的具体错误信息（作为双重保障）
+    const errorMessage = error.response?.data?.error || error.message || '注册失败'
+    registerErrorMessage.value = errorMessage
     console.error('Registration failed:', error)
   }
 }

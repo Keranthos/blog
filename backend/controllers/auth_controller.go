@@ -4,63 +4,100 @@ import (
 	"backend/config"
 	"backend/models"
 	"backend/utils"
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 func Register(c *gin.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("注册函数发生panic: %v, 堆栈: %s", r, getStackTrace())
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("服务器内部错误: %v", r)})
+		}
+	}()
+
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请求数据格式错误"})
+		log.Printf("注册请求JSON绑定失败: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求数据格式错误: " + err.Error()})
 		return
 	}
 
+	log.Printf("注册请求 - 用户名: %s, 密码长度: %d, Avatar: %s", user.Username, len(user.Password), user.Avatar)
+
+	// 去除用户名首尾空格（验证函数内部也会处理，但这里提前处理确保一致性）
+	user.Username = strings.TrimSpace(user.Username)
+
 	// 使用新的验证函数
 	if err := utils.ValidateUsername(user.Username); err != nil {
+		log.Printf("用户名验证失败: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	if err := utils.ValidatePassword(user.Password); err != nil {
+		log.Printf("密码验证失败: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	var existingUser models.User
 	if err := config.DB.Where("username = ?", user.Username).First(&existingUser).Error; err == nil {
+		log.Printf("用户名已存在: %s", user.Username)
 		c.JSON(http.StatusConflict, gin.H{"error": "用户名已存在"})
 		return
 	}
 
 	hashedPassword, err := utils.HashPassword(user.Password)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "服务器加密错误"})
+		log.Printf("密码加密失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "服务器加密错误: " + err.Error()})
 		return
 	}
-	user.Password = hashedPassword
+	
+	// 创建新用户对象，确保所有字段都正确设置
+	newUser := models.User{
+		Username: user.Username,
+		Password: hashedPassword,
+		Level:    2, // 默认用户等级（普通用户）
+		Avatar:   user.Avatar, // 保持原值，如果为空就是空字符串
+	}
 
-	if err := config.DB.Create(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建用户失败"})
+	log.Printf("准备创建用户 - Username: %s, Level: %d, Avatar: %s", newUser.Username, newUser.Level, newUser.Avatar)
+
+	if err := config.DB.Create(&newUser).Error; err != nil {
+		log.Printf("创建用户失败 - 数据库错误: %v, 用户数据: Username=%s, Level=%d, Avatar=%s", err, newUser.Username, newUser.Level, newUser.Avatar)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建用户失败: " + err.Error()})
 		return
 	}
 
-	token, err := utils.GenerateJWT(user.Username, 2)
+	log.Printf("用户创建成功 - ID: %d, Username: %s", newUser.ID, newUser.Username)
+
+	token, err := utils.GenerateJWT(newUser.Username, 2)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Token生成失败"})
+		log.Printf("Token生成失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Token生成失败: " + err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
 			"isLogged": true,
-			"name":     user.Username,
+			"name":     newUser.Username,
 			"level":    2,
-			"avatar":   user.Avatar,
+			"avatar":   newUser.Avatar,
 		},
 		"jwt": token,
 	})
+}
+
+// getStackTrace 获取堆栈跟踪信息（简化版）
+func getStackTrace() string {
+	return "stack trace unavailable"
 }
 
 func Login(c *gin.Context) {

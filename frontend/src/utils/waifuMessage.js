@@ -113,18 +113,29 @@ export function showErrorMessage (error) {
     // HTTP 状态码
     message = errorMessages[error] || errorMessages.unknown
   } else if (typeof error === 'string') {
-    // 错误类型字符串
-    message = errorMessages[error] || errorMessages.unknown
+    // 错误类型字符串 - 如果不在映射中，可能是后端返回的中文错误信息，直接显示
+    message = errorMessages[error] || error
   } else if (error && error.response) {
-    // Axios 错误对象
+    // Axios 错误对象 - 优先提取后端返回的具体错误信息
+    const backendError = error.response.data?.error || error.response.data?.message
     const status = error.response.status
-    message = errorMessages[status] || errorMessages.unknown
+
+    if (backendError) {
+      // 如果后端返回了具体错误信息，直接显示（可能是中文）
+      message = backendError
+    } else {
+      // 否则使用状态码对应的消息
+      message = errorMessages[status] || errorMessages.unknown
+    }
   } else if (error && error.message) {
     // 标准 Error 对象
     if (error.message.includes('Network')) {
       message = errorMessages.network
     } else if (error.message.includes('timeout')) {
       message = errorMessages.timeout
+    } else {
+      // 其他错误消息直接显示
+      message = error.message
     }
   }
 
