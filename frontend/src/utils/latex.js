@@ -84,10 +84,19 @@ export function restoreAndRenderLatex (html, placeholders) {
         const hasLineBreak = formula.includes('\\')
         const hasAlignedEnv = formula.includes('\\begin{aligned}') || formula.includes('\\begin{align}')
 
-        // 如果包含对齐语法但没有 aligned 环境，自动包裹
-        if ((hasAmpersand || hasLineBreak) && !hasAlignedEnv) {
-          // 移除首尾空白，然后包裹在 aligned 环境中
-          processedFormula = `\\begin{aligned}\n${formula.trim()}\n\\end{aligned}`
+        // 如果使用了 equation 环境（会自动编号），替换为 equation* 环境（不会编号）
+        if (formula.includes('\\begin{equation}')) {
+          processedFormula = formula.replace(/\\begin\{equation\}/g, '\\begin{equation*}')
+          processedFormula = processedFormula.replace(/\\end\{equation\}/g, '\\end{equation*}')
+        }
+        // 如果使用了 align 环境（会自动编号），替换为 aligned 环境（不会编号）
+        if (formula.includes('\\begin{align}')) {
+          processedFormula = processedFormula.replace(/\\begin\{align\}/g, '\\begin{aligned}')
+          processedFormula = processedFormula.replace(/\\end\{align\}/g, '\\end{aligned}')
+        } else if ((hasAmpersand || hasLineBreak) && !hasAlignedEnv) {
+          // 如果包含对齐语法但没有 aligned 环境，自动包裹
+          // 移除首尾空白，然后包裹在 aligned 环境中（不会自动编号）
+          processedFormula = `\\begin{aligned}\n${processedFormula.trim()}\n\\end{aligned}`
         }
       }
 

@@ -152,31 +152,45 @@
                   <div v-else-if="recentComments.length === 0" class="comments-empty">
                     <span>暂无评论</span>
                   </div>
-                  <div v-else class="comments-list">
-                    <div
-                      v-for="comment in recentComments"
-                      :key="comment.ID"
-                      class="comment-item"
-                      @click="goToCommentArticle(comment)"
-                    >
-                      <div class="comment-bubble">
-                        <div class="comment-avatar-col">
-                          <div class="avatar-square">{{ (comment.username || 'U').charAt(0).toUpperCase() }}</div>
-                        </div>
-                        <div class="comment-content-col">
-                          <div class="comment-meta-row">
-                            <span class="comment-author">{{ comment.username || '匿名用户' }}</span>
-                            <span class="comment-time">{{ formatCommentTime(comment.CreatedAt) }}</span>
+                  <div v-else class="comments-list-wrapper" @scroll="handleCommentsScroll">
+                    <div class="comments-list">
+                      <div
+                        v-for="comment in recentComments"
+                        :key="comment.ID"
+                        class="comment-item"
+                        @click="goToCommentArticle(comment)"
+                      >
+                        <div class="comment-bubble">
+                          <div class="comment-avatar-col">
+                            <div class="avatar-square">{{ (comment.username || 'U').charAt(0).toUpperCase() }}</div>
                           </div>
-                          <div class="comment-article-row">
-                            <font-awesome-icon :icon="getArticleTypeIcon(comment.articleType)" class="article-type-icon" />
-                            <span class="article-title-text">
-                              {{ comment.articleTitle || '未知文章' }}
-                            </span>
+                          <div class="comment-content-col">
+                            <div class="comment-meta-row">
+                              <span class="comment-author">{{ comment.username || '匿名用户' }}</span>
+                              <span v-if="comment.parent_id" class="reply-tag">@{{ getParentCommentUsername(comment.parent_id) }}</span>
+                              <span class="comment-time">{{ formatCommentTime(comment.CreatedAt) }}</span>
+                            </div>
+                            <div class="comment-article-row">
+                              <font-awesome-icon :icon="getArticleTypeIcon(comment.articleType)" class="article-type-icon" />
+                              <span class="article-title-text">
+                                {{ comment.articleTitle || '未知文章' }}
+                              </span>
+                            </div>
+                            <div class="comment-text">{{ stripMarkdown(comment.content || '') }}</div>
                           </div>
-                          <div class="comment-text">{{ stripMarkdown(comment.content || '') }}</div>
                         </div>
                       </div>
+                    </div>
+                    <!-- 加载更多提示 -->
+                    <div v-if="commentsLoadingMore" class="comments-loading-more">
+                      <div class="spinner small"></div>
+                      <span>加载中...</span>
+                    </div>
+                    <div v-else-if="commentsHasMore" class="comments-load-more-hint">
+                      <span>滚动加载更多</span>
+                    </div>
+                    <div v-else-if="recentComments.length > 0" class="comments-no-more">
+                      <span>已显示全部评论</span>
                     </div>
                   </div>
                 </div>
@@ -406,6 +420,9 @@ const isTagSearch = ref(false) // 是否为标签搜索
 const searchTag = ref('') // 当前搜索的标签
 const recentComments = ref([])
 const commentsLoading = ref(false)
+const commentsPage = ref(1)
+const commentsHasMore = ref(true)
+const commentsLoadingMore = ref(false)
 let timeout = null
 let otherTimeout = null
 let settingsTimeout = null
@@ -697,24 +714,93 @@ const hideCreateMenu = () => {
   showCreateMenu.value = false
 }
 
-// 加载最近评论
-const loadRecentComments = async () => {
+// 加载最近评论（支持分页）
+const loadRecentComments = async (page = 1, append = false) => {
   // 如果正在加载，不重复加载
-  if (commentsLoading.value) return
+  if (commentsLoading.value || commentsLoadingMore.value) return
+  // 如果没有更多数据，不加载
+  if (!append && !commentsHasMore.value) return
 
   try {
-    commentsLoading.value = true
-    const res = await getAllComments()
-    // 后端返回格式为 {data: [...]}，getAllComments 已经返回了 res.data，所以需要再取 .data
-    const data = res?.data || []
-    // 只取最近的评论，最多显示10条
-    recentComments.value = (Array.isArray(data) ? data : []).slice(0, 10)
+    if (append) {
+      commentsLoadingMore.value = true
+    } else {
+      commentsLoading.value = true
+      commentsPage.value = 1
+      recentComments.value = []
+    }
+
+    // 调用 API，每页10条
+    const response = await getAllComments(page, 10)
+    // 处理返回数据
+    const data = response?.data || response || []
+    const pagination = response?.pagination || {}
+
+    // 确保是数组格式
+    const comments = Array.isArray(data) ? data : []
+    // 处理评论数据，确保每个评论都有必要的字段
+    const processedComments = comments
+      .filter(comment => comment && (comment.ID || comment.id)) // 过滤掉无效的评论
+      .map(comment => ({
+        ...comment,
+        // 统一字段名（处理可能的字段名不一致）
+        ID: comment.ID || comment.id,
+        articleType: comment.articleType || comment.type || '',
+        articleTitle: comment.articleTitle || '未知文章',
+        blogID: comment.blogID || comment.BlogID || null,
+        username: comment.username || '匿名用户',
+        content: comment.content || '',
+        CreatedAt: comment.CreatedAt || comment.created_at || comment.createdAt || '',
+        parent_id: comment.parent_id || comment.parentId || null
+      }))
+
+    if (append) {
+      // 追加模式：将新评论添加到现有列表
+      recentComments.value = [...recentComments.value, ...processedComments]
+    } else {
+      // 初始加载：替换现有列表
+      recentComments.value = processedComments
+    }
+
+    // 更新分页信息
+    commentsHasMore.value = pagination.hasMore !== false
+    if (pagination.hasMore !== undefined) {
+      commentsHasMore.value = pagination.hasMore
+    } else {
+      // 如果没有分页信息，根据返回的数据量判断
+      commentsHasMore.value = comments.length >= 10
+    }
   } catch (error) {
     console.error('加载评论失败:', error)
-    recentComments.value = []
+    if (!append) {
+      recentComments.value = []
+    }
   } finally {
     // 确保加载状态被重置
     commentsLoading.value = false
+    commentsLoadingMore.value = false
+  }
+}
+
+// 加载更多评论
+const loadMoreComments = () => {
+  if (!commentsHasMore.value || commentsLoadingMore.value) return
+  commentsPage.value++
+  loadRecentComments(commentsPage.value, true)
+}
+
+// 处理评论列表滚动
+const handleCommentsScroll = (event) => {
+  const target = event.target
+  const scrollTop = target.scrollTop
+  const scrollHeight = target.scrollHeight
+  const clientHeight = target.clientHeight
+
+  // 当滚动到距离底部50px时，加载更多
+  if (scrollHeight - scrollTop - clientHeight < 50) {
+    if (commentsHasMore.value && !commentsLoadingMore.value && !commentsLoading.value) {
+      loadMoreComments()
+    }
   }
 }
 
@@ -732,7 +818,9 @@ const showCommentsMenu = () => {
 
   // 只有在没有评论数据且不在加载中时才加载
   if (recentComments.value.length === 0 && !commentsLoading.value) {
-    loadRecentComments()
+    commentsPage.value = 1
+    commentsHasMore.value = true
+    loadRecentComments(1, false)
   }
 }
 
@@ -755,6 +843,18 @@ const formatCommentTime = (timestamp) => {
   const hours = date.getHours().toString().padStart(2, '0')
   const minutes = date.getMinutes().toString().padStart(2, '0')
   return `${year}-${month}-${day} ${hours}:${minutes}`
+}
+
+// 获取父评论的用户名
+const getParentCommentUsername = (parentId) => {
+  if (!parentId) return '未知用户'
+  // 在已加载的评论中查找父评论
+  for (const comment of recentComments.value) {
+    if (comment.ID === parentId) {
+      return comment.username || '未知用户'
+    }
+  }
+  return '未知用户'
 }
 
 // 去除Markdown语法
@@ -789,17 +889,27 @@ const getArticleTypeIcon = (type) => {
 
 // 跳转到评论所属的文章
 const goToCommentArticle = (comment) => {
-  if (!comment.articleType || !comment.blogID) return
+  // 尝试多种可能的字段名
+  const articleType = comment.articleType || comment.type || ''
+  const blogID = comment.blogID || comment.BlogID
+
+  if (!articleType || !blogID) {
+    console.warn('评论缺少必要字段，无法跳转:', { articleType, blogID, comment })
+    return
+  }
 
   let path = '/'
-  if (comment.articleType === 'moment') {
-    path = `/moments/${comment.blogID}`
-  } else if (comment.articleType === 'blog') {
-    path = `/blog/${comment.blogID}`
-  } else if (comment.articleType === 'research') {
-    path = `/blog/${comment.blogID}`
-  } else if (comment.articleType === 'project') {
-    path = `/blog/${comment.blogID}`
+  if (articleType === 'moment') {
+    path = `/moments/${blogID}`
+  } else if (articleType === 'blog') {
+    path = `/blog/${blogID}`
+  } else if (articleType === 'research') {
+    path = `/blog/${blogID}`
+  } else if (articleType === 'project') {
+    path = `/blog/${blogID}`
+  } else {
+    console.warn('未知的文章类型:', articleType)
+    return
   }
 
   router.push(path)
@@ -1626,14 +1736,14 @@ onBeforeUnmount(() => {
 
 .comments-menu {
   width: 500px;
-  max-height: 500px;
   background: rgba(255, 255, 255, 1);
   border-radius: 8px;
   padding: 16px;
+  display: flex;
+  flex-direction: column;
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-top: none;
-  overflow-y: auto !important; /* 强制启用滚动 */
-  scrollbar-width: thin !important; /* Firefox */
+  overflow: hidden; /* 让内部容器处理滚动 */
 }
 
 .comments-loading,
@@ -1661,10 +1771,65 @@ onBeforeUnmount(() => {
   }
 }
 
+.comments-list-wrapper {
+  max-height: 450px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+  scrollbar-width: thin; /* Firefox */
+}
+
+.comments-list-wrapper::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+  display: block;
+}
+
+.comments-list-wrapper::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+  display: block;
+}
+
+.comments-list-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.3);
+  border-radius: 3px;
+  display: block;
+}
+
+.comments-list-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.5);
+}
+
 .comments-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.comments-loading-more,
+.comments-load-more-hint,
+.comments-no-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  color: #666;
+  font-size: 12px;
+  gap: 8px;
+}
+
+.comments-loading-more .spinner.small {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+.comments-no-more {
+  color: #999;
+  font-size: 11px;
 }
 
 .comment-item {
@@ -1727,6 +1892,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  flex-wrap: wrap;
 }
 
 .comment-author {
@@ -1738,6 +1904,17 @@ onBeforeUnmount(() => {
 .comment-time {
   font-size: 0.85rem; /* 增大字体 */
   color: #999;
+}
+
+.reply-tag {
+  background: #8b5cf6;
+  color: white;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin: 0 0.3rem;
+  display: inline-block;
 }
 
 .comment-article-row {
