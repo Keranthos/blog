@@ -12,6 +12,10 @@
     <!-- 如果使用外部字体或 API，添加预连接 -->
     <!-- <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin> -->
     
+    <!-- 关键图片预加载（首屏关键资源） -->
+    <link rel="preload" href="/img/my_headportrait.053e4654.jpg" as="image" type="image/jpeg">
+    <link rel="preload" href="/images/sunset-mountains.jpg" as="image" type="image/jpeg">
+    
     <!-- 关键 CSS 预加载（Vue CLI 会自动处理） -->
     <!-- 关键字体预加载（如果有自定义字体） -->
     <!-- <link rel="preload" href="/fonts/custom-font.woff2" as="font" type="font/woff2" crossorigin> -->
@@ -38,10 +42,44 @@
     <!-- Canonical URL -->
     <link rel="canonical" href="https://yourdomain.com">
     
-    
-    
-    <script src="/live2d-widget-master/autoload.js"></script>
     <title>山角函兽的个人博客 - 记录生活、分享技术、探索未知</title>
+    
+    <!-- Live2D 看板娘延迟加载脚本（仅桌面端） -->
+    <script>
+      // 延迟加载 Live2D，移动端完全禁用
+      (function() {
+        // 检测是否为移动端（宽度 <= 768px）
+        function isMobile() {
+          return window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+        
+        // 只在桌面端且页面加载完成后加载 Live2D
+        if (!isMobile()) {
+          // 等待页面加载完成后再加载 Live2D
+          if (document.readyState === 'complete') {
+            loadLive2D();
+          } else {
+            window.addEventListener('load', loadLive2D);
+          }
+        }
+        
+        function loadLive2D() {
+          // 再次检查是否为移动端（防止窗口大小变化）
+          if (window.innerWidth <= 768) {
+            return;
+          }
+          
+          const script = document.createElement('script');
+          script.src = '/live2d-widget-master/autoload.js';
+          script.async = true;
+          script.defer = true;
+          script.onerror = function() {
+            console.warn('Live2D 加载失败，已忽略');
+          };
+          document.body.appendChild(script);
+        }
+      })();
+    </script>
   </head>
   <body>
     <noscript>

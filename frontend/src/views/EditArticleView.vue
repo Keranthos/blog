@@ -533,10 +533,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 import axios from 'axios'
 import DOMPurify from 'dompurify' // 防止XSS攻击
-import { marked } from 'marked'
-import hljs from 'highlight.js'
-import '@/assets/styles/github-highlight.css'
 import '@/assets/styles/github-markdown.css'
+import '@/assets/styles/github-highlight.css'
 import NavBar from '@/components/NavBar.vue'
 import { createArticle, updateArticle } from '@/api/Articles/edit'
 import { getJWT, requestFunc } from '@/api/req'
@@ -545,7 +543,32 @@ import { getMediaByID } from '@/api/media/browse'
 // import { imageConfig } from '@/config/images'
 import apiConfig from '@/config/api'
 import { showErrorMessage, showSuccessMessage, showWarningMessage, showCustomMessage } from '@/utils/waifuMessage'
-import { protectLatex, restoreAndRenderLatex } from '@/utils/latex'
+
+// 大型库按需加载，减少首屏 JS 体积
+let marked = null
+let hljs = null
+
+// 动态加载大型库
+async function loadMarkdownLibs () {
+  if (marked && hljs) {
+    return // 已加载
+  }
+
+  try {
+    const [
+      markedModule,
+      hljsModule
+    ] = await Promise.all([
+      import('marked'),
+      import('highlight.js')
+    ])
+
+    marked = markedModule.marked
+    hljs = hljsModule.default
+  } catch (error) {
+    console.error('加载 Markdown 库失败:', error)
+  }
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -667,14 +690,17 @@ const mediaLineCount = computed(() => {
 })
 
 // 媒体内容预览（Markdown 渲染）- 与文章编辑器保持一致的功能
+// 注意：computed 不能是 async，所以这里使用同步方式，但库会在首次使用时加载
 const sanitizedMediaContent = computed(() => {
   if (!mediaData.value.description) return ''
 
-  // 预处理：保护 LaTeX 公式（在 marked 渲染前处理）
-  const { protected: protectedContent, placeholders: latexPlaceholders } = protectLatex(mediaData.value.description)
+  // 如果库未加载，返回原始内容（库会在 onMounted 时加载）
+  if (!marked) {
+    return mediaData.value.description
+  }
 
-  // 使用 marked 渲染 Markdown，确保代码块结构正确
-  const rendered = marked(protectedContent, {
+  // 使用 marked 渲染 Markdown（LaTeX 会在 updatePreview 中处理）
+  const rendered = marked(mediaData.value.description, {
     breaks: true, // 将换行符转换为 <br>
     gfm: true, // 启用 GitHub Flavored Markdown
     headerIds: false,
@@ -699,27 +725,12 @@ const sanitizedMediaContent = computed(() => {
     </div>`
   })
 
-  // 恢复并渲染 LaTeX 公式
-  processedContent = restoreAndRenderLatex(processedContent, latexPlaceholders)
-
   // 使用与文章编辑器相同的 DOMPurify 配置，支持 LaTeX 公式
   const sanitized = DOMPurify.sanitize(processedContent, {
     ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'math', 'annotation', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'mfrac', 'msup', 'msub', 'munderover', 'munder', 'mover', 'mtable', 'mtr', 'mtd', 'mtext'],
     ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'title', 'width', 'height', 'data-*', 'aria-*', 'role', 'dir', 'colspan', 'rowspan'],
     ALLOW_DATA_ATTR: true,
     ALLOW_UNKNOWN_PROTOCOLS: true
-  })
-
-  // 确保DOM更新后高亮代码块
-  nextTick(() => {
-    setTimeout(() => {
-      const finalCodeBlocks = document.querySelectorAll('.preview-content.markdown-body pre code')
-      finalCodeBlocks.forEach((block) => {
-        if (block.textContent && block.textContent.trim()) {
-          hljs.highlightElement(block)
-        }
-      })
-    }, 100)
   })
 
   return sanitized
@@ -749,7 +760,17 @@ const currentImageError = computed(() => {
 })
 
 // 更新预览并进行高亮代码块
-const updatePreview = () => {
+const updatePreview = async () => {
+  // 确保库已加载
+  await loadMarkdownLibs()
+  if (!marked) {
+    console.error('Markdown 库加载失败')
+    return
+  }
+
+  // 动态加载 LaTeX 工具
+  const { protectLatex, restoreAndRenderLatex } = await import('@/utils/latex')
+
   // 预处理：保护 LaTeX 公式（在 marked 渲染前处理）
   const { protected: protectedContent, placeholders: latexPlaceholders } = protectLatex(markdownContent.value)
 
@@ -852,8 +873,8 @@ const updatePreview = () => {
     </div>`
   })
 
-  // 恢复并渲染 LaTeX 公式
-  processedContent = restoreAndRenderLatex(processedContent, latexPlaceholders)
+  // 恢复并渲染 LaTeX 公式（异步）
+  processedContent = await restoreAndRenderLatex(processedContent, latexPlaceholders)
 
   // 在恢复 LaTeX 公式后，再次确保 katex-block 居中（使用 setProperty 确保 !important 优先级）
   const finalDiv = document.createElement('div')
@@ -937,6 +958,65 @@ const updatePreview = () => {
           child.style.setProperty('text-align', 'center', 'important')
         })
       })
+
+      // 为预览中的标题添加标识标签
+      const previewMarkdownBody = document.querySelector('.preview-content.markdown-body')
+      if (previewMarkdownBody) {
+        const headings = previewMarkdownBody.querySelectorAll('h1, h2, h3, h4, h5, h6')
+        headings.forEach((heading) => {
+          // 如果已经添加过标识，跳过
+          if (heading.querySelector('.heading-label')) return
+
+          const level = parseInt(heading.tagName.charAt(1))
+          const label = document.createElement('span')
+          label.className = 'heading-label'
+          label.setAttribute('data-level', level.toString())
+          label.textContent = `H${level}`
+
+          // 直接设置内联样式确保样式生效
+          label.style.display = 'inline-block'
+          label.style.padding = level === 1 ? '3px 10px' : level === 2 ? '2px 9px' : level === 3 ? '2px 8px' : level === 4 ? '2px 7px' : '1px 6px'
+          label.style.borderRadius = '4px'
+          label.style.marginRight = '10px'
+          label.style.fontWeight = '700'
+          label.style.fontSize = level === 1 ? '0.65em' : level === 2 || level === 3 ? '0.7em' : level === 4 ? '0.65em' : '0.6em'
+          label.style.fontFamily = "'Inter', 'Noto Sans SC', sans-serif"
+          label.style.letterSpacing = '0.5px'
+          label.style.lineHeight = '1.4'
+          label.style.boxShadow = '0 2px 4px rgba(139, 92, 246, 0.3)'
+          label.style.flexShrink = '0'
+          label.style.border = 'none'
+          label.style.textDecoration = 'none'
+
+          // 根据级别设置不同的背景色和文字颜色
+          if (level === 1) {
+            label.style.background = 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)'
+            label.style.color = 'white'
+          } else if (level === 2) {
+            label.style.background = 'linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%)'
+            label.style.color = 'white'
+          } else if (level === 3) {
+            label.style.background = 'linear-gradient(135deg, #a855f7 0%, #c084fc 100%)'
+            label.style.color = 'white'
+          } else if (level === 4) {
+            label.style.background = 'linear-gradient(135deg, #c084fc 0%, #d8b4fe 100%)'
+            label.style.color = 'white'
+          } else if (level === 5) {
+            label.style.background = 'linear-gradient(135deg, #d8b4fe 0%, #e9d5ff 100%)'
+            label.style.color = '#7c3aed'
+          } else if (level === 6) {
+            label.style.background = 'linear-gradient(135deg, #e9d5ff 0%, #f3e8ff 100%)'
+            label.style.color = '#8b5cf6'
+          }
+
+          // 将标识插入到标题的最前面
+          if (heading.firstChild) {
+            heading.insertBefore(label, heading.firstChild)
+          } else {
+            heading.appendChild(label)
+          }
+        })
+      }
     }, 100) // 延迟100ms确保渲染完成
   })
 }
@@ -971,15 +1051,15 @@ const handleMediaTab = (event) => {
   const start = textarea.selectionStart
   const end = textarea.selectionEnd
 
-  // 插入两个空格
+  // 插入四个空格（Tab 等于 4 个空格）
   mediaData.value.description =
     mediaData.value.description.substring(0, start) +
-    '  ' +
+    '    ' +
     mediaData.value.description.substring(end)
 
   // 移动光标
   nextTick(() => {
-    textarea.selectionStart = textarea.selectionEnd = start + 2
+    textarea.selectionStart = textarea.selectionEnd = start + 4
     updateMediaCursorPosition()
   })
 }
@@ -991,11 +1071,14 @@ const updateMediaPreview = () => {
   nextTick(() => {
     setTimeout(() => {
       const finalCodeBlocks = document.querySelectorAll('.preview-content.markdown-body pre code')
-      finalCodeBlocks.forEach((block) => {
-        if (block.textContent && block.textContent.trim()) {
-          hljs.highlightElement(block)
-        }
-      })
+      // 确保 highlight.js 已加载
+      if (hljs) {
+        finalCodeBlocks.forEach((block) => {
+          if (block.textContent && block.textContent.trim()) {
+            hljs.highlightElement(block)
+          }
+        })
+      }
     }, 100)
   })
 }
@@ -1546,12 +1629,12 @@ const handleTab = (event) => {
   const start = textarea.selectionStart
   const end = textarea.selectionEnd
 
-  // 插入两个空格
-  markdownContent.value = markdownContent.value.substring(0, start) + '  ' + markdownContent.value.substring(end)
+  // 插入四个空格（Tab 等于 4 个空格）
+  markdownContent.value = markdownContent.value.substring(0, start) + '    ' + markdownContent.value.substring(end)
 
   // 更新光标位置
   nextTick(() => {
-    textarea.selectionStart = textarea.selectionEnd = start + 2
+    textarea.selectionStart = textarea.selectionEnd = start + 4
   })
 }
 
@@ -2125,6 +2208,8 @@ const initializeComponent = async () => {
 
 // 组件挂载时初始化
 onMounted(async () => {
+  // 预加载 Markdown 库（编辑页需要这些库）
+  await loadMarkdownLibs()
   await initializeComponent()
 })
 
@@ -3073,6 +3158,92 @@ defineExpose({
   }
 
   /* 强制标题样式 - 使用更高优先级 */
+  /* 标题标识标签样式 */
+  .right-panel .preview-content.markdown-body h1 .heading-label,
+  .right-panel .preview-content.markdown-body h2 .heading-label,
+  .right-panel .preview-content.markdown-body h3 .heading-label,
+  .right-panel .preview-content.markdown-body h4 .heading-label,
+  .right-panel .preview-content.markdown-body h5 .heading-label,
+  .right-panel .preview-content.markdown-body h6 .heading-label {
+    display: inline-block;
+    background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+    color: white;
+    font-size: 0.7em;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-right: 10px;
+    vertical-align: middle;
+    line-height: 1.4;
+    font-family: 'Inter', 'Noto Sans SC', sans-serif;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+    flex-shrink: 0;
+  }
+
+  /* 不同级别标题的标识样式 */
+  .right-panel .preview-content.markdown-body h1 .heading-label {
+    font-size: 0.65em;
+    padding: 3px 10px;
+    background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+  }
+
+  .right-panel .preview-content.markdown-body h2 .heading-label {
+    font-size: 0.7em;
+    padding: 2px 9px;
+    background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+  }
+
+  .right-panel .preview-content.markdown-body h3 .heading-label {
+    font-size: 0.7em;
+    padding: 2px 8px;
+    background: linear-gradient(135deg, #a855f7 0%, #c084fc 100%);
+  }
+
+  .right-panel .preview-content.markdown-body h4 .heading-label {
+    font-size: 0.65em;
+    padding: 2px 7px;
+    background: linear-gradient(135deg, #c084fc 0%, #d8b4fe 100%);
+  }
+
+  .right-panel .preview-content.markdown-body h5 .heading-label {
+    font-size: 0.6em;
+    padding: 1px 6px;
+    background: linear-gradient(135deg, #d8b4fe 0%, #e9d5ff 100%);
+    color: #7c3aed;
+  }
+
+  .right-panel .preview-content.markdown-body h6 .heading-label {
+    font-size: 0.6em;
+    padding: 1px 6px;
+    background: linear-gradient(135deg, #e9d5ff 0%, #f3e8ff 100%);
+    color: #8b5cf6;
+  }
+
+  /* 确保标题和标识在同一行显示 */
+  .right-panel .preview-content.markdown-body h1,
+  .right-panel .preview-content.markdown-body h2,
+  .right-panel .preview-content.markdown-body h3,
+  .right-panel .preview-content.markdown-body h4,
+  .right-panel .preview-content.markdown-body h5,
+  .right-panel .preview-content.markdown-body h6 {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0;
+  }
+
+  /* 标题内容部分（排除标识） */
+  .right-panel .preview-content.markdown-body h1 > *:not(.heading-label),
+  .right-panel .preview-content.markdown-body h2 > *:not(.heading-label),
+  .right-panel .preview-content.markdown-body h3 > *:not(.heading-label),
+  .right-panel .preview-content.markdown-body h4 > *:not(.heading-label),
+  .right-panel .preview-content.markdown-body h5 > *:not(.heading-label),
+  .right-panel .preview-content.markdown-body h6 > *:not(.heading-label) {
+    flex: 1;
+    min-width: 0;
+  }
+
   .right-panel .preview-content.markdown-body h1 {
     font-size: 2em !important;
     font-weight: 600 !important;

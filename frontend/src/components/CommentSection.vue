@@ -13,13 +13,19 @@
     <!-- 发表评论 -->
     <div class="comment-form">
       <div class="form-content">
-        <textarea
-          v-model="newComment"
-          placeholder="支持 Markdown 语法"
-          rows="4"
-          :maxlength="300"
-          @focus="handleInputFocus"
-        ></textarea>
+        <div class="comment-input-wrapper">
+          <textarea
+            ref="commentTextarea"
+            v-model="newComment"
+            placeholder="支持 Markdown 语法"
+            rows="4"
+            :maxlength="300"
+            @focus="handleInputFocus"
+          ></textarea>
+          <button class="emoji-btn" @click="toggleEmojiPicker" type="button" title="插入表情">
+            😊
+          </button>
+        </div>
         <div class="form-actions">
           <div v-if="replyingTo" class="reply-indicator">
             <span class="reply-label">回复 @{{ getReplyTargetName() }}</span>
@@ -60,6 +66,13 @@
         </div>
       </div>
     </div>
+
+    <!-- Emoji 选择器 -->
+    <EmojiPicker
+      :visible="emojiPickerVisible"
+      @select="insertEmoji"
+      @close="emojiPickerVisible = false"
+    />
 
     <!-- 评论列表 -->
     <div v-if="Array.isArray(comments) && comments.length > 0" class="comments-list">
@@ -104,6 +117,7 @@ import { getCommentsByID } from '@/api/Comments/browse'
 import { createComment, deleteComment as deleteCommentAPI } from '@/api/Comments/edit'
 import { showErrorMessage, showSuccessMessage } from '@/utils/waifuMessage'
 import { protectLatex, restoreAndRenderLatex } from '@/utils/latex'
+import EmojiPicker from '@/components/EmojiPicker.vue'
 
 const props = defineProps({
   type: String, // 'blog', 'project', 'research', 'moment'
@@ -121,6 +135,8 @@ const previewVisible = ref(false)
 // 内嵌回复表单已移除，不再单独维护replyContent
 const replyingTo = ref(null)
 const replyTargetName = ref('')
+const emojiPickerVisible = ref(false)
+const commentTextarea = ref(null)
 
 // 加载评论
 const loadComments = async () => {
@@ -188,6 +204,38 @@ const handleInputFocus = () => {
   if (!replyingTo.value) {
     cancelReply()
   }
+}
+
+// 切换 Emoji 选择器
+const toggleEmojiPicker = () => {
+  emojiPickerVisible.value = !emojiPickerVisible.value
+}
+
+// 插入 Emoji
+const insertEmoji = (emoji) => {
+  const textarea = commentTextarea.value
+  if (!textarea) {
+    // 如果没有 textarea ref，直接追加到末尾
+    newComment.value += emoji
+    return
+  }
+
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  const text = newComment.value
+
+  // 在光标位置插入 Emoji
+  newComment.value = text.substring(0, start) + emoji + text.substring(end)
+
+  // 移动光标到插入位置之后
+  nextTick(() => {
+    textarea.focus()
+    const newPosition = start + emoji.length
+    textarea.setSelectionRange(newPosition, newPosition)
+  })
+
+  // 关闭选择器
+  emojiPickerVisible.value = false
 }
 
 // 预览切换
@@ -677,18 +725,47 @@ defineExpose({
   margin: 0 0 1.5rem 0;
 }
 
+.comment-input-wrapper {
+  position: relative;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
 .form-content textarea {
   width: 100%;
-  padding: 1rem;
+  padding: 1rem 50px 1rem 1rem;
   border: 2px solid #e5e7eb;
   border-radius: 12px;
   resize: vertical;
   font-family: inherit;
-  margin-bottom: 1rem;
   background: white;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
   font-size: 0.95rem;
   line-height: 1.5;
+}
+
+.emoji-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  line-height: 1;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Android Emoji", "EmojiSymbols", "EmojiOne Mozilla", "Twemoji Mozilla", "Segoe UI", sans-serif;
+}
+
+.emoji-btn:hover {
+  background: #f3f4f6;
+  transform: scale(1.1);
+}
+
+.emoji-btn:active {
+  transform: scale(0.95);
 }
 
 .form-content textarea:focus {

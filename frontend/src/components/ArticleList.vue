@@ -109,7 +109,13 @@ const props = defineProps({
 
 const currentPage = ref(1)
 const totalPage = ref(1)
-const limit = 9
+// 移动端减少每页数量（桌面端9条，移动端6条）
+const limit = computed(() => {
+  if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+    return 6 // 移动端
+  }
+  return 9 // 桌面端
+})
 const articles = ref([])
 const articleCache = ref({})// 用于缓存数据
 const displayedText = ref('')
@@ -310,9 +316,13 @@ const loadPage = async (page, append = false) => {
   // 判断是否为换页（不是无限滚动追加）
   const isChangingPage = !append && page !== currentPage.value
 
-  // 如果是换页，设置换页状态，但不显示加载界面
+  // 如果是换页，立即清空旧内容，避免显示旧数据
   if (isChangingPage) {
     isPageChanging.value = true
+    // 立即清空旧内容，显示加载状态
+    articles.value = []
+    loading.value = true
+    loadingProgress.value = 0
     // 换页时立即滚动到顶部
     scrollToTop()
   }
@@ -322,20 +332,17 @@ const loadPage = async (page, append = false) => {
   // 检查缓存中是否已有该页的数据
   const cacheKey = `${props.type}-${page}`
   if (articleCache.value[cacheKey]) {
+    // 立即更新内容，不等待
     if (append) {
       articles.value = [...articles.value, ...articleCache.value[cacheKey]]
     } else {
       articles.value = articleCache.value[cacheKey]
     }
     loading.value = false
-    // 如果是换页，等待过渡动画完成
-    if (isPageChanging.value) {
-      await new Promise(resolve => setTimeout(resolve, 300))
-    }
     isPageChanging.value = false
     return Promise.resolve() // 从缓存读取成功，返回 resolved Promise
   } else {
-    // 只有在初始加载时才显示加载界面
+    // 换页时已经设置了加载状态，初始加载时也需要设置
     if (!isPageChanging.value) {
       loading.value = true
       loadingProgress.value = 0
@@ -351,7 +358,7 @@ const loadPage = async (page, append = false) => {
     try {
       if (props.type === 'moment') {
         const { getMomentsList } = await import('@/api/Moments/browse')
-        const response = await getMomentsList(page, limit)
+        const response = await getMomentsList(page, limit.value)
 
         // 调试：检查返回的数据结构
         console.log('🔍 [ArticleList] getMomentsList 返回:', response)
@@ -388,11 +395,11 @@ const loadPage = async (page, append = false) => {
         // 获取所有类型的文章（博客、项目、科研）
         // 策略：根据当前页计算需要获取的数据范围
         // 为了确保有足够的数据排序后取当前页的数据，需要获取到当前页结束位置的数据
-        const offset = (page - 1) * limit
-        const endIndex = offset + limit
+        const offset = (page - 1) * limit.value
+        const endIndex = offset + limit.value
         // 获取足够多的数据以确保能覆盖到当前页的结束位置
         // 多获取一些缓冲数据，避免边界情况
-        const fetchLimit = Math.max(endIndex + limit, limit * 2)
+        const fetchLimit = Math.max(endIndex + limit.value, limit.value * 2)
 
         // 获取所有类型的文章
         const blogResponse = await getArticlesList('blog', 1, fetchLimit)
@@ -421,7 +428,7 @@ const loadPage = async (page, append = false) => {
         }
         articleCache.value[cacheKey] = computedList
       } else {
-        const response = await getArticlesList(props.type, page, limit)
+        const response = await getArticlesList(props.type, page, limit.value)
 
         // 批量计算阅读时间
         const computedList = batchEstimateReadingTime(response.data)
@@ -446,8 +453,8 @@ const loadPage = async (page, append = false) => {
           loading.value = false
         }, 300)
       } else {
-        // 换页时，等待一小段时间让过渡动画完成
-        await new Promise(resolve => setTimeout(resolve, 300))
+        // 换页时，立即更新内容，不等待动画
+        loading.value = false
         isPageChanging.value = false
       }
     } catch (error) {
@@ -563,7 +570,7 @@ onMounted(async () => {
 
     await loadThoughtsContent() // 加载所思所想内容
     const articleNum = await fetchArticlesNum()
-    totalPage.value = Math.ceil(articleNum / limit) || 1 // 确保至少为1
+    totalPage.value = Math.ceil(articleNum / limit.value) || 1 // 确保至少为1
     if (totalPage.value > 0) {
       await loadPage(1)
     } else {
@@ -596,7 +603,7 @@ onMounted(async () => {
 
 watch(() => props.type, async () => {
   const articleNum = await fetchArticlesNum()
-  totalPage.value = Math.ceil(articleNum / limit)
+  totalPage.value = Math.ceil(articleNum / limit.value)
   // 切换类型时重置数据与缓存定位
   articles.value = []
   currentPage.value = 1

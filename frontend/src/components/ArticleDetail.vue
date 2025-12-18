@@ -148,14 +148,20 @@
         <!-- 发表评论 -->
         <div class="comment-editor">
           <div class="editor-wrapper">
-            <textarea
-              v-model="newComment"
-              placeholder="支持 Markdown 语法"
-              class="comment-input"
-              :maxlength="300"
-              @keydown.ctrl.enter="submitComment"
-              @focus="handleInputFocus"
-            ></textarea>
+            <div class="comment-input-wrapper">
+              <textarea
+                ref="commentTextarea"
+                v-model="newComment"
+                placeholder="支持 Markdown 语法"
+                class="comment-input"
+                :maxlength="300"
+                @keydown.ctrl.enter="submitComment"
+                @focus="handleInputFocus"
+              ></textarea>
+              <button class="emoji-btn" @click="toggleEmojiPicker" type="button" title="插入表情">
+                😊
+              </button>
+            </div>
             <div class="editor-actions">
               <div v-if="replyingTo" class="reply-indicator">
                 <span class="reply-label">回复 @{{ getReplyTargetName() }}</span>
@@ -197,6 +203,13 @@
             </div>
           </div>
         </div>
+
+        <!-- Emoji 选择器 -->
+        <EmojiPicker
+          :visible="emojiPickerVisible"
+          @select="insertEmoji"
+          @close="emojiPickerVisible = false"
+        />
 
         <!-- 评论列表 -->
         <div v-if="Array.isArray(comments) && comments.length > 0" class="comments-list">
@@ -242,15 +255,46 @@ import { getArticleByID } from '@/api/Articles/browse'
 import { getCommentsByID } from '@/api/Comments/browse'
 import { createComment, deleteComment as deleteCommentAPI } from '@/api/Comments/edit'
 import { showErrorMessage, showSuccessMessage, showWarningMessage, showCustomMessage } from '@/utils/waifuMessage'
-import { marked } from 'marked'
-import hljs from 'highlight.js'
-import '@/assets/styles/github-highlight.css'
-import { generateArticleSEO } from '@/utils/seo'
+import { generateArticleSEO, updateSEO } from '@/utils/seo'
 import RelatedArticles from '@/components/RelatedArticles.vue'
 import { estimateReadingTime } from '@/utils/readingTime'
 import TextSelectionMenu from '@/components/TextSelectionMenu.vue'
+import EmojiPicker from '@/components/EmojiPicker.vue'
 import ShareCard from '@/components/ShareCard.vue'
-import { protectLatex, restoreAndRenderLatex } from '@/utils/latex'
+
+// 大型库按需加载，减少首屏 JS 体积
+let marked = null
+let hljs = null
+let protectLatex = null
+let restoreAndRenderLatex = null
+
+// 动态加载大型库
+async function loadMarkdownLibs () {
+  if (marked && hljs && protectLatex && restoreAndRenderLatex) {
+    return // 已加载
+  }
+
+  try {
+    // 并行加载所有库
+    const [
+      markedModule,
+      hljsModule,
+      latexModule
+    ] = await Promise.all([
+      import('marked'),
+      import('highlight.js'),
+      import('@/utils/latex'),
+      import('@/assets/styles/github-highlight.css') // CSS 也需要加载
+    ])
+
+    marked = markedModule.marked
+    hljs = hljsModule.default
+    protectLatex = latexModule.protectLatex
+    restoreAndRenderLatex = latexModule.restoreAndRenderLatex
+  } catch (error) {
+    console.error('加载 Markdown 库失败:', error)
+  }
+}
 
 // 防抖函数
 let scrollTimeout = null
@@ -372,7 +416,14 @@ const generateTOC = () => {
   const treeNodes = []
   headings.forEach((heading, index) => {
     const level = parseInt(heading.tagName.charAt(1))
-    const text = heading.textContent.trim()
+    // 排除标识标签，只获取标题的实际文本内容
+    // 克隆标题元素，移除标识标签，然后获取文本
+    const clonedHeading = heading.cloneNode(true)
+    const labelElement = clonedHeading.querySelector('.heading-label')
+    if (labelElement) {
+      labelElement.remove()
+    }
+    const text = clonedHeading.textContent.trim()
     const id = `heading-${index}`
 
     // 为标题添加 ID
@@ -762,6 +813,8 @@ const newComment = ref('')
 const previewVisible = ref(false)
 const replyingTo = ref(null)
 const replyTargetName = ref('')
+const emojiPickerVisible = ref(false)
+const commentTextarea = ref(null)
 const viewCount = ref(0)
 const toc = ref([]) // 文章目录
 const isLiked = ref(false) // 点赞状态
@@ -867,7 +920,7 @@ const loadDetail = async () => {
 
     // 处理404错误
     if (error.response && error.response.status === 404) {
-      // 设置404页面内容
+      // 设置404页面内容（页面内提示“文章不存在”即可，不再让看板娘重复提示）
       image.value = 'https://picsum.photos/id/180/1920/1080'
       title.value = '文章未找到'
       tags.value = []
@@ -876,13 +929,20 @@ const loadDetail = async () => {
       viewCount.value = 0
       readingTime.value = null
 
-      // 显示错误消息
-      showErrorMessage('文章不存在')
+      // 不调用 showErrorMessage，避免看板娘弹出“文章不存在”的提示语
       return
     }
 
     // 处理其他错误
     showErrorMessage('加载文章失败，请稍后重试')
+    return
+  }
+
+  // 确保库已加载
+  await loadMarkdownLibs()
+  if (!marked || !protectLatex || !restoreAndRenderLatex) {
+    console.error('Markdown 库加载失败')
+    showErrorMessage('内容渲染失败，请刷新页面重试')
     return
   }
 
@@ -952,8 +1012,8 @@ const loadDetail = async () => {
     }
   )
 
-  // 恢复并渲染 LaTeX 公式
-  renderedContent.value = restoreAndRenderLatex(renderedContent.value, latexPlaceholders)
+  // 恢复并渲染 LaTeX 公式（异步）
+  renderedContent.value = await restoreAndRenderLatex(renderedContent.value, latexPlaceholders)
 
   // 在渲染后通过 nextTick 为正文中的图片添加错误处理，并确保 LaTeX 公式居中
   // 这样即使封面图片和正文图片URL相同，也不会互相影响
@@ -1026,9 +1086,8 @@ const loadDetail = async () => {
     UpdatedAt: time.value
   }
   const seoData = generateArticleSEO(articleData, props.type || route.params.type)
-  import('@/utils/seo').then(({ updateSEO }) => {
-    updateSEO(seoData)
-  })
+  // 直接更新SEO，确保标题及时更新
+  updateSEO(seoData)
 
   // 等待 DOM 更新后手动触发代码高亮和添加复制按钮
   nextTick(() => {
@@ -1036,11 +1095,20 @@ const loadDetail = async () => {
     fixResidualBoldInDOM()
 
     // 延迟执行，确保代码块完全渲染
-    setTimeout(() => {
-      document.querySelectorAll('pre code').forEach((block) => {
-        hljs.highlightElement(block)
-        addCopyButton(block)
-      })
+    setTimeout(async () => {
+      // 确保 highlight.js 已加载
+      if (!hljs) {
+        await loadMarkdownLibs()
+      }
+      if (hljs) {
+        document.querySelectorAll('pre code').forEach((block) => {
+          hljs.highlightElement(block)
+          addCopyButton(block)
+        })
+      }
+
+      // 为标题添加标识标签
+      addHeadingLabels()
 
       // 生成目录
       generateTOC()
@@ -1106,27 +1174,81 @@ const handleInputFocus = () => {
   }
 }
 
+// 切换 Emoji 选择器
+const toggleEmojiPicker = () => {
+  emojiPickerVisible.value = !emojiPickerVisible.value
+}
+
+// 插入 Emoji
+const insertEmoji = (emoji) => {
+  const textarea = commentTextarea.value
+  if (!textarea) {
+    // 如果没有 textarea ref，直接追加到末尾
+    newComment.value += emoji
+    return
+  }
+
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  const text = newComment.value
+
+  // 在光标位置插入 Emoji
+  newComment.value = text.substring(0, start) + emoji + text.substring(end)
+
+  // 移动光标到插入位置之后
+  nextTick(() => {
+    textarea.focus()
+    const newPosition = start + emoji.length
+    textarea.setSelectionRange(newPosition, newPosition)
+  })
+
+  // 关闭选择器
+  emojiPickerVisible.value = false
+}
+
 // 预览切换
 const togglePreview = () => {
   previewVisible.value = !previewVisible.value
   if (previewVisible.value) {
-    nextTick(() => {
-      document.querySelectorAll('.preview-comment pre code').forEach((block) => {
-        try { hljs.highlightElement(block) } catch (e) {}
-      })
+    nextTick(async () => {
+      // 确保 highlight.js 已加载
+      if (!hljs) {
+        await loadMarkdownLibs()
+      }
+      if (hljs) {
+        document.querySelectorAll('.preview-comment pre code').forEach((block) => {
+          try { hljs.highlightElement(block) } catch (e) {}
+        })
+      }
     })
   }
 }
 
 // 预览渲染（Markdown -> HTML）
-const renderedPreview = computed(() => {
-  if (!newComment.value) return ''
+// 注意：computed 不能是 async，所以使用 ref + watch 代替
+const renderedPreview = ref('')
+
+watch(newComment, async () => {
+  if (!newComment.value) {
+    renderedPreview.value = ''
+    return
+  }
 
   // 先处理换行符，将 \n 转换为 <br>
   const content = newComment.value.replace(/\n/g, '<br>')
 
+  // 确保 marked 已加载
+  if (!marked) {
+    await loadMarkdownLibs()
+  }
+
+  if (!marked) {
+    renderedPreview.value = content
+    return
+  }
+
   // 然后使用 marked 渲染 Markdown
-  return marked(content, {
+  renderedPreview.value = marked(content, {
     breaks: false, // 我们已经手动处理了换行
     gfm: true,
     headerIds: false,
@@ -2177,6 +2299,68 @@ watch(
   { immediate: false }
 )
 
+// 为标题添加标识标签
+const addHeadingLabels = () => {
+  const markdownBody = document.querySelector('.markdown-body')
+  if (!markdownBody) return
+
+  // 为每个标题添加标识标签
+  const headings = markdownBody.querySelectorAll('h1, h2, h3, h4, h5, h6')
+  headings.forEach((heading) => {
+    // 如果已经添加过标识，跳过
+    if (heading.querySelector('.heading-label')) return
+
+    const level = parseInt(heading.tagName.charAt(1))
+    const label = document.createElement('span')
+    label.className = 'heading-label'
+    label.setAttribute('data-level', level.toString())
+    label.textContent = `H${level}`
+
+    // 直接设置内联样式确保样式生效
+    label.style.display = 'inline-block'
+    label.style.padding = level === 1 ? '3px 10px' : level === 2 ? '2px 9px' : level === 3 ? '2px 8px' : level === 4 ? '2px 7px' : '1px 6px'
+    label.style.borderRadius = '4px'
+    label.style.marginRight = '10px'
+    label.style.fontWeight = '700'
+    label.style.fontSize = level === 1 ? '0.65em' : level === 2 || level === 3 ? '0.7em' : level === 4 ? '0.65em' : '0.6em'
+    label.style.fontFamily = "'Inter', 'Noto Sans SC', sans-serif"
+    label.style.letterSpacing = '0.5px'
+    label.style.lineHeight = '1.4'
+    label.style.boxShadow = '0 2px 4px rgba(139, 92, 246, 0.3)'
+    label.style.flexShrink = '0'
+    label.style.border = 'none'
+    label.style.textDecoration = 'none'
+
+    // 根据级别设置不同的背景色和文字颜色
+    if (level === 1) {
+      label.style.background = 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)'
+      label.style.color = 'white'
+    } else if (level === 2) {
+      label.style.background = 'linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%)'
+      label.style.color = 'white'
+    } else if (level === 3) {
+      label.style.background = 'linear-gradient(135deg, #a855f7 0%, #c084fc 100%)'
+      label.style.color = 'white'
+    } else if (level === 4) {
+      label.style.background = 'linear-gradient(135deg, #c084fc 0%, #d8b4fe 100%)'
+      label.style.color = 'white'
+    } else if (level === 5) {
+      label.style.background = 'linear-gradient(135deg, #d8b4fe 0%, #e9d5ff 100%)'
+      label.style.color = '#7c3aed'
+    } else if (level === 6) {
+      label.style.background = 'linear-gradient(135deg, #e9d5ff 0%, #f3e8ff 100%)'
+      label.style.color = '#8b5cf6'
+    }
+
+    // 将标识插入到标题的最前面
+    if (heading.firstChild) {
+      heading.insertBefore(label, heading.firstChild)
+    } else {
+      heading.appendChild(label)
+    }
+  })
+}
+
 const fixResidualBoldInDOM = () => {
   const container = document.querySelector('.markdown-body')
   if (!container) return
@@ -2498,6 +2682,71 @@ const fixResidualBoldInDOM = () => {
   text-align: left !important;
 }
 
+/* 标题标识标签样式 - 使用 !important 确保优先级 */
+.markdown-body h1 .heading-label,
+.markdown-body h2 .heading-label,
+.markdown-body h3 .heading-label,
+.markdown-body h4 .heading-label,
+.markdown-body h5 .heading-label,
+.markdown-body h6 .heading-label {
+  display: inline-block !important;
+  background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%) !important;
+  color: white !important;
+  font-size: 0.7em !important;
+  font-weight: 700 !important;
+  padding: 2px 8px !important;
+  border-radius: 4px !important;
+  margin-right: 10px !important;
+  vertical-align: middle !important;
+  line-height: 1.4 !important;
+  font-family: 'Inter', 'Noto Sans SC', sans-serif !important;
+  letter-spacing: 0.5px !important;
+  box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3) !important;
+  flex-shrink: 0 !important;
+  border: none !important;
+  text-decoration: none !important;
+}
+
+/* 不同级别标题的标识样式 */
+.markdown-body h1 .heading-label {
+  font-size: 0.65em !important;
+  padding: 3px 10px !important;
+  background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%) !important;
+}
+
+.markdown-body h2 .heading-label {
+  font-size: 0.7em !important;
+  padding: 2px 9px !important;
+  background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%) !important;
+}
+
+.markdown-body h3 .heading-label {
+  font-size: 0.7em !important;
+  padding: 2px 8px !important;
+  background: linear-gradient(135deg, #a855f7 0%, #c084fc 100%) !important;
+}
+
+.markdown-body h4 .heading-label {
+  font-size: 0.65em !important;
+  padding: 2px 7px !important;
+  background: linear-gradient(135deg, #c084fc 0%, #d8b4fe 100%) !important;
+}
+
+.markdown-body h5 .heading-label {
+  font-size: 0.6em !important;
+  padding: 1px 6px !important;
+  background: linear-gradient(135deg, #d8b4fe 0%, #e9d5ff 100%) !important;
+  color: #7c3aed !important;
+}
+
+.markdown-body h6 .heading-label {
+  font-size: 0.6em !important;
+  padding: 1px 6px !important;
+  background: linear-gradient(135deg, #e9d5ff 0%, #f3e8ff 100%) !important;
+  color: #8b5cf6 !important;
+}
+
+/* 确保标题和标识在同一行显示 */
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3,
@@ -2505,6 +2754,21 @@ const fixResidualBoldInDOM = () => {
 .markdown-body h5,
 .markdown-body h6 {
   text-align: left !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 0 !important;
+}
+
+/* 标题内容部分（排除标识） */
+.markdown-body h1 > *:not(.heading-label),
+.markdown-body h2 > *:not(.heading-label),
+.markdown-body h3 > *:not(.heading-label),
+.markdown-body h4 > *:not(.heading-label),
+.markdown-body h5 > *:not(.heading-label),
+.markdown-body h6 > *:not(.heading-label) {
+  flex: 1;
+  min-width: 0;
 }
 
 .markdown-body p,
@@ -2904,10 +3168,15 @@ const fixResidualBoldInDOM = () => {
   backdrop-filter: none;
 }
 
+.comment-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
 .comment-input {
   width: 100%;
   min-height: 120px;
-  padding: 15px;
+  padding: 15px 50px 15px 15px;
   border: 2px solid #e5e7eb;
   border-radius: 12px;
   font-size: 0.95rem;
@@ -2917,6 +3186,30 @@ const fixResidualBoldInDOM = () => {
   color: #333;
   font-family: inherit;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.emoji-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  line-height: 1;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Android Emoji", "EmojiSymbols", "EmojiOne Mozilla", "Twemoji Mozilla", "Segoe UI", sans-serif;
+}
+
+.emoji-btn:hover {
+  background: #f3f4f6;
+  transform: scale(1.1);
+}
+
+.emoji-btn:active {
+  transform: scale(0.95);
 }
 
 .comment-input:focus {
@@ -3046,6 +3339,14 @@ pre:hover .copy-btn {
 .markdown-body pre {
   position: relative !important;
   overflow: hidden !important;
+  tab-size: 4 !important;
+  -moz-tab-size: 4 !important;
+}
+
+/* 确保代码块中的 Tab 显示为 4 个空格宽度 */
+.markdown-body pre code {
+  tab-size: 4 !important;
+  -moz-tab-size: 4 !important;
 }
 
 /* 文章目录样式 - 初始隐藏，等待JS定位 */

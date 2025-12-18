@@ -294,12 +294,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onActivated, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import NavBar from '@/components/NavBar'
 import ModernLoading from '@/components/ModernLoading.vue'
 import { getArticlesList, getTopArticles, getArticlesNum } from '@/api/Articles/browse'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { resetSEO } from '@/utils/seo'
+import { getOptimizedLimit } from '@/utils/mobileOptimization'
 
 const router = useRouter()
 
@@ -343,12 +345,24 @@ const typeText = async () => {
   }
 }
 
+// 预加载图片
+const preloadImage = (src) => {
+  if (!src) return
+  const link = document.createElement('link')
+  link.rel = 'preload'
+  link.as = 'image'
+  link.href = src
+  document.head.appendChild(link)
+}
+
 const loadLatestData = async () => {
   try {
+    // 移动端减少首屏数据量（桌面端3条，移动端2条）
+    const articleLimit = getOptimizedLimit(3, 2)
     const [blogs, moments, projects, blogNum, momentNum, projectNum] = await Promise.all([
-      getArticlesList('blog', 1, 3),
-      getArticlesList('moment', 1, 3),
-      getArticlesList('project', 1, 3),
+      getArticlesList('blog', 1, articleLimit),
+      getArticlesList('moment', 1, articleLimit),
+      getArticlesList('project', 1, articleLimit),
       getArticlesNum('blog'),
       getArticlesNum('moment'),
       getArticlesNum('project')
@@ -359,6 +373,14 @@ const loadLatestData = async () => {
     blogCount.value = (blogNum && (blogNum.total || blogNum.count || blogNum.num)) ? (blogNum.total || blogNum.count || blogNum.num) : (blogs.total || blogs.count || blogs.data?.length || 0)
     momentCount.value = (momentNum && (momentNum.total || momentNum.count || momentNum.num)) ? (momentNum.total || momentNum.count || momentNum.num) : (moments.total || moments.count || moments.data?.length || 0)
     projectCount.value = (projectNum && (projectNum.total || projectNum.count || projectNum.num)) ? (projectNum.total || projectNum.count || projectNum.num) : (projects.total || projects.count || projects.data?.length || 0)
+
+    // 预加载首屏文章封面图（最多预加载前3张）
+    const allArticles = [...(blogs.data || []), ...(moments.data || []), ...(projects.data || [])]
+    allArticles.slice(0, 3).forEach(article => {
+      if (article.image) {
+        preloadImage(article.image)
+      }
+    })
   } catch (error) {
     console.error('Failed to load latest data:', error)
   }
@@ -595,7 +617,15 @@ const getWeatherInfo = async () => {
   }
 }
 
+// 更新SEO信息
+const updateHomeSEO = () => {
+  resetSEO()
+}
+
 onMounted(async () => {
+  // 更新SEO信息（只在首次挂载时更新，避免与App.vue的路由监听重复）
+  updateHomeSEO()
+
   try {
     // 模拟加载进度
     const progressInterval = setInterval(() => {
@@ -627,6 +657,15 @@ onMounted(async () => {
     console.error('组件初始化失败:', error)
     isComponentReady.value = true // 即使出错也标记为就绪
   }
+})
+
+// keep-alive 激活时更新SEO（处理路由切换但组件未卸载的情况）
+// 注意：App.vue的路由监听也会更新SEO，但这里确保在组件激活时立即更新，避免延迟
+onActivated(() => {
+  // 使用nextTick确保在路由完全切换后再更新
+  nextTick(() => {
+    updateHomeSEO()
+  })
 })
 </script>
 

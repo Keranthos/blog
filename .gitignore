@@ -41,3 +41,13 @@ logs/
 # 缓存文件
 .cache/
 *.cache
+
+# 说明文档（根目录）
+DEPLOY_STEPS.md
+PERFORMANCE_OPTIMIZATION.md
+TECH_INNOVATIONS.txt
+使用bug记录.md
+未来安全优化方向.md
+
+# blog 文件夹
+blog/

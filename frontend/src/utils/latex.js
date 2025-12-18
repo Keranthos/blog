@@ -1,5 +1,26 @@
-import katex from 'katex'
-import 'katex/dist/katex.min.css'
+// katex 按需加载，减少首屏 JS 体积
+let katex = null
+let katexLoaded = false
+
+// 动态加载 katex
+async function loadKatex () {
+  if (katexLoaded && katex) {
+    return katex
+  }
+
+  try {
+    const [katexModule] = await Promise.all([
+      import('katex'),
+      import('katex/dist/katex.min.css')
+    ])
+    katex = katexModule.default
+    katexLoaded = true
+    return katex
+  } catch (error) {
+    console.error('加载 katex 失败:', error)
+    throw error
+  }
+}
 
 /**
  * 在 Markdown 渲染前保护 LaTeX 公式，避免被 Markdown 解析器处理
@@ -62,15 +83,20 @@ export function protectLatex (markdown) {
  * 恢复并渲染 LaTeX 公式
  * @param {string} html - 已渲染的 HTML 内容
  * @param {Array} placeholders - 占位符映射
- * @returns {string} - 处理后的 HTML 内容
+ * @returns {Promise<string>} - 处理后的 HTML 内容
  */
-export function restoreAndRenderLatex (html, placeholders) {
+export async function restoreAndRenderLatex (html, placeholders) {
   if (!html || !placeholders || placeholders.length === 0) return html
+
+  // 确保 katex 已加载
+  if (!katex) {
+    await loadKatex()
+  }
 
   let processedHtml = html
 
   // 恢复并渲染每个占位符
-  placeholders.forEach(({ placeholder, formula, type }) => {
+  for (const { placeholder, formula, type } of placeholders) {
     try {
       if (!formula) {
         processedHtml = processedHtml.replace(placeholder, '')
@@ -100,6 +126,11 @@ export function restoreAndRenderLatex (html, placeholders) {
         }
       }
 
+      // 确保 katex 已加载
+      if (!katex) {
+        await loadKatex()
+      }
+
       const rendered = katex.renderToString(processedFormula, {
         displayMode: type === 'block',
         throwOnError: false,
@@ -122,7 +153,7 @@ export function restoreAndRenderLatex (html, placeholders) {
         : `<span class="katex-error">公式错误: ${formula}</span>`
       processedHtml = processedHtml.replace(placeholder, errorHtml)
     }
-  })
+  }
 
   return processedHtml
 }
