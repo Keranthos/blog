@@ -94,6 +94,7 @@ func InitDB() error { // 初始化全局连接池DB
 		&models.ResearchArticle{},
 		&models.ProjectArticle{},
 		&models.Comment{},
+		&models.Like{},
 		&models.Media{},
 		&models.Question{},
 		&models.User{},

@@ -66,6 +66,10 @@ func SetupRouter() *gin.Engine {
 		api.POST("/comments", controllers.CreateComment)
 		api.DELETE("/comments/:commentId", middlewares.Auth(3), controllers.DeleteComment) // 删除评论需要管理员权限
 
+		// 点赞相关路由
+		api.GET("/likes/:articleType/:articleID", controllers.GetLikeStatus)                    // 获取点赞状态（公开）
+		api.POST("/likes/:articleType/:articleID", middlewares.Auth(1), controllers.ToggleLike) // 切换点赞状态（需要登录）
+
 		// 媒体相关路由，权限: 3 (管理员)
 		api.GET("/media", controllers.GetMedia)
 		api.GET("/media/:mediaId", controllers.GetMediaByID)

@@ -41,6 +41,7 @@ type BlogArticle struct {
 	Tags       StringArray `json:"tags" gorm:"type:json"`
 	Image      string      `json:"image" gorm:"type:varchar(500)"`
 	ViewCount  int         `json:"viewCount" gorm:"default:0;index:idx_view_count"` // 阅读量
+	LikeCount  int         `json:"likeCount" gorm:"default:0;index:idx_like_count"` // 点赞数
 	IsTop      bool        `json:"isTop" gorm:"default:false;index:idx_is_top"`     // 是否置顶
 	// 添加 created_at 索引用于排序查询
 	// CreatedAt 由 gorm.Model 提供，需要在迁移时创建索引
@@ -53,6 +54,7 @@ type ResearchArticle struct {
 	Tags       StringArray `json:"tags" gorm:"type:json"`
 	Image      string      `json:"image"`
 	ViewCount  int         `json:"viewCount" gorm:"default:0;index:idx_research_view_count"` // 阅读量
+	LikeCount  int         `json:"likeCount" gorm:"default:0;index:idx_research_like_count"` // 点赞数
 	IsTop      bool        `json:"isTop" gorm:"default:false;index:idx_research_is_top"`     // 是否置顶
 	// CreatedAt 索引用于排序查询
 }
@@ -64,6 +66,7 @@ type ProjectArticle struct {
 	Tags       StringArray `json:"tags" gorm:"type:json"`
 	Image      string      `json:"image"`
 	ViewCount  int         `json:"viewCount" gorm:"default:0;index:idx_project_view_count"` // 阅读量
+	LikeCount  int         `json:"likeCount" gorm:"default:0;index:idx_project_like_count"` // 点赞数
 	IsTop      bool        `json:"isTop" gorm:"default:false;index:idx_project_is_top"`     // 是否置顶
 	// CreatedAt 索引用于排序查询
 }

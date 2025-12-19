@@ -24,7 +24,7 @@
         <!-- 四个互动按钮和编辑按钮 -->
         <div class="engagement-buttons">
           <div class="left-buttons">
-            <button class="like-btn" :class="{ liked: isLiked }" @click="handleLike">
+            <button class="like-btn" :class="{ liked: isLiked, loading: likeLoading }" @click="handleLike" :disabled="likeLoading">
               <font-awesome-icon :icon="isLiked ? 'heart' : ['far', 'heart']" />
               <span>{{ likeCount }}</span>
             </button>
@@ -279,6 +279,7 @@ import { useStore } from 'vuex'
 import { getArticleByID } from '@/api/Articles/browse'
 import { getCommentsByID } from '@/api/Comments/browse'
 import { createComment, deleteComment as deleteCommentAPI } from '@/api/Comments/edit'
+import { getLikeStatus, toggleLike } from '@/api/Likes/like'
 import { showErrorMessage, showSuccessMessage, showWarningMessage, showCustomMessage } from '@/utils/waifuMessage'
 import { generateArticleSEO, updateSEO } from '@/utils/seo'
 import RelatedArticles from '@/components/RelatedArticles.vue'
@@ -619,13 +620,57 @@ const scrollToHeading = (id) => {
 }
 
 // 点赞功能
-const handleLike = () => {
-  if (isLiked.value) {
-    isLiked.value = false
-    likeCount.value = Math.max(0, likeCount.value - 1)
-  } else {
-    isLiked.value = true
-    likeCount.value += 1
+const handleLike = async () => {
+  // 检查是否已登录
+  if (!user.value.isLogged) {
+    showCustomMessage('请先登录后再点赞～', 3000)
+    return
+  }
+
+  // 防止重复点击
+  if (likeLoading.value) {
+    return
+  }
+
+  const articleType = props.type || route.params.type
+  const articleID = props.articleId || route.params.id
+
+  if (!articleType || !articleID) {
+    showErrorMessage('文章信息不完整')
+    return
+  }
+
+  likeLoading.value = true
+
+  try {
+    const result = await toggleLike(articleType, articleID, user.value, store.state.token)
+    isLiked.value = result.isLiked
+    likeCount.value = result.likeCount
+
+    // 显示成功提示
+    if (result.isLiked) {
+      showCustomMessage('点赞成功！感谢你的支持～', 2000)
+    } else {
+      showCustomMessage('已取消点赞', 2000)
+    }
+  } catch (error) {
+    console.error('点赞操作失败:', error)
+    // 打印详细的错误信息
+    if (error.response) {
+      console.error('错误响应:', error.response.data)
+      console.error('错误状态:', error.response.status)
+      if (error.response.data?.details) {
+        console.error('错误详情:', error.response.data.details)
+      }
+    }
+    if (error.response && error.response.status === 401) {
+      showCustomMessage('请先登录后再点赞～', 3000)
+    } else {
+      const errorMsg = error.response?.data?.error || error.response?.data?.details || '点赞操作失败，请稍后重试'
+      showErrorMessage(errorMsg)
+    }
+  } finally {
+    likeLoading.value = false
   }
 }
 
@@ -845,6 +890,7 @@ const viewCount = ref(0)
 const toc = ref([]) // 文章目录
 const isLiked = ref(false) // 点赞状态
 const likeCount = ref(0) // 点赞数
+const likeLoading = ref(false) // 点赞操作加载状态
 
 // 文本选择相关
 const articleContentRef = ref(null)
@@ -932,6 +978,7 @@ const loadDetail = async () => {
       time.value = response.CreatedAt ? new Date(response.CreatedAt).toLocaleDateString('zh-CN') : '未知时间'
       content.value = response.Content
       viewCount.value = response.viewCount || 0
+      likeCount.value = response.likeCount || 0
 
       // 计算阅读时间
       readingTime.value = estimateReadingTime(response.Content, response.Title)
@@ -944,6 +991,7 @@ const loadDetail = async () => {
       time.value = response.time || response.CreatedAt ? new Date(response.time || response.CreatedAt).toLocaleDateString('zh-CN') : '未知时间'
       content.value = response.content
       viewCount.value = response.viewCount || 0
+      likeCount.value = response.likeCount || 0
 
       // 计算阅读时间
       readingTime.value = estimateReadingTime(response.content, response.title)
@@ -1152,6 +1200,30 @@ const loadDetail = async () => {
       }, 200)
     }, 100) // 延迟100ms确保渲染完成
   })
+}
+
+// 加载点赞状态
+const loadLikeStatus = async () => {
+  try {
+    const articleType = props.type || route.params.type
+    const articleID = props.articleId || route.params.id
+
+    // 如果ID无效，跳过点赞状态加载
+    if (!articleID || articleID === 'undefined' || !articleType) {
+      isLiked.value = false
+      likeCount.value = 0
+      return
+    }
+
+    const result = await getLikeStatus(articleType, articleID)
+    isLiked.value = result.isLiked || false
+    likeCount.value = result.likeCount || 0
+  } catch (error) {
+    console.error('加载点赞状态失败:', error)
+    // 点赞状态加载失败不影响页面显示，静默处理
+    isLiked.value = false
+    likeCount.value = 0
+  }
 }
 
 // 加载评论
@@ -2676,7 +2748,10 @@ const initializeDetail = async () => {
   // 只有当ID存在且有效时才加载
   if (id && id !== 'undefined') {
     await loadDetail()
-    await loadComments()
+    await Promise.all([
+      loadComments(),
+      loadLikeStatus() // 并行加载评论和点赞状态
+    ])
   }
 }
 
@@ -2983,6 +3058,17 @@ const fixResidualBoldInDOM = () => {
 .like-btn.liked {
   border-color: #ff4757;
   background: rgba(255, 71, 87, 0.1);
+}
+
+.like-btn.loading {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.like-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .subscribe-btn svg {

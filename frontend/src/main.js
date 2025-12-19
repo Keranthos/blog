@@ -32,8 +32,14 @@ import {
   faCommentDots,
   faHighlighter,
   faFilm,
-  faTrash
+  faTrash,
+  faHeart,
+  faBookmark,
+  faPenToSquare,
+  faComment,
+  faShare
 } from '@fortawesome/free-solid-svg-icons'
+import { faHeart as farHeart } from '@fortawesome/free-regular-svg-icons'
 
 // 其他图标按需加载（通过 iconLoader 工具）
 // 注意：Font Awesome 的 tree-shaking 会自动移除未使用的图标
@@ -94,7 +100,13 @@ library.add(
   faCommentDots,
   faHighlighter,
   faFilm,
-  faTrash
+  faTrash,
+  faHeart,
+  farHeart,
+  faBookmark,
+  faPenToSquare,
+  faComment,
+  faShare
 )
 
 // 预加载其他常用图标（在页面加载完成后）

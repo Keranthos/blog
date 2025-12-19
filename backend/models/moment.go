@@ -10,5 +10,6 @@ type Moment struct {
 	Tags      string `gorm:"type:varchar(500)" json:"Tags"`
 	Author    string `gorm:"type:varchar(100);index:idx_moment_author" json:"Author"`
 	ViewCount int    `json:"viewCount" gorm:"default:0;index:idx_moment_view_count"` // 阅读量
+	LikeCount int    `json:"likeCount" gorm:"default:0;index:idx_moment_like_count"` // 点赞数
 	// CreatedAt 索引用于排序查询
 }
