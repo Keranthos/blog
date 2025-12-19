@@ -258,6 +258,65 @@ func SanitizeInput(input string) string {
 	return input
 }
 
+// 清理引用文本输入（保留换行符、代码块和LaTeX公式，移除其他Markdown格式字符）
+func SanitizeQuotedText(input string) string {
+	// 移除首尾空格和换行符
+	input = strings.TrimSpace(input)
+
+	// 检查是否包含代码块或LaTeX公式
+	hasCodeBlock := strings.Contains(input, "```")
+	hasLatex := strings.Contains(input, "$$") || strings.Contains(input, "$")
+
+	// 如果包含代码块或LaTeX公式，保留原始格式（不清理）
+	if hasCodeBlock || hasLatex {
+		// 只清理多余的连续空格（保留换行符）
+		input = regexp.MustCompile(`[ \t]+`).ReplaceAllString(input, " ")
+		// 清理多个连续换行符（最多保留两个）
+		input = regexp.MustCompile(`\n{3,}`).ReplaceAllString(input, "\n\n")
+		return input
+	}
+
+	// 如果不包含代码块或LaTeX公式，移除所有Markdown格式字符，只保留纯文本和换行符
+	// 移除粗体 **text** 或 __text__
+	input = regexp.MustCompile(`\*\*([^*]+)\*\*`).ReplaceAllString(input, "$1")
+	input = regexp.MustCompile(`__([^_]+)__`).ReplaceAllString(input, "$1")
+	
+	// 移除斜体 *text* 或 _text_
+	input = regexp.MustCompile(`\*([^*]+)\*`).ReplaceAllString(input, "$1")
+	input = regexp.MustCompile(`_([^_]+)_`).ReplaceAllString(input, "$1")
+	
+	// 移除链接 [text](url)
+	input = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`).ReplaceAllString(input, "$1")
+	
+	// 移除图片 ![alt](url)
+	input = regexp.MustCompile(`!\[([^\]]*)\]\([^)]+\)`).ReplaceAllString(input, "$1")
+	
+	// 移除行内代码 `code`
+	input = regexp.MustCompile("`([^`]+)`").ReplaceAllString(input, "$1")
+	
+	// 移除标题标记 # ## ### 等
+	input = regexp.MustCompile(`^#{1,6}\s+`).ReplaceAllString(input, "")
+	
+	// 移除引用标记 >
+	input = regexp.MustCompile(`^>\s+`).ReplaceAllString(input, "")
+	
+	// 移除列表标记 - * + 或数字.
+	input = regexp.MustCompile(`^[\s]*[-*+]\s+`).ReplaceAllString(input, "")
+	input = regexp.MustCompile(`^[\s]*\d+\.\s+`).ReplaceAllString(input, "")
+	
+	// 移除删除线 ~~text~~
+	input = regexp.MustCompile(`~~([^~]+)~~`).ReplaceAllString(input, "$1")
+	
+	// 只清理多余的连续空格（保留换行符）
+	// 将多个连续空格替换为单个空格，但保留换行符
+	input = regexp.MustCompile(`[ \t]+`).ReplaceAllString(input, " ")
+	
+	// 清理多个连续换行符（最多保留两个）
+	input = regexp.MustCompile(`\n{3,}`).ReplaceAllString(input, "\n\n")
+
+	return input
+}
+
 // 检查是否包含恶意内容
 func ContainsMaliciousContent(content string) bool {
 	// 简单的恶意内容检测（可以扩展）

@@ -6,6 +6,7 @@ import (
 	"backend/utils"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -54,6 +55,12 @@ func CreateComment(c *gin.Context) {
 
 	// 清理输入内容
 	comment.Content = utils.SanitizeInput(comment.Content)
+	
+	// 如果有quoted_text，使用专门的清理函数（保留换行符）
+	if comment.QuotedText != nil && *comment.QuotedText != "" {
+		sanitized := utils.SanitizeQuotedText(*comment.QuotedText)
+		comment.QuotedText = &sanitized
+	}
 
 	// 如果有parent_id，验证父评论是否存在
 	if comment.ParentID != nil {
@@ -92,11 +99,39 @@ func DeleteComment(c *gin.Context) {
 // GetAllComments 获取所有评论（按时间倒序，包含文章信息）
 func GetAllComments(c *gin.Context) {
 	var comments []models.Comment
+	var total int64
 
-	// 获取所有评论（不包含回复），按创建时间倒序
-	if err := config.DB.Where("parent_id IS NULL").
-		Order("created_at DESC").
-		Find(&comments).Error; err != nil {
+	// 获取分页参数
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "10")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 {
+		limit = 10
+	}
+	// 分页上限校验
+	const maxLimit = 100
+	if limit > maxLimit {
+		limit = maxLimit
+	}
+
+	offset := (page - 1) * limit
+
+	// 获取所有评论（包括回复），按创建时间倒序
+	query := config.DB.Order("created_at DESC")
+	
+	// 计算总数
+	if err := query.Model(&models.Comment{}).Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count comments"})
+		return
+	}
+
+	// 分页查询
+	if err := query.Offset(offset).Limit(limit).Find(&comments).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get comments"})
 		return
 	}
@@ -145,5 +180,17 @@ func GetAllComments(c *gin.Context) {
 		result = append(result, item)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": result})
+	// 计算分页信息
+	totalPages := int((total + int64(limit) - 1) / int64(limit))
+	hasMore := page < totalPages
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": result,
+		"pagination": gin.H{
+			"page":     page,
+			"limit":    limit,
+			"total":    total,
+			"hasMore":  hasMore,
+		},
+	})
 }
