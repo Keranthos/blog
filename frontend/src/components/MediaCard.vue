@@ -144,47 +144,66 @@ const starArray = computed(() => {
   return arr
 })
 
-// 渲染 Markdown
-const renderedReview = computed(() => {
-  if (!props.media.Review) return ''
-  // 预处理：保护 LaTeX 公式（在 marked 渲染前处理）
-  const { protected: protectedContent, placeholders: latexPlaceholders } = protectLatex(props.media.Review)
-  let html = marked(protectedContent, {
-    breaks: true, // 将换行符转换为 <br>
-    gfm: true, // 启用 GitHub Flavored Markdown
-    headerIds: false,
-    mangle: false,
-    sanitize: false
-  })
+// 渲染 Markdown（使用 ref 因为需要异步处理 LaTeX）
+const renderedReview = ref('')
 
-  // 为图片添加内联样式，确保在渲染时就有宽度和高度限制，避免闪烁
-  html = html.replace(
-    /<img([^>]*)(style="[^"]*")?([^>]*)>/gi,
-    (match, before, existingStyle, after) => {
-      // 如果已经有style属性，则合并样式
-      if (existingStyle) {
-        const newStyle = existingStyle.replace(/"/g, '') + '; max-width: 80% !important; max-height: 400px !important; width: auto !important; height: auto !important; display: block !important; margin: 20px auto !important; box-sizing: border-box !important;'
-        return `<img${before} style="${newStyle}"${after}>`
-      } else {
-        // 如果没有style属性，则添加新的style属性
-        return `<img${before} style="max-width: 80% !important; max-height: 400px !important; width: auto !important; height: auto !important; display: block !important; margin: 20px auto !important; box-sizing: border-box !important;"${after}>`
+// 异步渲染 Markdown 内容
+const renderReviewContent = async () => {
+  if (!props.media.Review) {
+    renderedReview.value = ''
+    return
+  }
+
+  try {
+    // 预处理：保护 LaTeX 公式（在 marked 渲染前处理）
+    const { protected: protectedContent, placeholders: latexPlaceholders } = protectLatex(props.media.Review)
+    let html = marked(protectedContent, {
+      breaks: true, // 将换行符转换为 <br>
+      gfm: true, // 启用 GitHub Flavored Markdown
+      headerIds: false,
+      mangle: false,
+      sanitize: false
+    })
+
+    // 为图片添加内联样式，确保在渲染时就有宽度和高度限制，避免闪烁
+    html = html.replace(
+      /<img([^>]*)(style="[^"]*")?([^>]*)>/gi,
+      (match, before, existingStyle, after) => {
+        // 如果已经有style属性，则合并样式
+        if (existingStyle) {
+          const newStyle = existingStyle.replace(/"/g, '') + '; max-width: 80% !important; max-height: 400px !important; width: auto !important; height: auto !important; display: block !important; margin: 20px auto !important; box-sizing: border-box !important;'
+          return `<img${before} style="${newStyle}"${after}>`
+        } else {
+          // 如果没有style属性，则添加新的style属性
+          return `<img${before} style="max-width: 80% !important; max-height: 400px !important; width: auto !important; height: auto !important; display: block !important; margin: 20px auto !important; box-sizing: border-box !important;"${after}>`
+        }
       }
-    }
-  )
+    )
 
-  // 恢复并渲染 LaTeX 公式
-  html = restoreAndRenderLatex(html, latexPlaceholders)
+    // 恢复并渲染 LaTeX 公式（异步）
+    html = await restoreAndRenderLatex(html, latexPlaceholders)
 
-  // 配置DOMPurify允许style属性，确保内联样式不被过滤，支持 LaTeX 公式
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'math', 'annotation', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'mfrac', 'msup', 'msub', 'munderover', 'munder', 'mover', 'mtable', 'mtr', 'mtd', 'mtext'],
-    ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'title', 'width', 'height', 'data-*', 'aria-*', 'role', 'dir', 'colspan', 'rowspan'],
-    ALLOW_DATA_ATTR: true
-  })
-})
+    // 配置DOMPurify允许style属性，确保内联样式不被过滤，支持 LaTeX 公式
+    renderedReview.value = DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'math', 'annotation', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'mfrac', 'msup', 'msub', 'munderover', 'munder', 'mover', 'mtable', 'mtr', 'mtd', 'mtext'],
+      ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'title', 'width', 'height', 'data-*', 'aria-*', 'role', 'dir', 'colspan', 'rowspan'],
+      ALLOW_DATA_ATTR: true
+    })
+  } catch (error) {
+    console.error('渲染评论内容失败:', error)
+    renderedReview.value = props.media.Review || ''
+  }
+}
+
+// 监听 media.Review 变化，重新渲染
+watch(() => props.media.Review, () => {
+  renderReviewContent()
+}, { immediate: true })
 
 const openMediaModal = () => {
   showMediaModal.value = true
+  // 确保内容已渲染
+  renderReviewContent()
   // 在弹框打开后，延迟为图片添加样式（确保 DOM 完全渲染）
   nextTick(() => {
     setTimeout(() => {
@@ -258,6 +277,8 @@ const openMediaModal = () => {
 // 监听弹框打开，为正文中的图片添加错误处理和样式
 watch(showMediaModal, (isOpen) => {
   if (isOpen) {
+    // 确保内容已渲染
+    renderReviewContent()
     // 使用 nextTick 和延迟执行，确保 v-html 渲染完成后再处理图片
     nextTick(() => {
       setTimeout(() => {
@@ -639,6 +660,8 @@ defineExpose({
   width: 90%;
   max-width: 600px; /* 与搜索模态一致 */
   max-height: 85vh;
+  height: auto;
+  min-height: 200px;
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -675,7 +698,7 @@ defineExpose({
   flex-direction: column;
   gap: 1rem;
   flex: 1;
-  min-height: 0;
+  min-height: 100px;
   overflow: hidden;
   margin-top: 2.5rem;
 }
@@ -683,7 +706,7 @@ defineExpose({
 .media-modal-content {
   flex: 1;
   min-width: 0;
-  min-height: 0;
+  min-height: 100px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -696,7 +719,7 @@ defineExpose({
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  min-height: 0;
+  min-height: 50px;
   text-align: left;
   padding-right: 8px;
 }

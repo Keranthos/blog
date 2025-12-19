@@ -29,7 +29,10 @@ import {
   faLocationDot,
   faChalkboard,
   faEnvelope,
-  faCommentDots
+  faCommentDots,
+  faHighlighter,
+  faFilm,
+  faTrash
 } from '@fortawesome/free-solid-svg-icons'
 
 // 其他图标按需加载（通过 iconLoader 工具）
@@ -88,7 +91,10 @@ library.add(
   faLocationDot,
   faChalkboard,
   faEnvelope,
-  faCommentDots
+  faCommentDots,
+  faHighlighter,
+  faFilm,
+  faTrash
 )
 
 // 预加载其他常用图标（在页面加载完成后）

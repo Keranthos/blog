@@ -18,6 +18,10 @@
       <font-awesome-icon icon="share" class="menu-icon" />
       <span class="menu-text">分享</span>
     </button>
+    <button class="menu-btn" @click="handleComment" @mousedown.prevent>
+      <font-awesome-icon icon="comment" class="menu-icon" />
+      <span class="menu-text">评论</span>
+    </button>
   </div>
 </template>
 
@@ -44,7 +48,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['copy', 'highlight', 'share'])
+const emit = defineEmits(['copy', 'highlight', 'share', 'comment'])
 
 const menuRef = ref(null)
 const menuStyle = computed(() => {
@@ -108,6 +112,14 @@ const handleShare = (e) => {
   // 清除文本选择，避免显示选中特效
   window.getSelection().removeAllRanges()
   emit('share', props.selectedText)
+}
+
+const handleComment = (e) => {
+  e.preventDefault()
+  e.stopPropagation()
+  // 清除文本选择，避免显示选中特效
+  window.getSelection().removeAllRanges()
+  emit('comment', props.selectedText)
 }
 
 // 监听位置变化，确保菜单始终可见

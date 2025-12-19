@@ -1,6 +1,6 @@
 import { requestFunc } from '../req'
 
-async function createComment (user, blogID, type, content, parentId = null, token = null) {
+async function createComment (user, blogID, type, content, parentId = null, token = null, quotedText = null) {
   try {
     const data = {
       blogID: parseInt(blogID),
@@ -12,6 +12,11 @@ async function createComment (user, blogID, type, content, parentId = null, toke
     // 如果有父评论ID，添加parent_id字段
     if (parentId) {
       data.parent_id = parseInt(parentId)
+    }
+
+    // 如果有引用文本，添加quoted_text字段
+    if (quotedText && quotedText.trim()) {
+      data.quoted_text = quotedText.trim()
     }
 
     console.log('发送评论数据:', data)

@@ -15,9 +15,9 @@ async function getCommentsByID (type, blogID) {
   }
 }
 
-async function getAllComments () {
+async function getAllComments (page = 1, limit = 10) {
   try {
-    const res = await requestFunc('/comments', {
+    const res = await requestFunc(`/comments?page=${page}&limit=${limit}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'

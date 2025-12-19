@@ -387,6 +387,10 @@
 .markdown-body p {
   margin-top: 0;
   margin-bottom: 10px;
+  /* 文本中Tab宽度设置为4个字符（相当于2个汉字） */
+  tab-size: 4;
+  -moz-tab-size: 4;
+  white-space: pre-wrap; /* 保留Tab字符和换行，允许自动换行 */
 }
 
 .markdown-body blockquote {
@@ -394,6 +398,10 @@
   padding: 0 1em;
   color: var(--fgColor-muted);
   border-left: .25em solid var(--borderColor-default);
+  /* 文本中Tab宽度设置为4个字符（相当于2个汉字） */
+  tab-size: 4;
+  -moz-tab-size: 4;
+  white-space: pre-wrap;
 }
 
 .markdown-body ul,
@@ -401,6 +409,10 @@
   margin-top: 0;
   margin-bottom: 0;
   padding-left: 2em;
+  /* 文本中Tab宽度设置为4个字符（相当于2个汉字） */
+  tab-size: 4;
+  -moz-tab-size: 4;
+  white-space: pre-wrap;
 }
 
 .markdown-body ol ol,

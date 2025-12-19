@@ -19,7 +19,6 @@
             v-model="newComment"
             placeholder="支持 Markdown 语法"
             rows="4"
-            :maxlength="300"
             @focus="handleInputFocus"
           ></textarea>
           <button class="emoji-btn" @click="toggleEmojiPicker" type="button" title="插入表情">

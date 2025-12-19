@@ -73,6 +73,7 @@
           @copy="handleTextCopy"
           @highlight="handleTextHighlight"
           @share="handleTextShare"
+          @comment="handleTextComment"
         />
 
         <!-- 分享卡片 -->
@@ -149,15 +150,29 @@
         <div class="comment-editor">
           <div class="editor-wrapper">
             <div class="comment-input-wrapper">
-              <textarea
-                ref="commentTextarea"
-                v-model="newComment"
-                placeholder="支持 Markdown 语法"
-                class="comment-input"
-                :maxlength="300"
-                @keydown.ctrl.enter="submitComment"
-                @focus="handleInputFocus"
-              ></textarea>
+              <div class="comment-input-box" :class="{ 'has-quoted-text': quotedText }">
+                <!-- 引用原文显示（在输入框内部） -->
+                <div v-if="quotedText" class="quoted-text-container">
+                  <div class="quoted-text-label">引用原文：</div>
+                  <div
+                    ref="inputQuotedTextRef"
+                    class="quoted-text-content markdown-body"
+                    :class="{ 'is-truncated': isInputQuotedTextTruncated }"
+                    v-html="renderedQuotedText"
+                  ></div>
+                  <button class="cancel-quote-btn" @click="clearQuotedText" title="取消引用">
+                    <font-awesome-icon icon="times" />
+                  </button>
+                </div>
+                <textarea
+                  ref="commentTextarea"
+                  v-model="newComment"
+                  placeholder="支持 Markdown 语法"
+                  class="comment-input"
+                  @keydown.ctrl.enter="submitComment"
+                  @focus="handleInputFocus"
+                ></textarea>
+              </div>
               <button class="emoji-btn" @click="toggleEmojiPicker" type="button" title="插入表情">
                 😊
               </button>
@@ -228,7 +243,17 @@
                 </button>
               </div>
               <div class="comment-bubble">
-                <div class="comment-content">{{ comment.content }}</div>
+                <!-- 引用原文显示 -->
+                <div v-if="comment.quoted_text" class="comment-quoted-text">
+                  <div class="quoted-text-label">引用原文：</div>
+                  <div
+                    :ref="el => setCommentQuotedTextRef(comment.ID, el)"
+                    class="quoted-text-content markdown-body"
+                    :class="{ 'is-truncated': isCommentQuotedTextTruncated[comment.ID] }"
+                    v-html="commentQuotedTexts[comment.ID] || ''"
+                  ></div>
+                </div>
+                <div class="comment-content markdown-body" v-html="formattedCommentContents[comment.ID] || comment.content"></div>
               </div>
             </div>
             <button v-if="user.level >= 3" class="delete-btn" @click="handleDeleteComment(comment.ID)">
@@ -261,6 +286,7 @@ import { estimateReadingTime } from '@/utils/readingTime'
 import TextSelectionMenu from '@/components/TextSelectionMenu.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import ShareCard from '@/components/ShareCard.vue'
+import { renderQuotedText } from '@/utils/renderQuotedText'
 
 // 大型库按需加载，减少首屏 JS 体积
 let marked = null
@@ -833,6 +859,13 @@ const articleUrl = ref('')
 const readingTime = ref(null) // 阅读时间估算
 const tocVisible = ref(true) // 目录是否可见
 const contentContainer = ref(null) // 内容容器引用
+const quotedText = ref('') // 引用的原文
+const renderedQuotedText = ref('') // 渲染后的引用文本HTML
+const commentQuotedTexts = ref({}) // 存储每个评论的渲染后的引用文本 { commentId: html }
+const inputQuotedTextRef = ref(null) // 输入框引用文本的DOM引用
+const commentQuotedTextRefs = ref({}) // 评论引用文本的DOM引用 { commentId: element }
+const isInputQuotedTextTruncated = ref(false) // 输入框引用文本是否被截断
+const isCommentQuotedTextTruncated = ref({}) // 每个评论的引用文本是否被截断 { commentId: boolean }
 const fallbackImg = '/images/sunset-mountains.jpg'
 
 // 图片错误回退
@@ -1135,6 +1168,10 @@ const loadComments = async () => {
 
     const res = await getCommentsByID(props.type, id)
     comments.value = res.data
+    // 渲染所有评论的引用文本和格式化评论内容
+    await nextTick()
+    await renderAllCommentQuotedTexts()
+    await formatAllCommentContents()
   } catch (error) {
     console.error('加载评论失败:', error)
     comments.value = []
@@ -1319,11 +1356,17 @@ const submitComment = async () => {
   try {
     // 如果是回复，使用parentId
     const parentId = replyingTo.value || null
-    await createComment(user.value, id, props.type, newComment.value, parentId, store.state.token)
+    // 传递引用文本
+    const quoted = quotedText.value || null
+    await createComment(user.value, id, props.type, newComment.value, parentId, store.state.token, quoted)
 
     newComment.value = ''
     cancelReply() // 清空回复状态
+    clearQuotedText() // 清空引用文本
     await loadComments()
+    // 重新渲染引用文本和格式化评论内容（包括新提交的评论）
+    await renderAllCommentQuotedTexts()
+    await formatAllCommentContents()
     showSuccessMessage('comment')
   } catch (error) {
     showErrorMessage(error)
@@ -1360,6 +1403,188 @@ const handleDeleteComment = async (commentId) => {
 }
 
 // 在组件挂载时加载文章和评论
+// 清理选中文本中的UI元素（代码块复制按钮、标题标签等）
+const cleanSelectedText = (range) => {
+  if (!range) return ''
+
+  try {
+    // 克隆range的内容，避免修改原始DOM
+    const clonedContents = range.cloneContents()
+
+    // 创建一个临时容器来操作克隆的内容
+    const tempDiv = document.createElement('div')
+    tempDiv.appendChild(clonedContents)
+
+    // 移除代码块复制按钮（包括emoji图标）
+    const copyButtons = tempDiv.querySelectorAll('.copy-btn')
+    copyButtons.forEach(btn => btn.remove())
+
+    // 移除标题标签（H1, H2等）
+    const headingLabels = tempDiv.querySelectorAll('.heading-label')
+    headingLabels.forEach(label => label.remove())
+
+    // 移除其他可能的UI元素
+    const uiElements = tempDiv.querySelectorAll('[class*="toolbox"], [class*="button"], [class*="btn"]')
+    uiElements.forEach(el => {
+      // 只移除明显的UI元素，保留内容相关的元素
+      if (el.classList.contains('copy-btn') ||
+          el.classList.contains('heading-label') ||
+          el.classList.contains('code-toolbox') ||
+          el.classList.contains('expand-button') ||
+          el.classList.contains('copy-button')) {
+        el.remove()
+      }
+    })
+
+    // 尝试从原始Markdown中提取对应的文本（包括LaTeX公式和代码块）
+    // 如果选中的内容包含LaTeX公式或代码块的渲染结果，尝试从原始内容中匹配
+    const katexElements = tempDiv.querySelectorAll('.katex, .katex-block')
+    const codeBlocks = tempDiv.querySelectorAll('pre code, code')
+    let extractedText = ''
+
+    // 优先处理代码块（因为代码块格式更明显，匹配更准确）
+    if (codeBlocks.length > 0 && content.value) {
+      // 如果包含代码块，尝试从原始Markdown中提取
+      const codeText = Array.from(codeBlocks).map(block => block.textContent).join('\n')
+      const lines = content.value.split('\n')
+      let foundMatch = false
+
+      // 查找包含代码块的行（```标记）
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim()
+        if (line.startsWith('```')) {
+          // 找到代码块开始，提取整个代码块
+          let codeBlock = line + '\n'
+
+          for (let j = i + 1; j < lines.length; j++) {
+            const currentLine = lines[j]
+            if (currentLine.trim() === '```') {
+              codeBlock += currentLine
+              extractedText = codeBlock
+              foundMatch = true
+              break
+            } else {
+              codeBlock += currentLine + '\n'
+            }
+          }
+
+          if (foundMatch) {
+            // 验证提取的代码块内容是否匹配
+            const extractedCode = codeBlock.replace(/```[\w]*\n?/g, '').replace(/```/g, '').trim()
+            if (extractedCode.includes(codeText.substring(0, Math.min(50, codeText.length)))) {
+              return extractedText
+            }
+          }
+        }
+      }
+    }
+
+    // 处理LaTeX公式
+    if (katexElements.length > 0 && content.value && !extractedText) {
+      // 如果包含LaTeX公式，尝试从原始Markdown中提取
+      // 获取选中文本的纯文本版本（用于匹配）
+      const plainText = tempDiv.textContent || tempDiv.innerText || ''
+      const cleanPlainText = plainText.replace(/\s+/g, ' ').trim()
+
+      // 尝试在原始Markdown中找到包含LaTeX公式的段落
+      // 策略：查找包含LaTeX公式标记（$$或$）的行，并尝试匹配上下文
+      const lines = content.value.split('\n')
+      let foundMatch = false
+      const searchText = cleanPlainText.length > 30 ? cleanPlainText.substring(0, 30) : cleanPlainText
+
+      // 首先尝试找到包含LaTeX公式的行
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim()
+        // 如果这一行包含LaTeX公式标记
+        if (line.includes('$$') || (line.includes('$') && !line.startsWith('$'))) {
+          // 检查这一行或相邻行是否包含选中的文本片段
+          const contextLines = []
+          // 收集当前行和前后各2行作为上下文
+          for (let j = Math.max(0, i - 2); j <= Math.min(lines.length - 1, i + 2); j++) {
+            contextLines.push(lines[j])
+          }
+          const context = contextLines.join('\n')
+
+          // 如果上下文中包含选中的文本片段，提取包含LaTeX公式的行
+          if (context.includes(searchText) || cleanPlainText.length < 20) {
+            // 提取包含LaTeX公式的完整段落
+            // 对于块级公式（$$），提取完整的公式块
+            if (line.includes('$$')) {
+              // 查找公式块的开始和结束
+              let formulaBlock = ''
+              let inBlock = false
+              for (let j = i; j < lines.length; j++) {
+                const currentLine = lines[j]
+                if (currentLine.includes('$$')) {
+                  formulaBlock += currentLine + '\n'
+                  // 如果遇到第二个$$，结束块级公式
+                  if ((currentLine.match(/\$\$/g) || []).length >= 2) {
+                    break
+                  } else if (!inBlock) {
+                    inBlock = true
+                  } else {
+                    break
+                  }
+                } else if (inBlock) {
+                  formulaBlock += currentLine + '\n'
+                } else {
+                  break
+                }
+              }
+              extractedText = formulaBlock.trim()
+            } else {
+              // 行内公式，提取整行
+              extractedText = line
+            }
+            foundMatch = true
+            break
+          }
+        }
+      }
+
+      // 如果找到了匹配，使用提取的文本；否则使用清理后的HTML文本
+      if (foundMatch && extractedText) {
+        return extractedText
+      }
+    }
+
+    // 提取清理后的文本，保留换行
+    // 使用 innerHTML 获取 HTML 结构，然后转换为 Markdown 格式以保留换行
+    let cleanedText = ''
+
+    // 尝试保留换行：将块级元素的换行转换为换行符
+    const blockElements = tempDiv.querySelectorAll('p, div, br, pre, li, h1, h2, h3, h4, h5, h6')
+    if (blockElements.length > 0) {
+      // 如果有块级元素，尝试保留结构
+      // 将 <br> 转换为换行
+      const htmlContent = tempDiv.innerHTML
+      cleanedText = htmlContent
+        .replace(/<br\s*\/?>/gi, '\n') // <br> 转换为换行
+        .replace(/<\/p>/gi, '\n') // </p> 后添加换行
+        .replace(/<\/div>/gi, '\n') // </div> 后添加换行
+        .replace(/<\/li>/gi, '\n') // </li> 后添加换行
+        .replace(/<\/h[1-6]>/gi, '\n') // 标题后添加换行
+        .replace(/<[^>]+>/g, '') // 移除所有HTML标签
+        .replace(/\n{3,}/g, '\n\n') // 多个连续换行替换为两个换行
+        .trim()
+    } else {
+      // 如果没有块级元素，使用 textContent 但保留换行
+      cleanedText = tempDiv.textContent || tempDiv.innerText || ''
+      // 保留换行，只清理多余的空白字符
+      cleanedText = cleanedText
+        .replace(/[ \t]+/g, ' ') // 将多个连续空格/制表符替换为单个空格
+        .replace(/\n{3,}/g, '\n\n') // 多个连续换行替换为两个换行
+        .trim()
+    }
+
+    return cleanedText
+  } catch (error) {
+    console.error('清理选中文本失败:', error)
+    // 如果清理失败，返回原始文本（通过toString获取）
+    return range.toString().trim()
+  }
+}
+
 // 文本选择处理函数
 const handleTextSelection = (e) => {
   // 如果点击的是文本选择菜单，不处理文本选择
@@ -1368,10 +1593,9 @@ const handleTextSelection = (e) => {
   }
 
   const selection = window.getSelection()
-  const selectedTextValue = selection.toString().trim()
 
   // 如果选择为空或不在文章内容区域内，隐藏菜单
-  if (!selectedTextValue || !articleContentRef.value) {
+  if (!selection.rangeCount || !articleContentRef.value) {
     textSelectionMenuVisible.value = false
     return
   }
@@ -1385,6 +1609,15 @@ const handleTextSelection = (e) => {
 
   // 获取选择的位置
   const range = selection.getRangeAt(0).cloneRange() // 克隆 range，避免选择被清除时丢失
+
+  // 清理选中文本，移除UI元素，并尝试提取原始Markdown（包括LaTeX公式）
+  const selectedTextValue = cleanSelectedText(range)
+
+  if (!selectedTextValue) {
+    textSelectionMenuVisible.value = false
+    return
+  }
+
   const rect = range.getBoundingClientRect()
 
   // 设置菜单位置（鼠标位置）
@@ -2118,6 +2351,128 @@ const restoreHighlights = () => {
 }
 
 // 分享文本
+// 处理文本评论
+const handleTextComment = async (text) => {
+  if (!text || !text.trim()) return
+
+  // 保存引用的原文
+  quotedText.value = text.trim()
+
+  // 检查是否包含代码块或LaTeX公式
+  const hasCodeBlock = quotedText.value.includes('```')
+  const hasLatex = quotedText.value.includes('$$') || quotedText.value.includes('$')
+
+  // 如果包含代码块或LaTeX公式，使用renderQuotedText渲染
+  if (hasCodeBlock || hasLatex) {
+    renderedQuotedText.value = await renderQuotedText(quotedText.value, 250)
+  } else {
+    // 否则只保留换行，不渲染Markdown格式
+    // 将换行符转换为 <br>，并转义HTML特殊字符
+    const escapedText = quotedText.value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+    renderedQuotedText.value = escapedText.replace(/\n/g, '<br>')
+  }
+
+  // 隐藏文本选择菜单
+  textSelectionMenuVisible.value = false
+  selectedText.value = ''
+  highlightedRange.value = null
+
+  // 跳转到评论区
+  await nextTick()
+  scrollToComments()
+
+  // 检测输入框引用文本是否溢出
+  await nextTick()
+  checkInputQuotedTextOverflow()
+
+  // 聚焦到评论输入框
+  setTimeout(() => {
+    const textarea = document.querySelector('.comment-input')
+    if (textarea) {
+      textarea.focus()
+    }
+  }, 300)
+}
+
+// 检测输入框引用文本是否溢出
+const checkInputQuotedTextOverflow = () => {
+  if (!inputQuotedTextRef.value) {
+    isInputQuotedTextTruncated.value = false
+    return
+  }
+  const element = inputQuotedTextRef.value
+  isInputQuotedTextTruncated.value = element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth
+}
+
+// 设置评论引用文本的DOM引用
+const setCommentQuotedTextRef = (commentId, el) => {
+  if (el) {
+    commentQuotedTextRefs.value[commentId] = el
+    // 检测是否溢出
+    nextTick(() => {
+      checkCommentQuotedTextOverflow(commentId)
+    })
+  }
+}
+
+// 检测评论引用文本是否溢出
+const checkCommentQuotedTextOverflow = (commentId) => {
+  const element = commentQuotedTextRefs.value[commentId]
+  if (!element) {
+    isCommentQuotedTextTruncated.value[commentId] = false
+    return
+  }
+  isCommentQuotedTextTruncated.value[commentId] = element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth
+}
+
+// 清除引用文本
+const clearQuotedText = () => {
+  quotedText.value = ''
+  renderedQuotedText.value = ''
+}
+
+// 渲染所有评论的引用文本（如果包含代码块或LaTeX公式则渲染，否则只保留换行）
+const renderAllCommentQuotedTexts = async () => {
+  const allComments = getAllCommentsInOrder()
+  const renderPromises = allComments
+    .filter(comment => comment.quoted_text && comment.quoted_text.trim())
+    .map(async (comment) => {
+      if (!commentQuotedTexts.value[comment.ID]) {
+        // 检查是否包含代码块或LaTeX公式
+        const hasCodeBlock = comment.quoted_text.includes('```')
+        const hasLatex = comment.quoted_text.includes('$$') || comment.quoted_text.includes('$')
+
+        // 如果包含代码块或LaTeX公式，使用renderQuotedText渲染
+        if (hasCodeBlock || hasLatex) {
+          const rendered = await renderQuotedText(comment.quoted_text, 250)
+          commentQuotedTexts.value[comment.ID] = rendered
+        } else {
+          // 否则只将换行符转换为 <br>，转义HTML特殊字符
+          const escapedText = comment.quoted_text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+          commentQuotedTexts.value[comment.ID] = escapedText.replace(/\n/g, '<br>')
+        }
+      }
+    })
+  await Promise.all(renderPromises)
+  // 渲染完成后检测所有评论引用文本是否溢出
+  await nextTick()
+  allComments
+    .filter(comment => comment.quoted_text && comment.quoted_text.trim())
+    .forEach(comment => {
+      checkCommentQuotedTextOverflow(comment.ID)
+    })
+}
+
 const handleTextShare = (text) => {
   shareSelectedText.value = text
   // 生成文章 URL
@@ -2174,11 +2529,13 @@ onMounted(async () => {
     }
   })
 
-  // 监听路由变化，切换文章时清除高亮
+  // 监听路由变化，切换文章时清除高亮和引用文本
   watch(() => route.params.id, (newId, oldId) => {
-    // 只有在真正切换文章时才清除高亮
+    // 只有在真正切换文章时才清除高亮和引用文本
     if (newId !== oldId && oldId) {
       removeHighlight()
+      clearQuotedText()
+      commentQuotedTexts.value = {} // 清空评论引用文本缓存
     }
   })
 
@@ -2212,8 +2569,10 @@ onActivated(async () => {
   // 检查是否切换了文章
   const currentArticleId = route.params.id || props.articleId
   if (previousArticleId !== currentArticleId) {
-    // 切换了文章，清除高亮
+    // 切换了文章，清除高亮和引用文本
     removeHighlight()
+    clearQuotedText()
+    commentQuotedTexts.value = {} // 清空评论引用文本缓存
   }
   // 如果没有切换文章，高亮会在 restoreHighlights 中恢复
 
@@ -2241,6 +2600,54 @@ onUnmounted(() => {
 })
 
 // 格式化评论时间
+// 格式化评论内容，保留换行并支持Markdown
+const formatCommentContent = async (content) => {
+  if (!content) return ''
+
+  // 确保 marked 已加载
+  if (!marked) {
+    await loadMarkdownLibs()
+  }
+
+  if (marked) {
+    // 使用 marked 渲染 Markdown（会自动处理换行）
+    const html = marked(content, {
+      breaks: true, // 将换行符转换为 <br>
+      gfm: true,
+      headerIds: false,
+      mangle: false,
+      sanitize: false
+    })
+
+    // 使用 DOMPurify 清理 HTML（确保安全）
+    const DOMPurify = (await import('dompurify')).default
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'code', 'pre', 'a', 'ul', 'ol', 'li'],
+      ALLOWED_ATTR: ['href', 'class']
+    })
+  } else {
+    // 如果 marked 未加载，只处理换行符
+    return content.replace(/\n/g, '<br>')
+  }
+}
+
+// 缓存格式化后的评论内容
+const formattedCommentContents = ref({})
+
+// 格式化所有评论内容
+const formatAllCommentContents = async () => {
+  const allComments = getAllCommentsInOrder()
+  const formatPromises = allComments
+    .filter(comment => comment.content && comment.content.trim())
+    .map(async (comment) => {
+      if (!formattedCommentContents.value[comment.ID]) {
+        const formatted = await formatCommentContent(comment.content)
+        formattedCommentContents.value[comment.ID] = formatted
+      }
+    })
+  await Promise.all(formatPromises)
+}
+
 const formatCommentTime = (timestamp) => {
   const date = new Date(timestamp)
   const now = new Date()
@@ -2289,6 +2696,20 @@ watch(
 )
 
 // keep-alive 激活时重新初始化（处理路由切换但组件未卸载的情况）
+// 监听输入框引用文本的变化，检测是否溢出
+watch(renderedQuotedText, async () => {
+  await nextTick()
+  checkInputQuotedTextOverflow()
+}, { flush: 'post' })
+
+// 监听评论引用文本的变化，检测是否溢出
+watch(commentQuotedTexts, async () => {
+  await nextTick()
+  Object.keys(commentQuotedTextRefs.value).forEach(commentId => {
+    checkCommentQuotedTextOverflow(Number(commentId))
+  })
+}, { deep: true, flush: 'post' })
+
 watch(
   () => route.path,
   async (newPath, oldPath) => {
@@ -3136,6 +3557,203 @@ const fixResidualBoldInDOM = () => {
   margin: 0;
 }
 
+/* 引用文本容器 */
+.quoted-text-container {
+  position: relative;
+  background: rgba(168, 85, 247, 0.15);
+  border-left: 3px solid rgba(168, 85, 247, 0.5);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 8px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.quoted-text-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #7c3aed;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.quoted-text-content {
+  color: #333;
+  max-height: 7.2em; /* 约6行的高度 (1.2 * 6) */
+  overflow: hidden;
+  background: transparent !important;
+  word-break: break-word;
+  line-height: 1.2;
+  position: relative;
+  padding-right: 48px; /* 提前两个字截断，为省略号留出空间（约2个中文字符宽度） */
+}
+
+/* 确保所有子元素也遵守截断规则 */
+.quoted-text-content :deep(*) {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* 添加省略号（当内容被截断时） */
+.quoted-text-content.is-truncated::after {
+  content: '...';
+  position: absolute;
+  right: 4px;
+  bottom: 0;
+  background: transparent; /* 透明背景，因为容器已有背景 */
+  padding-left: 8px;
+  padding-right: 4px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.quoted-text-content.markdown-body {
+  background: transparent !important;
+}
+
+.quoted-text-content.markdown-body :deep(*),
+.quoted-text-content.markdown-body :deep(p),
+.quoted-text-content.markdown-body :deep(div),
+.quoted-text-content.markdown-body :deep(span),
+.quoted-text-content.markdown-body :deep(code),
+.quoted-text-content.markdown-body :deep(pre) {
+  background: transparent !important;
+}
+
+.quoted-text-content :deep(p),
+.quoted-text-content :deep(div) {
+  margin: 0.2em 0;
+  display: block;
+  line-height: 1.2;
+}
+
+.quoted-text-content :deep(br) {
+  display: block;
+  line-height: 1.2;
+  height: 1.2em;
+}
+
+.quoted-text-content :deep(p:first-child),
+.quoted-text-content :deep(div:first-child) {
+  margin-top: 0;
+}
+
+.quoted-text-content :deep(p:last-child),
+.quoted-text-content :deep(div:last-child) {
+  margin-bottom: 0;
+}
+
+.cancel-quote-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(168, 85, 247, 0.2);
+  color: #7c3aed;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  font-size: 0.75rem;
+}
+
+.cancel-quote-btn:hover {
+  background: rgba(168, 85, 247, 0.3);
+  transform: scale(1.1);
+}
+
+/* 评论中的引用文本 */
+.comment-quoted-text {
+  background: rgba(168, 85, 247, 0.15);
+  border-left: 3px solid rgba(168, 85, 247, 0.5);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-top: 0;
+}
+
+.comment-quoted-text .quoted-text-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #7c3aed;
+  margin-bottom: 6px;
+  text-align: left;
+}
+
+.comment-quoted-text .quoted-text-content {
+  color: #333;
+  max-height: 6em; /* 约5行的高度 (1.2 * 5) */
+  overflow: hidden;
+  background: transparent !important;
+  word-break: break-word;
+  line-height: 1.2;
+  position: relative;
+  padding-right: 48px; /* 提前两个字截断，为省略号留出空间（约2个中文字符宽度） */
+}
+
+/* 确保所有子元素也遵守截断规则 */
+.comment-quoted-text .quoted-text-content :deep(*) {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* 添加省略号（当内容被截断时） */
+.comment-quoted-text .quoted-text-content.is-truncated::after {
+  content: '...';
+  position: absolute;
+  right: 4px;
+  bottom: 0;
+  background: transparent; /* 透明背景，因为容器已有背景 */
+  padding-left: 8px;
+  padding-right: 4px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.comment-quoted-text .quoted-text-content.markdown-body {
+  background: transparent !important;
+}
+
+.comment-quoted-text .quoted-text-content.markdown-body :deep(*),
+.comment-quoted-text .quoted-text-content.markdown-body :deep(p),
+.comment-quoted-text .quoted-text-content.markdown-body :deep(div),
+.comment-quoted-text .quoted-text-content.markdown-body :deep(span),
+.comment-quoted-text .quoted-text-content.markdown-body :deep(code),
+.comment-quoted-text .quoted-text-content.markdown-body :deep(pre) {
+  background: transparent !important;
+}
+
+.comment-quoted-text .quoted-text-content :deep(p),
+.comment-quoted-text .quoted-text-content :deep(div) {
+  margin: 0.2em 0;
+  font-size: 0.9em;
+  display: block;
+  line-height: 1.2;
+}
+
+.comment-quoted-text .quoted-text-content :deep(br) {
+  display: block;
+  line-height: 1.2;
+  height: 1.2em;
+}
+
+.comment-quoted-text .quoted-text-content :deep(p:first-child),
+.comment-quoted-text .quoted-text-content :deep(div:first-child) {
+  margin-top: 0;
+}
+
+.comment-quoted-text .quoted-text-content :deep(p:last-child),
+.comment-quoted-text .quoted-text-content :deep(div:last-child) {
+  margin-bottom: 0;
+}
+
 /* 评论编辑器 */
 .comment-editor {
   margin-top: 30px;
@@ -3173,19 +3791,38 @@ const fixResidualBoldInDOM = () => {
   width: 100%;
 }
 
+.comment-input-box {
+  position: relative;
+  width: 100%;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  background: white;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  min-height: 120px;
+}
+
+.comment-input-box:focus-within {
+  border-color: rgba(168, 85, 247, 0.5);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+}
+
 .comment-input {
   width: 100%;
   min-height: 120px;
   padding: 15px 50px 15px 15px;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
+  border: none;
+  border-radius: 0;
   font-size: 0.95rem;
   line-height: 1.6;
   resize: vertical;
-  background: white;
+  background: transparent;
   color: #333;
   font-family: inherit;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: none;
+}
+
+.comment-input-box.has-quoted-text .comment-input {
+  border-radius: 0 0 12px 12px;
 }
 
 .emoji-btn {
@@ -3214,8 +3851,6 @@ const fixResidualBoldInDOM = () => {
 
 .comment-input:focus {
   outline: none;
-  border-color: #8b5cf6;
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
 }
 
 .comment-input::placeholder {

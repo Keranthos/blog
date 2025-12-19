@@ -176,6 +176,11 @@
                                 {{ comment.articleTitle || '未知文章' }}
                               </span>
                             </div>
+                            <!-- 引用原文显示 -->
+                            <div v-if="comment.quoted_text" class="nav-comment-quoted-text">
+                              <div class="quoted-text-label">引用原文：</div>
+                              <div class="quoted-text-content markdown-body" v-html="commentQuotedTexts[comment.ID] || ''"></div>
+                            </div>
                             <div class="comment-text">{{ stripMarkdown(comment.content || '') }}</div>
                           </div>
                         </div>
@@ -393,6 +398,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { getAllComments } from '@/api/Comments/browse'
 import { getArticlesList } from '@/api/Articles/browse'
 import { getMomentsList } from '@/api/Moments/browse'
+import { renderQuotedText } from '@/utils/renderQuotedText'
 
 const store = useStore()
 const router = useRouter()
@@ -423,6 +429,7 @@ const commentsLoading = ref(false)
 const commentsPage = ref(1)
 const commentsHasMore = ref(true)
 const commentsLoadingMore = ref(false)
+const commentQuotedTexts = ref({}) // 存储每个评论的渲染后的引用文本 { commentId: html }
 let timeout = null
 let otherTimeout = null
 let settingsTimeout = null
@@ -762,6 +769,9 @@ const loadRecentComments = async (page = 1, append = false) => {
       recentComments.value = processedComments
     }
 
+    // 渲染所有评论的引用文本（导航栏限制50-100字）
+    await renderNavCommentQuotedTexts()
+
     // 更新分页信息
     commentsHasMore.value = pagination.hasMore !== false
     if (pagination.hasMore !== undefined) {
@@ -857,6 +867,35 @@ const getParentCommentUsername = (parentId) => {
   return '未知用户'
 }
 
+// 渲染导航栏评论的引用文本（如果包含代码块或LaTeX公式则渲染，否则只保留换行）
+const renderNavCommentQuotedTexts = async () => {
+  const renderPromises = recentComments.value
+    .filter(comment => comment.quoted_text && comment.quoted_text.trim())
+    .map(async (comment) => {
+      if (!commentQuotedTexts.value[comment.ID]) {
+        // 检查是否包含代码块或LaTeX公式
+        const hasCodeBlock = comment.quoted_text.includes('```')
+        const hasLatex = comment.quoted_text.includes('$$') || comment.quoted_text.includes('$')
+
+        // 如果包含代码块或LaTeX公式，使用renderQuotedText渲染
+        if (hasCodeBlock || hasLatex) {
+          const rendered = await renderQuotedText(comment.quoted_text, 80)
+          commentQuotedTexts.value[comment.ID] = rendered
+        } else {
+          // 否则只将换行符转换为 <br>，转义HTML特殊字符
+          const escapedText = comment.quoted_text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+          commentQuotedTexts.value[comment.ID] = escapedText.replace(/\n/g, '<br>')
+        }
+      }
+    })
+  await Promise.all(renderPromises)
+}
+
 // 去除Markdown语法
 const stripMarkdown = (text) => {
   if (!text) return ''
@@ -873,7 +912,7 @@ const stripMarkdown = (text) => {
     .replace(/^\s*[-*+]\s+/gm, '') // 列表
     .replace(/^\s*\d+\.\s+/gm, '') // 有序列表
     .trim()
-    .substring(0, 100) // 限制长度
+    // 移除长度限制，评论内容可以完整显示
 }
 
 // 获取文章类型图标
@@ -1942,18 +1981,94 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 
+/* 导航栏评论中的引用文本 */
+.nav-comment-quoted-text {
+  background: rgba(168, 85, 247, 0.15);
+  border-left: 3px solid rgba(168, 85, 247, 0.5);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.nav-comment-quoted-text .quoted-text-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #7c3aed;
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+.nav-comment-quoted-text .quoted-text-content {
+  color: #333;
+  max-height: 3.6em; /* 约3行的高度 (1.2 * 3) */
+  overflow: hidden;
+  background: transparent !important;
+  word-break: break-word;
+  line-height: 1.2;
+  position: relative;
+  /* 使用渐变遮罩实现自然淡出效果 */
+  mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+}
+
+/* 确保所有子元素也遵守截断规则 */
+.nav-comment-quoted-text .quoted-text-content :deep(*) {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.nav-comment-quoted-text .quoted-text-content.markdown-body {
+  background: transparent !important;
+}
+
+.nav-comment-quoted-text .quoted-text-content.markdown-body :deep(p),
+.nav-comment-quoted-text .quoted-text-content.markdown-body :deep(div),
+.nav-comment-quoted-text .quoted-text-content.markdown-body :deep(span) {
+  background: transparent !important;
+}
+
+.nav-comment-quoted-text .quoted-text-content :deep(p),
+.nav-comment-quoted-text .quoted-text-content :deep(div) {
+  margin: 0.2em 0;
+  font-size: 0.9em;
+  display: block;
+  line-height: 1.2;
+}
+
+.nav-comment-quoted-text .quoted-text-content :deep(br) {
+  display: block;
+  line-height: 1.2;
+  height: 1.2em;
+}
+
+.nav-comment-quoted-text .quoted-text-content :deep(p:last-child),
+.nav-comment-quoted-text .quoted-text-content :deep(div:last-child) {
+  margin-bottom: 0;
+  display: inline;
+}
+
+.nav-comment-quoted-text .quoted-text-content :deep(p:first-child),
+.nav-comment-quoted-text .quoted-text-content :deep(div:first-child) {
+  margin-top: 0;
+}
+
+.nav-comment-quoted-text .quoted-text-content :deep(p:last-child),
+.nav-comment-quoted-text .quoted-text-content :deep(div:last-child) {
+  margin-bottom: 0;
+}
+
 .comment-text {
   font-size: 0.95rem; /* 增大字体 */
   color: #2b2b2b;
   line-height: 1.6;
   word-break: break-word;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
   text-align: left;
+  white-space: normal !important; /* 确保可以换行 */
+  overflow: visible !important; /* 确保内容不被隐藏 */
+  display: block !important; /* 确保是块级元素，可以多行显示 */
+  /* 移除行数限制，评论内容可以完整显示 */
 }
 
 /* 滚动条样式 - 使用 !important 覆盖全局隐藏 */
