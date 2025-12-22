@@ -14,7 +14,7 @@
           </div>
 
           <div class="article-stats">
-            <span class="word-count">本文字数 {{ content.length }} - 阅读时间约为 {{ readingTime ? readingTime.display : '未知' }}</span>
+            <span class="word-count">本文字数 {{ content ? content.length : 0 }} - 阅读时间约为 {{ readingTime ? readingTime.display : '未知' }}</span>
           </div>
         </div>
 
@@ -1028,11 +1028,119 @@ const loadDetail = async () => {
   }
 
   // 预处理：保护 LaTeX 公式（在 marked 渲染前处理）
-  const { protected: protectedContent, placeholders: latexPlaceholders } = protectLatex(content.value)
+  // 确保 content.value 不为 null 或 undefined
+  const contentValue = content.value || ''
+  const latexResult = protectLatex(contentValue)
+  if (!latexResult || typeof latexResult !== 'object') {
+    console.error('protectLatex returned invalid result:', latexResult)
+    return
+  }
+  const { protected: protectedContent, placeholders: latexPlaceholders } = latexResult
+
+  // 预处理：修复列表项之间的空行和列表项内容中的换行问题
+  // 确保 protectedContent 不为空
+  let processedContent
+  if (!protectedContent || typeof protectedContent !== 'string') {
+    console.error('protectedContent is invalid:', protectedContent)
+    processedContent = protectedContent || ''
+  } else {
+    // 1. 移除列表项之间的空行（多个连续空行）
+    processedContent = protectedContent.replace(/(^[\s]*[-*+]\s+.*|^\d+\.\s+.*)\n\n+(?=^[\s]*[-*+]\s+|^\d+\.\s+)/gm, (match) => {
+      // 将列表项之间的空行（\n\n+）替换为单个换行符（\n）
+      return match.replace(/\n\n+/g, '\n')
+    })
+
+    // 2. 处理列表项内容中的换行符，避免被 marked 渲染成多个段落导致空行
+    // marked 会将列表项内容中的换行符渲染成段落分隔，导致空行
+    // 我们需要将列表项内容中的单个换行符替换为空格
+    // 使用逐行处理的方式，识别列表项的开始和结束
+    const lines = processedContent.split('\n')
+    const processedLines = []
+    let inListItem = false
+    let listItemPrefix = ''
+    let listItemLines = []
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      const isListItemStart = /^[\s]*[-*+]\s+/.test(line) || /^[\s]*\d+\.\s+/.test(line)
+      const isEmptyLine = /^\s*$/.test(line)
+      const isCodeBlock = line.trim().startsWith('```')
+
+      if (isListItemStart) {
+        // 如果之前有未完成的列表项，先处理它
+        if (inListItem && listItemLines.length > 0) {
+          // 将列表项内容中的换行符替换为空格
+          const content = listItemLines.join(' ').replace(/\s+/g, ' ')
+          processedLines.push(listItemPrefix + content)
+          listItemLines = []
+        }
+        // 开始新的列表项
+        inListItem = true
+        // 提取列表项前缀（包括缩进和标记）
+        const match = line.match(/^([\s]*[-*+]\s+|[\s]*\d+\.\s+)(.*)$/)
+        if (match) {
+          listItemPrefix = match[1]
+          const content = match[2]
+          if (content.trim()) {
+            listItemLines.push(content.trim())
+          }
+        } else {
+          listItemPrefix = line.match(/^([\s]*[-*+]\s+|[\s]*\d+\.\s+)/)?.[0] || ''
+          listItemLines.push('')
+        }
+      } else if (inListItem) {
+        if (isEmptyLine) {
+          // 空行表示列表项结束
+          if (listItemLines.length > 0) {
+            const content = listItemLines.join(' ').replace(/\s+/g, ' ')
+            processedLines.push(listItemPrefix + content)
+            listItemLines = []
+          }
+          processedLines.push('')
+          inListItem = false
+        } else if (isCodeBlock) {
+          // 遇到代码块，结束当前列表项处理
+          if (listItemLines.length > 0) {
+            const content = listItemLines.join(' ').replace(/\s+/g, ' ')
+            processedLines.push(listItemPrefix + content)
+            listItemLines = []
+          }
+          processedLines.push(line)
+          inListItem = false
+        } else {
+          // 继续当前列表项的内容（可能是缩进的续行）
+          // 检查是否是列表项的续行（有缩进但不是新的列表项）
+          const hasIndent = /^[\s]+/.test(line)
+          if (hasIndent && !isListItemStart) {
+            listItemLines.push(line.trim())
+          } else {
+            // 不是续行，结束当前列表项
+            if (listItemLines.length > 0) {
+              const content = listItemLines.join(' ').replace(/\s+/g, ' ')
+              processedLines.push(listItemPrefix + content)
+              listItemLines = []
+            }
+            processedLines.push(line)
+            inListItem = false
+          }
+        }
+      } else {
+        // 不在列表项中，直接添加
+        processedLines.push(line)
+      }
+    }
+
+    // 处理最后一个列表项
+    if (inListItem && listItemLines.length > 0) {
+      const content = listItemLines.join(' ').replace(/\s+/g, ' ')
+      processedLines.push(listItemPrefix + content)
+    }
+
+    processedContent = processedLines.join('\n')
+  }
 
   // 预处理：修复 **`code`** 格式（在 marked 渲染前处理）
   // 使用临时标记避免与 marked 的解析冲突
-  let processedContent = protectedContent
   const boldCodePlaceholders = new Map()
   let placeholderIndex = 0
 
@@ -1095,6 +1203,72 @@ const loadDetail = async () => {
 
   // 恢复并渲染 LaTeX 公式（异步）
   renderedContent.value = await restoreAndRenderLatex(renderedContent.value, latexPlaceholders)
+
+  // 后处理：移除列表项之间的空段落，修复空行问题
+  // marked 会将每个列表项内容包装在 <p> 标签中，导致列表项之间出现空行
+  // 我们需要移除列表项内的 <p> 标签，但保留内容
+  const tempDiv = document.createElement('div')
+  tempDiv.innerHTML = renderedContent.value
+
+  // 查找所有列表项
+  const listItems = tempDiv.querySelectorAll('li')
+  listItems.forEach(li => {
+    // 查找列表项内的所有段落标签（只处理直接子元素）
+    const paragraphs = Array.from(li.children).filter(child => child.tagName === 'P')
+    if (paragraphs.length > 0) {
+      // 创建一个文档片段来存储所有内容
+      const fragment = document.createDocumentFragment()
+      paragraphs.forEach(p => {
+        // 将段落内的所有内容移动到片段中
+        while (p.firstChild) {
+          fragment.appendChild(p.firstChild)
+        }
+        // 移除段落标签
+        p.remove()
+      })
+      // 将片段内容插入到列表项的开头
+      li.insertBefore(fragment, li.firstChild)
+    }
+    // 直接设置内联样式，确保没有任何间距
+    li.style.setProperty('margin', '0', 'important')
+    li.style.setProperty('padding', '0', 'important')
+    li.style.setProperty('line-height', '1.5', 'important')
+    li.style.setProperty('min-height', '0', 'important')
+    li.style.setProperty('height', 'auto', 'important')
+  })
+
+  renderedContent.value = tempDiv.innerHTML
+
+  // 在 DOM 更新后，再次检查和修复列表项的样式
+  nextTick(() => {
+    setTimeout(() => {
+      const markdownBody = document.querySelector('.markdown-body')
+      if (markdownBody) {
+        const listItems = markdownBody.querySelectorAll('li')
+        listItems.forEach(li => {
+          // 强制设置内联样式，确保没有任何间距
+          li.style.setProperty('margin', '0', 'important')
+          li.style.setProperty('padding', '0', 'important')
+          li.style.setProperty('line-height', '1.5', 'important')
+          li.style.setProperty('min-height', '0', 'important')
+          li.style.setProperty('height', 'auto', 'important')
+        })
+
+        // 也检查 ul 和 ol 的样式
+        const lists = markdownBody.querySelectorAll('ul, ol')
+        lists.forEach(list => {
+          list.style.setProperty('padding-top', '0', 'important')
+          list.style.setProperty('padding-bottom', '0', 'important')
+          list.style.setProperty('margin-top', '0', 'important')
+          // 关键修复：将 line-height 设置为 1，避免列表项之间产生额外的垂直空间
+          list.style.setProperty('line-height', '1', 'important')
+          list.style.setProperty('display', 'flex', 'important')
+          list.style.setProperty('flex-direction', 'column', 'important')
+          list.style.setProperty('gap', '0', 'important')
+        })
+      }
+    }, 100)
+  })
 
   // 在渲染后通过 nextTick 为正文中的图片添加错误处理，并确保 LaTeX 公式居中
   // 这样即使封面图片和正文图片URL相同，也不会互相影响
@@ -1183,7 +1357,20 @@ const loadDetail = async () => {
       }
       if (hljs) {
         document.querySelectorAll('pre code').forEach((block) => {
-          hljs.highlightElement(block)
+          // 检查是否已经高亮过，避免重复高亮
+          if (!block.dataset.highlighted) {
+            try {
+              // 使用 highlight 方法手动高亮，完全避免 highlightElement 的警告
+              const language = block.className.match(/language-(\w+)/)?.[1] || 'plaintext'
+              const code = block.textContent
+              const highlighted = hljs.highlight(code, { language, ignoreIllegals: true })
+              block.innerHTML = highlighted.value
+              block.className = `hljs language-${language}`
+              block.dataset.highlighted = 'yes'
+            } catch (e) {
+              // 高亮失败时静默处理，不影响页面显示
+            }
+          }
           addCopyButton(block)
         })
       }
@@ -1326,7 +1513,19 @@ const togglePreview = () => {
       }
       if (hljs) {
         document.querySelectorAll('.preview-comment pre code').forEach((block) => {
-          try { hljs.highlightElement(block) } catch (e) {}
+          try {
+            // 使用 highlight 方法手动高亮，避免 highlightElement 的警告
+            if (!block.dataset.highlighted) {
+              const language = block.className.match(/language-(\w+)/)?.[1] || 'plaintext'
+              const code = block.textContent
+              const highlighted = hljs.highlight(code, { language, ignoreIllegals: true })
+              block.innerHTML = highlighted.value
+              block.className = `hljs language-${language}`
+              block.dataset.highlighted = 'yes'
+            }
+          } catch (e) {
+            // 忽略高亮错误
+          }
         })
       }
     })
@@ -1415,12 +1614,6 @@ const submitComment = async () => {
   }
 
   if (!user.value || !user.value.isLogged || !store.state.token) {
-    console.log('登录状态检查失败:', {
-      user: user.value,
-      isLogged: user.value?.isLogged,
-      token: store.state.token,
-      tokenLength: store.state.token?.length
-    })
     showErrorMessage('401')
     return
   }
@@ -1477,7 +1670,18 @@ const handleDeleteComment = async (commentId) => {
 // 在组件挂载时加载文章和评论
 // 清理选中文本中的UI元素（代码块复制按钮、标题标签等）
 const cleanSelectedText = (range) => {
-  if (!range) return ''
+  console.log('[引用调试] cleanSelectedText 被调用')
+  if (!range) {
+    console.log('[引用调试] range 为空，返回空字符串')
+    return ''
+  }
+
+  // 首先输出原始选中的文本（从 range 直接获取）
+  const rawSelectedText = range.toString()
+  console.log('[引用调试] ========== 原始选中文本 ==========')
+  console.log('[引用调试] 原始文本长度:', rawSelectedText.length)
+  console.log('[引用调试] 原始文本内容:', rawSelectedText)
+  console.log('[引用调试] 原始文本前200字符:', rawSelectedText.substring(0, 200))
 
   try {
     // 克隆range的内容，避免修改原始DOM
@@ -1486,6 +1690,14 @@ const cleanSelectedText = (range) => {
     // 创建一个临时容器来操作克隆的内容
     const tempDiv = document.createElement('div')
     tempDiv.appendChild(clonedContents)
+
+    // 输出 tempDiv 中的文本内容
+    const tempDivText = tempDiv.textContent || tempDiv.innerText || ''
+    console.log('[引用调试] ========== tempDiv 中的文本 ==========')
+    console.log('[引用调试] tempDiv 文本长度:', tempDivText.length)
+    console.log('[引用调试] tempDiv 文本内容:', tempDivText)
+    console.log('[引用调试] tempDiv 文本前200字符:', tempDivText.substring(0, 200))
+    console.log('[引用调试] tempDiv HTML:', tempDiv.innerHTML.substring(0, 500))
 
     // 移除代码块复制按钮（包括emoji图标）
     const copyButtons = tempDiv.querySelectorAll('.copy-btn')
@@ -1508,6 +1720,30 @@ const cleanSelectedText = (range) => {
       }
     })
 
+    // 检查是否选中了列表项（在代码块匹配之前）
+    const listItems = tempDiv.querySelectorAll('li')
+    const rangeContainsListItem = (range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE &&
+      (range.commonAncestorContainer.tagName === 'LI' ||
+       range.commonAncestorContainer.closest('li') !== null)) ||
+      (range.startContainer.nodeType === Node.TEXT_NODE &&
+       range.startContainer.parentElement?.tagName === 'LI') ||
+      (range.endContainer.nodeType === Node.TEXT_NODE &&
+       range.endContainer.parentElement?.tagName === 'LI')
+
+    // 如果选中了列表项，跳过代码块和LaTeX公式匹配，直接处理列表项
+    const isListItemSelection = (listItems.length > 0 || rangeContainsListItem)
+
+    console.log('[引用调试] ========== 早期列表项检测（代码块匹配前） ==========')
+    console.log('[引用调试] tempDiv 中的列表项数量（早期）:', listItems.length)
+    console.log('[引用调试] range 是否包含列表项（早期）:', rangeContainsListItem)
+    console.log('[引用调试] isListItemSelection（早期）:', isListItemSelection)
+    if (listItems.length > 0) {
+      console.log('[引用调试] tempDiv 中的列表项（早期）:')
+      listItems.forEach((li, index) => {
+        console.log(`[引用调试]   列表项 ${index + 1}:`, li.textContent.trim().substring(0, 80))
+      })
+    }
+
     // 尝试从原始Markdown中提取对应的文本（包括LaTeX公式和代码块）
     // 如果选中的内容包含LaTeX公式或代码块的渲染结果，尝试从原始内容中匹配
     const katexElements = tempDiv.querySelectorAll('.katex, .katex-block')
@@ -1515,7 +1751,13 @@ const cleanSelectedText = (range) => {
     let extractedText = ''
 
     // 优先处理代码块（因为代码块格式更明显，匹配更准确）
-    if (codeBlocks.length > 0 && content.value) {
+    // 但如果选中了列表项，跳过代码块匹配（因为列表项中可能包含 <code> 标签）
+    console.log('[引用调试] 代码块检测:', {
+      codeBlocksCount: codeBlocks.length,
+      isListItemSelection: isListItemSelection,
+      willSkipCodeBlock: isListItemSelection
+    })
+    if (codeBlocks.length > 0 && content.value && !isListItemSelection) {
       // 如果包含代码块，尝试从原始Markdown中提取
       const codeText = Array.from(codeBlocks).map(block => block.textContent).join('\n')
       const lines = content.value.split('\n')
@@ -1551,8 +1793,8 @@ const cleanSelectedText = (range) => {
       }
     }
 
-    // 处理LaTeX公式
-    if (katexElements.length > 0 && content.value && !extractedText) {
+    // 处理LaTeX公式（如果选中了列表项，跳过LaTeX公式匹配）
+    if (katexElements.length > 0 && content.value && !extractedText && !isListItemSelection) {
       // 如果包含LaTeX公式，尝试从原始Markdown中提取
       // 获取选中文本的纯文本版本（用于匹配）
       const plainText = tempDiv.textContent || tempDiv.innerText || ''
@@ -1624,6 +1866,308 @@ const cleanSelectedText = (range) => {
     // 使用 innerHTML 获取 HTML 结构，然后转换为 Markdown 格式以保留换行
     let cleanedText = ''
 
+    // 特别处理：如果选中的是列表项，尝试从原始 Markdown 中提取
+    // 注意：listItems 和 rangeContainsListItem 已经在上面定义过了
+
+    console.log('[引用调试] ========== 列表项检测 ==========')
+    console.log('[引用调试] tempDiv 中的列表项数量:', listItems.length)
+    if (listItems.length > 0) {
+      console.log('[引用调试] tempDiv 中的列表项文本:')
+      listItems.forEach((li, index) => {
+        const liText = li.textContent.trim()
+        console.log(`[引用调试]   列表项 ${index + 1} (长度: ${liText.length}):`, liText.substring(0, 150))
+      })
+    }
+    console.log('[引用调试] range 是否包含列表项:', rangeContainsListItem)
+    console.log('[引用调试] range.commonAncestorContainer:', {
+      nodeType: range.commonAncestorContainer.nodeType,
+      tagName: range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE ? range.commonAncestorContainer.tagName : 'TEXT',
+      textContent: range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+        ? range.commonAncestorContainer.textContent?.substring(0, 100) || ''
+        : (range.commonAncestorContainer.textContent || '').substring(0, 100)
+    })
+    console.log('[引用调试] range.startContainer:', {
+      nodeType: range.startContainer.nodeType,
+      tagName: range.startContainer.nodeType === Node.TEXT_NODE
+        ? range.startContainer.parentElement?.tagName
+        : range.startContainer.tagName,
+      textContent: range.startContainer.nodeType === Node.TEXT_NODE
+        ? range.startContainer.textContent?.substring(0, 100) || ''
+        : (range.startContainer.textContent || '').substring(0, 100)
+    })
+    console.log('[引用调试] range.endContainer:', {
+      nodeType: range.endContainer.nodeType,
+      tagName: range.endContainer.nodeType === Node.TEXT_NODE
+        ? range.endContainer.parentElement?.tagName
+        : range.endContainer.tagName,
+      textContent: range.endContainer.nodeType === Node.TEXT_NODE
+        ? range.endContainer.textContent?.substring(0, 100) || ''
+        : (range.endContainer.textContent || '').substring(0, 100)
+    })
+
+    if ((listItems.length > 0 || rangeContainsListItem) && content.value) {
+      // 从原始 DOM 中获取实际选中的列表项元素（更准确）
+      const markdownBody = articleContentRef.value?.querySelector('.markdown-body')
+      if (!markdownBody) {
+        console.log('[引用调试] 未找到 markdown-body，跳过列表项处理')
+      } else {
+        // 从原始 DOM 中获取实际选中的列表项元素
+        // 首先确定选择范围的起始和结束位置
+        const startLi = range.startContainer.nodeType === Node.TEXT_NODE
+          ? range.startContainer.parentElement?.closest('li')
+          : range.startContainer.closest('li')
+        const endLi = range.endContainer.nodeType === Node.TEXT_NODE
+          ? range.endContainer.parentElement?.closest('li')
+          : range.endContainer.closest('li')
+
+        // 如果选择范围包含列表项，获取所有选中的列表项
+        const targetListItems = []
+        if (startLi && markdownBody.contains(startLi)) {
+          // 如果起始和结束都在同一个列表项中，只添加一个
+          if (endLi && endLi === startLi) {
+            targetListItems.push(startLi)
+          } else {
+            // 获取起始列表项所在的所有列表项
+            const allListItemsInDOM = Array.from(markdownBody.querySelectorAll('li'))
+            const startIndex = allListItemsInDOM.indexOf(startLi)
+            const endIndex = endLi && markdownBody.contains(endLi) ? allListItemsInDOM.indexOf(endLi) : startIndex
+
+            // 添加从 startIndex 到 endIndex 的所有列表项
+            const minIndex = Math.min(startIndex, endIndex)
+            const maxIndex = Math.max(startIndex, endIndex)
+            for (let i = minIndex; i <= maxIndex && i < allListItemsInDOM.length; i++) {
+              if (i >= 0) {
+                targetListItems.push(allListItemsInDOM[i])
+              }
+            }
+          }
+        } else if (listItems.length > 0) {
+          // 如果 tempDiv 中有完整的 li，需要从原始 DOM 中找到对应的元素
+          // 通过文本内容和位置匹配找到原始 DOM 中的列表项
+          const allListItemsInDOM = Array.from(markdownBody.querySelectorAll('li'))
+          for (const tempLi of listItems) {
+            const tempText = tempLi.textContent.trim()
+            // 在原始 DOM 中查找文本内容完全匹配的列表项
+            for (const originalLi of allListItemsInDOM) {
+              if (originalLi.textContent.trim() === tempText) {
+                targetListItems.push(originalLi)
+                break
+              }
+            }
+          }
+        }
+
+        if (targetListItems.length > 0) {
+          // 获取选中列表项的文本内容（用于精确匹配）
+          const selectedTexts = targetListItems.map(li => li.textContent.trim())
+
+          console.log('[引用调试] ========== 目标列表项信息 ==========')
+          console.log('[引用调试] listItemsInTempDiv:', listItems.length)
+          console.log('[引用调试] targetListItemsCount:', targetListItems.length)
+          console.log('[引用调试] 用户实际选中的列表项文本:')
+          selectedTexts.forEach((text, index) => {
+            console.log(`[引用调试]   列表项 ${index + 1}:`, text)
+          })
+          console.log('[引用调试] startLi 文本:', startLi ? startLi.textContent.trim() : null)
+          console.log('[引用调试] endLi 文本:', endLi ? endLi.textContent.trim() : null)
+
+          // 通过计算列表项在 DOM 中的位置来定位 Markdown 中的对应行
+          const allListItemsInDOM = Array.from(markdownBody.querySelectorAll('li'))
+          const targetIndices = targetListItems.map(li => allListItemsInDOM.indexOf(li)).filter(idx => idx >= 0)
+
+          console.log('[引用调试] 目标列表项索引:', targetIndices)
+
+          const lines = content.value.split('\n')
+          const markdownListItems = []
+
+          // 先收集所有 Markdown 中的列表项及其行号
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim()
+            const isListItem = /^[\s]*[-*+]\s+/.test(line) || /^[\s]*\d+\.\s+/.test(line)
+            if (isListItem) {
+              const itemContent = line.replace(/^[\s]*[-*+]\s+/, '').replace(/^[\s]*\d+\.\s+/, '').trim()
+              // 移除 Markdown 中的代码标记（`code`），用于文本匹配
+              // 但保留原始行用于返回
+              const itemContentForMatch = itemContent.replace(/`([^`]+)`/g, '$1')
+              markdownListItems.push({
+                lineIndex: i,
+                content: itemContent,
+                contentForMatch: itemContentForMatch, // 用于匹配的文本（移除代码标记）
+                originalLine: lines[i]
+              })
+            }
+          }
+
+          console.log('[引用调试] Markdown 列表项统计:', {
+            totalMarkdownListItems: markdownListItems.length,
+            totalDOMListItems: allListItemsInDOM.length,
+            targetIndices: targetIndices
+          })
+
+          // 如果 DOM 中的列表项数量和 Markdown 中的列表项数量相同或接近，使用索引匹配
+          if (markdownListItems.length === allListItemsInDOM.length ||
+              Math.abs(markdownListItems.length - allListItemsInDOM.length) <= 2) {
+            console.log('[引用调试] ========== 尝试索引匹配 ==========')
+            const matchedItems = []
+            let allMatched = true
+
+            for (let i = 0; i < targetIndices.length; i++) {
+              const targetIndex = targetIndices[i]
+              const selectedText = selectedTexts[i]
+
+              if (targetIndex >= 0 && targetIndex < markdownListItems.length) {
+                const markdownItem = markdownListItems[targetIndex]
+                const markdownText = markdownItem.content
+
+                console.log(`[引用调试] 索引 ${targetIndex}:`)
+                console.log(`[引用调试]   用户选中: "${selectedText.substring(0, 80)}"`)
+                console.log(`[引用调试]   Markdown: "${markdownText.substring(0, 80)}"`)
+                const isMatch = markdownText === selectedText || markdownText.includes(selectedText) || selectedText.includes(markdownText)
+                console.log(`[引用调试]   是否匹配: ${isMatch}`)
+
+                if (isMatch) {
+                  // 提取完整的列表项（包括可能的多行内容）
+                  let fullItem = markdownItem.originalLine
+                  // 检查下一行是否是列表项的续行
+                  for (let j = markdownItem.lineIndex + 1; j < lines.length; j++) {
+                    const nextLine = lines[j]
+                    const isNextListItem = /^[\s]*[-*+]\s+/.test(nextLine.trim()) || /^[\s]*\d+\.\s+/.test(nextLine.trim())
+                    const isEmptyLine = /^\s*$/.test(nextLine)
+                    if (isEmptyLine || isNextListItem) {
+                      break
+                    }
+                    if (/^[\s]+/.test(nextLine)) {
+                      fullItem += ' ' + nextLine.trim()
+                    } else {
+                      break
+                    }
+                  }
+                  matchedItems.push(fullItem)
+                } else {
+                  allMatched = false
+                  console.log(`[引用调试]   警告：索引 ${targetIndex} 的文本不匹配，跳过索引匹配`)
+                  break
+                }
+              } else {
+                allMatched = false
+                console.log(`[引用调试]   警告：索引 ${targetIndex} 超出范围，跳过索引匹配`)
+                break
+              }
+            }
+
+            if (allMatched && matchedItems.length === targetListItems.length && matchedItems.length > 0) {
+              const result = matchedItems.join('\n')
+              console.log('[引用调试] ========== 索引匹配成功 ==========')
+              console.log('[引用调试] 匹配到的 Markdown 列表项:')
+              matchedItems.forEach((item, index) => {
+                console.log(`[引用调试]   列表项 ${index + 1}:`, item.substring(0, 100))
+              })
+              return result
+            } else {
+              console.log('[引用调试] 索引匹配失败，尝试文本匹配')
+            }
+          }
+
+          // 如果索引匹配失败，使用文本内容精确匹配
+          console.log('[引用调试] ========== 尝试文本匹配 ==========')
+          const matchedItems = []
+          let lastMatchedIndex = -1
+
+          for (let idx = 0; idx < targetListItems.length; idx++) {
+            const targetLi = targetListItems[idx]
+            const targetText = targetLi.textContent.trim()
+            let found = false
+
+            console.log(`[引用调试] 查找列表项 ${idx + 1}/${targetListItems.length}: "${targetText.substring(0, 80)}"`)
+
+            // 从上次匹配的位置之后开始查找，确保匹配连续的列表项
+            for (let i = lastMatchedIndex + 1; i < markdownListItems.length; i++) {
+              const markdownItem = markdownListItems[i]
+              // 使用 contentForMatch（移除代码标记后的文本）进行匹配
+              const markdownText = markdownItem.contentForMatch || markdownItem.content
+              const markdownOriginalText = markdownItem.content
+
+              // 精确匹配或包含匹配（同时检查原始文本和移除代码标记后的文本）
+              const isExactMatch = markdownText === targetText || markdownOriginalText === targetText
+              const isPartialMatch = (targetText.length > 20 && (markdownText.includes(targetText.substring(0, 20)) || markdownOriginalText.includes(targetText.substring(0, 20)))) ||
+                                     (markdownText.length > 20 && (targetText.includes(markdownText.substring(0, 20)) || targetText.includes(markdownOriginalText.substring(0, 20))))
+
+              console.log(`[引用调试]   检查索引 ${i}:`, {
+                markdownText: markdownText.substring(0, 50),
+                markdownOriginalText: markdownOriginalText.substring(0, 50),
+                targetText: targetText.substring(0, 50),
+                isExactMatch,
+                isPartialMatch
+              })
+
+              if (isExactMatch || isPartialMatch) {
+                console.log(`[引用调试]   在索引 ${i} 找到匹配: "${markdownText.substring(0, 80)}"`)
+                // 提取完整的列表项
+                let fullItem = markdownItem.originalLine
+                for (let j = markdownItem.lineIndex + 1; j < lines.length; j++) {
+                  const nextLine = lines[j]
+                  const isNextListItem = /^[\s]*[-*+]\s+/.test(nextLine.trim()) || /^[\s]*\d+\.\s+/.test(nextLine.trim())
+                  const isEmptyLine = /^\s*$/.test(nextLine)
+                  if (isEmptyLine || isNextListItem) {
+                    break
+                  }
+                  if (/^[\s]+/.test(nextLine)) {
+                    fullItem += ' ' + nextLine.trim()
+                  } else {
+                    break
+                  }
+                }
+                matchedItems.push(fullItem)
+                lastMatchedIndex = i
+                found = true
+                break
+              }
+            }
+
+            // 如果没找到匹配，记录警告
+            if (!found) {
+              console.log(`[引用调试]   警告：未找到匹配的列表项 "${targetText.substring(0, 80)}"`)
+              // 如果第一个列表项就没找到，说明可能匹配逻辑有问题，直接返回原始文本
+              if (idx === 0) {
+                console.log('[引用调试] 第一个列表项未找到匹配，返回原始选中文本')
+                break
+              }
+            }
+          }
+
+          // 验证匹配结果：检查匹配到的列表项数量是否与用户选中的数量一致
+          if (matchedItems.length === targetListItems.length && matchedItems.length > 0) {
+            const result = matchedItems.join('\n')
+            console.log('[引用调试] ========== 文本匹配成功 ==========')
+            console.log('[引用调试] 匹配到的 Markdown 列表项:')
+            matchedItems.forEach((item, index) => {
+              console.log(`[引用调试]   列表项 ${index + 1}:`, item.substring(0, 100))
+            })
+            return result
+          } else {
+            console.log('[引用调试] ========== 文本匹配失败 ==========')
+            console.log('[引用调试] 匹配到的列表项数量:', matchedItems.length, '期望:', targetListItems.length)
+            console.log('[引用调试] 返回原始选中的列表项文本（转换为 Markdown 格式）')
+            // 如果匹配失败，返回原始选中的列表项文本（转换为 Markdown 格式）
+            const fallbackItems = []
+            for (const li of listItems.length > 0 ? listItems : targetListItems) {
+              const text = li.textContent.trim()
+              // 尝试识别列表项类型（有序或无序）
+              const parent = li.parentElement
+              const isOrdered = parent && parent.tagName === 'OL'
+              const prefix = isOrdered ? '1. ' : '- '
+              fallbackItems.push(prefix + text)
+            }
+            if (fallbackItems.length > 0) {
+              const result = fallbackItems.join('\n')
+              console.log('[引用调试] 返回原始列表项 Markdown:', result.substring(0, 200))
+              return result
+            }
+          }
+        }
+      }
+    }
+
     // 尝试保留换行：将块级元素的换行转换为换行符
     const blockElements = tempDiv.querySelectorAll('p, div, br, pre, li, h1, h2, h3, h4, h5, h6')
     if (blockElements.length > 0) {
@@ -1649,9 +2193,16 @@ const cleanSelectedText = (range) => {
         .trim()
     }
 
-    return cleanedText
+    const result = cleanedText.trim()
+    console.log('[引用调试] ========== 最终返回结果 ==========')
+    console.log('[引用调试] 返回文本长度:', result.length)
+    console.log('[引用调试] 返回文本完整内容:')
+    console.log(result)
+    console.log('[引用调试] 返回文本前300字符:', result.substring(0, 300))
+    console.log('[引用调试] ==========================================')
+    return result
   } catch (error) {
-    console.error('清理选中文本失败:', error)
+    console.error('[引用调试] 清理选中文本失败:', error)
     // 如果清理失败，返回原始文本（通过toString获取）
     return range.toString().trim()
   }
@@ -2415,7 +2966,6 @@ const restoreHighlights = () => {
         hl.style.setProperty('line-height', 'inherit', 'important')
         hl.style.setProperty('vertical-align', 'baseline', 'important')
       })
-      console.log('恢复高亮数量:', highlights.length)
     }, 100)
   } catch (error) {
     console.error('恢复高亮失败:', error)
@@ -2425,10 +2975,15 @@ const restoreHighlights = () => {
 // 分享文本
 // 处理文本评论
 const handleTextComment = async (text) => {
-  if (!text || !text.trim()) return
+  console.log('[引用调试] handleTextComment 被调用，接收到的文本:', text)
+  if (!text || !text.trim()) {
+    console.log('[引用调试] 文本为空，退出')
+    return
+  }
 
   // 保存引用的原文
   quotedText.value = text.trim()
+  console.log('[引用调试] 保存的引用文本:', quotedText.value.substring(0, 100))
 
   // 检查是否包含代码块或LaTeX公式
   const hasCodeBlock = quotedText.value.includes('```')
@@ -2478,7 +3033,10 @@ const checkInputQuotedTextOverflow = () => {
     return
   }
   const element = inputQuotedTextRef.value
-  isInputQuotedTextTruncated.value = element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth
+  // 检查高度和宽度是否溢出，允许1px的误差
+  const heightOverflow = element.scrollHeight > element.clientHeight + 1
+  const widthOverflow = element.scrollWidth > element.clientWidth + 1
+  isInputQuotedTextTruncated.value = heightOverflow || widthOverflow
 }
 
 // 设置评论引用文本的DOM引用
@@ -2499,7 +3057,10 @@ const checkCommentQuotedTextOverflow = (commentId) => {
     isCommentQuotedTextTruncated.value[commentId] = false
     return
   }
-  isCommentQuotedTextTruncated.value[commentId] = element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth
+  // 检查高度和宽度是否溢出，允许1px的误差
+  const heightOverflow = element.scrollHeight > element.clientHeight + 1
+  const widthOverflow = element.scrollWidth > element.clientWidth + 1
+  isCommentQuotedTextTruncated.value[commentId] = heightOverflow || widthOverflow
 }
 
 // 清除引用文本
@@ -3284,6 +3845,224 @@ const fixResidualBoldInDOM = () => {
   text-align: left !important;
 }
 
+/* 减少列表项间距，使其与其他正常行一致 */
+.markdown-body ul,
+.markdown-body ol {
+  margin-top: 0 !important;
+  margin-bottom: var(--base-size-16, 1rem) !important; /* 保持列表与其他元素的间距 */
+  padding-left: 2em !important; /* 保持列表缩进 */
+  /* 确保列表容器本身没有额外的间距 */
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  /* 关键修复：将 line-height 设置为 1，避免列表项之间产生额外的垂直空间 */
+  line-height: 1 !important;
+  /* 使用 flex 布局来完全控制列表项的间距 */
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+}
+
+/* 列表项本身：完全移除所有 margin 和 padding */
+.markdown-body li {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.5 !important; /* 与段落行高一致 */
+  list-style-position: outside !important;
+  display: list-item !important;
+  vertical-align: baseline !important;
+  /* 确保列表项高度最小化 */
+  min-height: 0 !important;
+  height: auto !important;
+  /* 移除所有可能的边框和间距 */
+  border: none !important;
+  outline: none !important;
+}
+
+/* 列表项之间的间距：完全移除 */
+.markdown-body li + li {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* 确保列表项内的文本节点也没有额外的间距 */
+.markdown-body li {
+  display: list-item !important;
+  list-style-position: outside !important;
+  /* 确保没有任何 margin 或 padding 导致空行 */
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.5 !important;
+  min-height: 0 !important;
+  height: auto !important;
+}
+
+/* 移除列表项的所有可能的间距来源 */
+.markdown-body ul > li,
+.markdown-body ol > li {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* 特别处理：确保列表项之间的间距完全为 0 */
+.markdown-body ul li,
+.markdown-body ol li {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* 确保列表项之间没有任何间距，包括相邻的列表项 */
+.markdown-body ul > li + li,
+.markdown-body ol > li + li {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-top: none !important;
+}
+
+/* 列表项内的所有直接子元素：完全移除 margin */
+.markdown-body li > * {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* 列表项内的段落：特别处理，确保没有 margin 且不产生额外的垂直空间 */
+.markdown-body li > p {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  display: inline !important; /* 关键：将块级元素改为行内元素，避免产生额外的垂直空间 */
+  line-height: inherit !important;
+}
+
+/* 列表项内的第一个元素：确保没有上边距 */
+.markdown-body li > *:first-child {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+/* 列表项内的最后一个元素：确保没有下边距 */
+.markdown-body li > *:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* 列表项内的所有段落：无论嵌套层级，都移除 margin 并设置为行内元素 */
+.markdown-body li p {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  display: inline !important; /* 避免产生额外的垂直空间 */
+  line-height: inherit !important;
+}
+
+/* 嵌套列表：确保嵌套列表项也没有多余的间距 */
+.markdown-body li ul,
+.markdown-body li ol {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.markdown-body li li {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* 确保列表前后的段落不会产生额外的空行 */
+.markdown-body p + ul,
+.markdown-body p + ol,
+.markdown-body ul + p,
+.markdown-body ol + p {
+  margin-top: 0 !important;
+}
+
+/* 确保列表前面的段落没有下边距（这是导致列表项上方空行的主要原因） */
+.markdown-body p:has(+ ul),
+.markdown-body p:has(+ ol) {
+  margin-bottom: 0 !important;
+}
+
+/* 如果浏览器不支持 :has()，使用相邻兄弟选择器作为后备 */
+.markdown-body p:empty + ul,
+.markdown-body p:empty + ol,
+.markdown-body p:only-child:has(br) + ul,
+.markdown-body p:only-child:has(br) + ol {
+  margin-top: 0 !important;
+}
+
+/* 确保紧邻列表的段落没有下边距 */
+.markdown-body p:not(:last-child) + ul,
+.markdown-body p:not(:last-child) + ol {
+  margin-top: 0 !important;
+}
+
+/* 更通用的规则：列表前面的任何元素都不应该有下边距影响列表 */
+.markdown-body * + ul,
+.markdown-body * + ol {
+  margin-top: 0 !important;
+}
+
+/* 移除列表项的所有伪元素的 margin 和 padding */
+.markdown-body li::before,
+.markdown-body li::after {
+  margin: 0 !important;
+  padding: 0 !important;
+  content: none !important;
+}
+
+/* 修复表格对齐问题：确保表格使用 table 布局 */
+.markdown-body table {
+  display: table !important;
+  width: 100% !important;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  table-layout: auto !important; /* 使用自动布局，让浏览器自动计算列宽 */
+  margin: 16px 0 !important;
+}
+
+.markdown-body table th,
+.markdown-body table td {
+  vertical-align: top !important;
+  padding: 6px 13px !important; /* 确保 padding 一致 */
+  box-sizing: border-box !important; /* 确保 padding 和 border 包含在宽度内 */
+  border: 1px solid var(--borderColor-default, #d0d7de) !important; /* 确保边框一致 */
+  /* 默认左对齐，marked 会根据对齐符号添加 text-align 样式 */
+}
+
+/* 确保表头和数据行的列宽一致 */
+.markdown-body table colgroup,
+.markdown-body table col {
+  display: table-column !important;
+}
+
+/* 确保表格第一行（表头）与数据行对齐 */
+.markdown-body table thead th,
+.markdown-body table tbody td {
+  box-sizing: border-box !important;
+  border-width: 1px !important; /* 确保边框宽度一致 */
+}
+
+/* 确保表头行的样式 */
+.markdown-body table thead {
+  display: table-header-group !important;
+}
+
+.markdown-body table tbody {
+  display: table-row-group !important;
+}
+
+.markdown-body table tr {
+  display: table-row !important;
+}
+
 /* 确保粗体样式正确显示 */
 .markdown-body strong,
 .markdown-body b {
@@ -3672,6 +4451,10 @@ const fixResidualBoldInDOM = () => {
   word-break: break-word;
   line-height: 1.2;
   position: relative;
+  /* 只有在截断时才添加 padding-right，为省略号留出空间 */
+}
+
+.quoted-text-content.is-truncated {
   padding-right: 48px; /* 提前两个字截断，为省略号留出空间（约2个中文字符宽度） */
 }
 
@@ -3781,6 +4564,10 @@ const fixResidualBoldInDOM = () => {
   word-break: break-word;
   line-height: 1.2;
   position: relative;
+  /* 只有在截断时才添加 padding-right，为省略号留出空间 */
+}
+
+.comment-quoted-text .quoted-text-content.is-truncated {
   padding-right: 48px; /* 提前两个字截断，为省略号留出空间（约2个中文字符宽度） */
 }
 

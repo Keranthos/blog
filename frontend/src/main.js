@@ -35,11 +35,32 @@ import {
   faTrash,
   faHeart,
   faBookmark,
+  faBook,
   faPenToSquare,
   faComment,
-  faShare
+  faShare,
+  faStar,
+  faStarHalfStroke,
+  // 编辑页工具栏图标
+  faBold,
+  faItalic,
+  faStrikethrough,
+  faLink,
+  faImage,
+  faCode,
+  faQuoteLeft,
+  faListUl,
+  faListOl,
+  faMinus,
+  faTable,
+  faUpload,
+  faDice,
+  faTriangleExclamation,
+  faRotateRight,
+  faArrowUp,
+  faEye
 } from '@fortawesome/free-solid-svg-icons'
-import { faHeart as farHeart } from '@fortawesome/free-regular-svg-icons'
+import { faHeart as farHeart, faStar as farStar } from '@fortawesome/free-regular-svg-icons'
 
 // 其他图标按需加载（通过 iconLoader 工具）
 // 注意：Font Awesome 的 tree-shaking 会自动移除未使用的图标
@@ -104,9 +125,31 @@ library.add(
   faHeart,
   farHeart,
   faBookmark,
+  faBook,
   faPenToSquare,
   faComment,
-  faShare
+  faShare,
+  faStar,
+  farStar,
+  faStarHalfStroke,
+  // 编辑页工具栏图标
+  faBold,
+  faItalic,
+  faStrikethrough,
+  faLink,
+  faImage,
+  faCode,
+  faQuoteLeft,
+  faListUl,
+  faListOl,
+  faMinus,
+  faTable,
+  faUpload,
+  faDice,
+  faTriangleExclamation,
+  faRotateRight,
+  faArrowUp,
+  faEye
 )
 
 // 预加载其他常用图标（在页面加载完成后）

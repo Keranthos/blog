@@ -24,13 +24,12 @@ async function submitAnswer (user, questionId, answer) { // 前端传递"answer"
     const res = await requestFunc(`/questions/${questionId}/answer`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${user.token}`
+        'Content-Type': 'application/json'
       },
       data: {
         answer
       }
-    }, true)
+    }, true) // requestFunc 会自动从 localStorage 获取最新的 token
     return res.data
   } catch (error) {
     console.error(error)
